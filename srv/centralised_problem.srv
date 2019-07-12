@@ -1,0 +1,7 @@
+Float32MultiArrayStamped x_0
+Float32MultiArrayStamped xb_0
+---
+Float32MultiArrayStamped u_traj
+Float32MultiArrayStamped ub_traj
+Float32MultiArrayStamped x_traj
+Float32MultiArrayStamped xb_traj

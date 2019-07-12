@@ -1,0 +1,51 @@
+# Produced by CVXGEN, 2019-04-23 04:29:21 -0400.
+# CVXGEN is Copyright (C) 2006-2017 Jacob Mattingley, jem@cvxgen.com.
+# The code in this file is Copyright (C) 2006-2017 Jacob Mattingley.
+# CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial
+# applications without prior written permission from Jacob Mattingley.
+
+# Filename: description.cvxgen.
+# Description: A description of the CVXGEN problem.
+
+dimensions
+  n = 2   # States
+  m = 1   # Inputs
+  T = 25  # Horizon
+end
+
+parameters
+  A (n,n)
+  B (n,m)
+  Q (n,n) psd           # State Difference Cost
+  R (m,m) psd           # Input cost
+  P (n,n) psd           # Final State Difference Cost
+  x[0] (n)              # Initial UAV State
+  xb (n)                # USV vertical state. Assumed constant
+  hs                    # Safe Flight Height
+  ds                    # Safe Flight Distance
+  dl                    # Landing distance
+  dist[t], t=0..T       # Distance from USV
+  b[t],    t=0..T       # Boolean parameter
+  wmin nonpositive      # Minimum allowed vertical velocity
+  wmax nonnegative      # Maximum allowed vertical velocity
+  wmin_land nonpositive # Minimum allowed velocity at landing
+  kl nonnegative        # Additional allowed negative vertical velocity per unit height
+end
+
+variables
+  x[t] (n), t=1..T        # State
+  u[t] (m), t=0..T-1      # Control Input
+end
+
+minimize
+  sum[t=0..T-1]( quad(b[t]*(x[t]-xb), Q) + quad(u[t], R) ) + quad(b[T]*(x[T]-xb), P)
+subject to
+  x[t+1] == A*x[t] + B*u[t], t=0..T-1
+  wmin <= x[t+1][2], t=0..T-1
+  wmin <= u[t] <= wmax, t=0..T-1         # My attempt to constrain wdes, so that desired angles don't become too large
+  b[t+1]*x[t+1][2] >= -kl*x[t+1][1] + wmin_land, t=0..T-1
+  x[t+1][1] >= 0, t=0..T-1
+  b[t+1]*hs*dist[t+1]  + (dl-ds)*x[t+1][1] <= hs*dl, t=0..T-1
+  #-b[t+1]*hs*dist[t+1] + (dl-ds)*x[t+1][1] <= hs*dl, t=0..T-1 # Shouldn't be necessary, distance is always positive
+
+end

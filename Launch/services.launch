@@ -1,0 +1,8 @@
+<launch>
+	<node pkg="rendezvous_problem" type="solve_UAV_problem_server" name="solve_UAV_problem_server"/>
+	<node pkg="rendezvous_problem" type="solve_USV_problem_server" name="solve_USV_problem_server"/>
+	<node pkg="rendezvous_problem" type="solve_centralised_problem_server" name="solve_centralised_problem_server" output="screen"/>
+	<node pkg="rendezvous_problem" type="solve_vertical_problem_server" name="solve_vertical_problem_server"/>
+	<node pkg="rendezvous_problem" type="solve_vertical_problem_server_long" name="solve_vertical_problem_server_long"/>
+	<node pkg="rendezvous_problem" type="solve_vertical_problem_server_ulong" name="solve_vertical_problem_server_ulong"/>
+</launch>
