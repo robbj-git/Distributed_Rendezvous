@@ -68,10 +68,11 @@ class StampedMsgQueue():
                 # print 'was empty'
                 most_recent_message_found = True
 
-        if new_msg is None and self.msg is None:
-            return None
-        elif new_msg is None:  # implies: "and self.traj_msg is not None"
-            return self.msg
+        if new_msg is None:
+            # If self.delay_time > 0, the queue isn't necessary empty. This
+            # just means that no element in the queue was sufficiently old for
+            # simulating the desired delay
+            raise IndexError('Queue was empty')
         else:
             self.msg = new_msg
             return self.msg
@@ -116,14 +117,11 @@ class StampedTrajQueue():
                 # print 'was empty'
                 most_recent_message_found = True
 
-        if new_traj_msg is None and self.traj_msg is None:
-            # Hasn't received any new trajectories, and no old trajectories are stored either
-            return None
-        elif new_traj_msg is None:  # implies: "and self.traj_msg is not None"
-            # Raise error, let caller choose whether old trajectory should be
-            # shifted or whether the error should be handled in another way
-            raise IndexError('No sufficiently old element was found in the queue')
-            # return np.reshape(self.traj_msg.array.data, (-1, 1))
+        if new_traj_msg is None:
+            # If self.delay_time > 0, the queue isn't necessary empty. This
+            # just means that no element in the queue was sufficiently old for
+            # simulating the desired delay
+            raise IndexError('Queue was empty')
         else:
             self.traj_msg = new_traj_msg
             return np.reshape(self.traj_msg.array.data, (-1, 1))
@@ -140,103 +138,103 @@ class StampedTrajQueue():
     def set_delay_time(self, new_delay_time):
         self.delay_duration = rospy.Duration.from_sec(new_delay_time)
 
-class StateApproximator():
-
-    def __init__(self, n, T, delay_len, anti_switch=True):
-        self.ignore_changes = False
-        self.its_since_started_ignoring = 0
-        self.num_rapid_changes = 0
-        self.its_since_rapid_change = 0
-        # self.traj_msg = np.full( (n*(T+1), 1), np.nan )
-        self.traj_msg = Float32MultiArrayStamped()
-        # self.traj_msg.array.data = [np.nan]*n*(T+1)
-        self.traj_msg.array.data = None     #TEST
-        self.traj_queue = Queue.Queue(delay_len+1)
-        self.n = n
-        self.T = T
-        self.delay_len = delay_len
-        self.anti_switch = anti_switch
-
-    def get_traj(self):
-        is_empty = False
-        try:
-            traj_msg_new = self.traj_queue.get_nowait()
-        except Queue.Empty:
-            is_empty = True
-
-        if is_empty:
-            # No new trajectory received, return shifted old trajectory
-            if self.traj_msg.array.data is not None:
-                self.traj_msg = \
-                    shift_traj_msg(self.traj_msg, self.n, SAMPLING_TIME)
-                # print "Shifted traj"
-                return np.reshape(self.traj_msg.array.data, (-1, 1))
-            else:
-                return None
-
-        quit_early = False
-        #np.isnan(self.traj_msg.array.data).any() or not self.anti_switch:
-        if self.traj_msg.array.data is None or not self.anti_switch:    #TEST
-            # self.traj_msg never before set, or anti-switch is turned off
-            quit_early = True
-        else:
-            old_dir = get_traj_dir(\
-                np.reshape(self.traj_msg.array.data, (-1,1)), self.n)
-            new_dir = get_traj_dir(\
-                np.reshape(traj_msg_new.array.data, (-1,1)), self.n)
-            cos_angle = get_cos_angle_between(old_dir, new_dir)
-            # direction of previously used trajectory was 0
-            if np.isnan(cos_angle):
-                quit_early = True
-
-        # Special case
-        if quit_early:
-            self.ignore_changes = False
-            self.its_since_started_ignoring = 0
-            self.num_rapid_changes = 0
-            self.its_since_rapid_change = 0
-            self.traj_msg = \
-                shift_traj_msg(traj_msg_new, self.n, SAMPLING_TIME)
-                # shift_trajectory(traj_new, self.n, self.delay_len)
-            return np.reshape(self.traj_msg.array.data, (-1, 1))
-
-        if cos_angle < 0:
-            self.num_rapid_changes += 1
-            self.its_since_rapid_change = 0
-
-        if self.ignore_changes:
-            self.its_since_started_ignoring += 1
-            if self.its_since_started_ignoring > self.delay_len + 1:
-                self.ignore_changes = False
-                self.its_since_started_ignoring = 0
-                self.num_rapid_changes = 0
-                self.its_since_rapid_change = 0
-        else:
-            if self.num_rapid_changes >= 2:
-                self.ignore_changes = True
-
-        if self.ignore_changes and cos_angle < 0:
-            # Use old trajectory
-            self.traj_msg = shift_traj_msg(self.traj_msg, self.n, 1)
-            return np.reshape(self.traj_msg.array.data, (-1, 1))
-        else:
-            # Use new trajectory
-            self.traj_msg = \
-                shift_traj_msg(traj_msg_new, self.n, SAMPLING_TIME)
-                # shift_trajectory(traj_new, self.n, self.delay_len)
-            return np.reshape(self.traj_msg.array.data, (-1, 1))
-
-    def put_traj(self, traj_msg):
-        if self.traj_queue.full():
-            try:
-                self.traj_queue.get_nowait()
-            except Queue.Empty:
-                pass
-        self.traj_queue.put_nowait(traj_msg)
-
-    # def peek(self):
-    #     print "size before:", self.traj_queue.qsize()
-    #     queue_iterable = copy.copy(self.traj_queue.queue)
-    #     print queue_iterable.pop()
-    #     print "progress!"
-    #     print "size after:", self.traj_queue.qsize()
+# class StateApproximator():
+#
+#     def __init__(self, n, T, delay_len, anti_switch=True):
+#         self.ignore_changes = False
+#         self.its_since_started_ignoring = 0
+#         self.num_rapid_changes = 0
+#         self.its_since_rapid_change = 0
+#         # self.traj_msg = np.full( (n*(T+1), 1), np.nan )
+#         self.traj_msg = Float32MultiArrayStamped()
+#         # self.traj_msg.array.data = [np.nan]*n*(T+1)
+#         self.traj_msg.array.data = None     #TEST
+#         self.traj_queue = Queue.Queue(delay_len+1)
+#         self.n = n
+#         self.T = T
+#         self.delay_len = delay_len
+#         self.anti_switch = anti_switch
+#
+#     def get_traj(self):
+#         is_empty = False
+#         try:
+#             traj_msg_new = self.traj_queue.get_nowait()
+#         except Queue.Empty:
+#             is_empty = True
+#
+#         if is_empty:
+#             # No new trajectory received, return shifted old trajectory
+#             if self.traj_msg.array.data is not None:
+#                 self.traj_msg = \
+#                     shift_traj_msg(self.traj_msg, self.n, SAMPLING_TIME)
+#                 # print "Shifted traj"
+#                 return np.reshape(self.traj_msg.array.data, (-1, 1))
+#             else:
+#                 return None
+#
+#         quit_early = False
+#         #np.isnan(self.traj_msg.array.data).any() or not self.anti_switch:
+#         if self.traj_msg.array.data is None or not self.anti_switch:    #TEST
+#             # self.traj_msg never before set, or anti-switch is turned off
+#             quit_early = True
+#         else:
+#             old_dir = get_traj_dir(\
+#                 np.reshape(self.traj_msg.array.data, (-1,1)), self.n)
+#             new_dir = get_traj_dir(\
+#                 np.reshape(traj_msg_new.array.data, (-1,1)), self.n)
+#             cos_angle = get_cos_angle_between(old_dir, new_dir)
+#             # direction of previously used trajectory was 0
+#             if np.isnan(cos_angle):
+#                 quit_early = True
+#
+#         # Special case
+#         if quit_early:
+#             self.ignore_changes = False
+#             self.its_since_started_ignoring = 0
+#             self.num_rapid_changes = 0
+#             self.its_since_rapid_change = 0
+#             self.traj_msg = \
+#                 shift_traj_msg(traj_msg_new, self.n, SAMPLING_TIME)
+#                 # shift_trajectory(traj_new, self.n, self.delay_len)
+#             return np.reshape(self.traj_msg.array.data, (-1, 1))
+#
+#         if cos_angle < 0:
+#             self.num_rapid_changes += 1
+#             self.its_since_rapid_change = 0
+#
+#         if self.ignore_changes:
+#             self.its_since_started_ignoring += 1
+#             if self.its_since_started_ignoring > self.delay_len + 1:
+#                 self.ignore_changes = False
+#                 self.its_since_started_ignoring = 0
+#                 self.num_rapid_changes = 0
+#                 self.its_since_rapid_change = 0
+#         else:
+#             if self.num_rapid_changes >= 2:
+#                 self.ignore_changes = True
+#
+#         if self.ignore_changes and cos_angle < 0:
+#             # Use old trajectory
+#             self.traj_msg = shift_traj_msg(self.traj_msg, self.n, 1)
+#             return np.reshape(self.traj_msg.array.data, (-1, 1))
+#         else:
+#             # Use new trajectory
+#             self.traj_msg = \
+#                 shift_traj_msg(traj_msg_new, self.n, SAMPLING_TIME)
+#                 # shift_trajectory(traj_new, self.n, self.delay_len)
+#             return np.reshape(self.traj_msg.array.data, (-1, 1))
+#
+#     def put_traj(self, traj_msg):
+#         if self.traj_queue.full():
+#             try:
+#                 self.traj_queue.get_nowait()
+#             except Queue.Empty:
+#                 pass
+#         self.traj_queue.put_nowait(traj_msg)
+#
+#     # def peek(self):
+#     #     print "size before:", self.traj_queue.qsize()
+#     #     queue_iterable = copy.copy(self.traj_queue.queue)
+#     #     print queue_iterable.pop()
+#     #     print "progress!"
+#     #     print "size after:", self.traj_queue.qsize()

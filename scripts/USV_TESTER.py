@@ -2,7 +2,7 @@
 import rospy
 from Dynamics import *              # THESE ARE SUPER NECESSARY
 from IMPORT_ME import *
-from helper_classes import Parameters, StateApproximator
+from helper_classes import Parameters
 from helper_functions import mat_to_multiarray_stamped, get_dist_traj
 import Queue
 import os
@@ -24,8 +24,7 @@ import osqp
 import thread
 # import threading
 from problemClasses import *
-from UAV_simulation import UAV_simulator
-from USV_simulation import USV_simulator
+from USV_simulation_NEW import USV_simulator
 import pdb
 import random
 
@@ -170,17 +169,17 @@ for N in range(hor_max, hor_min-1, -1):
 
         my_usv_simulator.simulate_problem(sim_len, xb_m)
         # time.sleep(20)
-        my_usv_simulator.store_data()
-        try:
-            my_usv_simulator.plot_results(True)
-        except:
-            pass
+        # my_usv_simulator.store_data()
+        # try:
+        #     my_usv_simulator.plot_results(True)
+        # except:
+        #     pass
         print "Finished simulation round", i, "with horizon", N
         print np.mean(my_usv_simulator.iteration_durations)
         print np.median(my_usv_simulator.iteration_durations)
         # ------------- FOR PARALLEL ------------
-        if PARALLEL and np.mean(my_usv_simulator.dist_solution_durations) > SAMPLING_TIME\
-            and np.median(my_usv_simulator.dist_solution_durations) > SAMPLING_TIME:
+        if PARALLEL and np.mean(my_usv_simulator.hor_solution_durations) > SAMPLING_TIME\
+            and np.median(my_usv_simulator.hor_solution_durations) > SAMPLING_TIME:
             took_too_long = True
             break
         # ---------- FOR NON PARALLEL -----------
@@ -204,6 +203,7 @@ if not quit_horizon >= 0:
 
 print "stopped sleeping"
 
+my_usv_simulator.plot_results(True)
 store_pub.publish(Int32(1))
 if quit_horizon >= 0:
     print "Storing!"

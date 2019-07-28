@@ -2,11 +2,15 @@ from math import ceil
 
 USE_ROS = False
 CENTRALISED = False
-DISTRIBUTED = not CENTRALISED
+DISTRIBUTED = False
 PARALLEL = True
 SAMPLING_RATE = 20              # Dynamics change if this changes
 SAMPLING_TIME = 1.0/SAMPLING_RATE
 ADD_DROPOUT = False
+
+if CENTRALISED + DISTRIBUTED + PARALLEL > 1:
+    print "PLEASE ONLY SELECT ONE OUT OF CENTRALISED, DISTRIBUTED, OR PARALLEL"
+    exit()
 
 INTER_ITS = 5  # Number of iteration    between each solution of the parallel optimisaion problem
 

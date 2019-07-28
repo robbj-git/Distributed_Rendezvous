@@ -206,6 +206,7 @@ class UAVProblem():
         [self.nUAV, self.mUAV] = B.shape
         self.t_since_update = 0
         self.t_since_prev_update = 0
+        self.last_solution_is_used = False
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
         if self.type == 'CVXGEN':
@@ -308,6 +309,7 @@ class UAVProblem():
 
         self.t_since_prev_update = self.t_since_update
         self.t_since_update = 0
+        self.last_solution_is_used = False
         end = time.time()
         self.last_solution_duration = end - start
 
@@ -458,7 +460,8 @@ class VerticalProblem():
         self.nv = 2
         self.mv = 1
         self.t_since_update = 0
-        self.t_since_prev_update = 0
+        self.t_since_prev_update = 0    # TODO: Us this used still?
+        self.last_solution_is_used = False
         self.last_solution_duration = np.nan
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
@@ -701,13 +704,25 @@ class VerticalProblem():
             except cp.error.SolverError as e:
                 print "Vertical problem:"
                 print e
+                # Using np.full() doesn't seem to work, since "variables must be
+                # real". Using this approach seems to circumvent that limitation
                 self.wdes.value = np.empty((self.T, 1))
                 self.wdes.value.fill(np.nan)
+                self.xv.value = np.empty( (self.nv*(self.T+1), 1))
+                self.xv.value.fill(np.nan)
+            # Exception is not thrown in problem was unbounded or infeasible
+            if self.problemVert.status == 'unbounded' or\
+                self.problemVert.status == 'infeasible':
+                print "Vertical problem: Problem was unbounded or infeasible"
+                self.wdes.value = np.empty((self.T, 1))
+                self.wdes.value.fill(np.nan)
+                self.xv.value = np.empty( (self.nv*(self.T+1), 1))
+                self.xv.value.fill(np.nan)
         self.t_since_prev_update = self.t_since_update
         self.t_since_update = 0
+        self.last_solution_is_used = False
         end = time.time()
         self.last_solution_duration = end - start
-
         # Constraints are clearly violated, even a few iterations before the crash
         # Maybe just decrease something? UAV Velocity?
         # # DEBUG DEBUG DEBUG DEBUG

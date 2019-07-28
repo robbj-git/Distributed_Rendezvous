@@ -2,7 +2,7 @@
 import rospy
 from Dynamics import *              # THESE ARE SUPER NECESSARY
 from IMPORT_ME import *
-from helper_classes import Parameters, StateApproximator
+from helper_classes import Parameters
 from helper_functions import mat_to_multiarray_stamped, get_dist_traj
 import Queue
 import os
@@ -26,11 +26,13 @@ import pdb
 import random
 # import threading
 from problemClasses import *
-from UAV_simulation import UAV_simulator
+# from UAV_simulation import UAV_simulator
+from UAV_simulation_NEW import UAV_simulator
 from USV_simulation import USV_simulator
 
 CVXGEN = "CVXGEN"
 CVXPy = "CVXPy"
+OSQP = "OSQP"
 
 lookahead = 0   # Only for parallel. TODO: Move to IMPORT_ME.py???
 
@@ -77,6 +79,7 @@ class ProblemParams():
         self.Pv = Pv
         self.Rv = Rv
         self.used_solver = CVXPy
+        self.vert_used_solver = CVXPy
         self.lookahead = lookahead
         self.KUAV = KUAV
         self.KUSV = KUSV
@@ -145,6 +148,9 @@ for N in range(hor_max, hor_min-1, -1):
             print "Waiting in loop 1"
         time.sleep(0.01)
 
+    if rospy.is_shutdown():
+        break
+
     if my_uav_simulator is not None:
         # We deinitialise here because hopefully old messages have stopped arriving by now
         my_uav_simulator.deinitialise()
@@ -170,15 +176,15 @@ for N in range(hor_max, hor_min-1, -1):
             break
 
         my_uav_simulator.simulate_problem(sim_len, x_m, xv_m)
+        print "FINISHED SIMULATING!"
         # # DEBUG storing
         # my_uav_simulator.store_data()
         # DEBUG plotting
-        try:
-            my_uav_simulator.plot_results(True)
-        except Exception as e:
-            print "Failed plotting:"
-            print e
-        break
+        # try:
+        #     my_uav_simulator.plot_results(True)
+        # except Exception as e:
+        #     print "Failed plotting:"
+        #     print e
         xv_log = my_uav_simulator.xv_log
         z_traj = xv_log[0,:]
         # Calculate landing time
@@ -233,6 +239,7 @@ for N in range(hor_max, hor_min-1, -1):
         break
 
 #DEBUG
+my_uav_simulator.plot_results(True)
 instruct_pub.publish(Int32(N))
 if not cancelled:
     print "ENTERING HERE! COMMUNICATION ISSUES AFTER THIS POINT AREN'T A BIG DEAL"

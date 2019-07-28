@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
 import numpy as np
-from helper_classes import StateApproximator, StampedTrajQueue, StampedMsgQueue
+from helper_classes import StampedTrajQueue, StampedMsgQueue
 from helper_functions import mat_to_multiarray_stamped, shift_trajectory
 from problemClasses import USVProblem, FastUSVProblem
 from rendezvous_problem.msg import Float32MultiArrayStamped, StateStamped
