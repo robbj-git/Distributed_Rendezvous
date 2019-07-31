@@ -2,19 +2,19 @@ import numpy as np
 from math import atan
 from IMPORT_ME import *
 
-def get_cmd_angle(u, wdes, xv):
-    # The angles that we want now, not to be confused with angle_cmd
-    phi_des =   atan( -u[1] / ( g + (1.0/tau_w)*(kw*wdes - xv[1]) ) )
-    theta_des = atan(  u[0] / ( g + (1.0/tau_w)*(kw*wdes - xv[1]) ) )
-    return phi_des, theta_des
-    # Predict angles we need at next time step
-    # phi_next   = atan( -varsUAV.u{1}(2) / ...
-    #     ( g + (1/tau_w)*(kw*varsVert.u{1} - varsVert.x{1}(2)) ) );
-    # theta_next = atan(  varsUAV.u{1}(1) / ...
-    #     ( g + (1/tau_w)*(kw*varsVert.u{1} - varsVert.x{1}(2)) ) );
-    # % Chose control signal to achieve desired angles at next time step
-    # phi_cmd   = (phi_next   - Aphi(1, 1)  *  phi - Aphi(1, 2)  * w_1 )/Bphi(1);
-    # theta_cmd = (theta_next - Atheta(1, 1)*theta  - Atheta(1, 2)*w_2)/Btheta(1);
+# def get_cmd_angle(u, wdes, xv):
+#     # The angles that we want now, not to be confused with angle_cmd
+#     phi_des =   atan( -u[1] / ( g + (1.0/tau_w)*(kw*wdes - xv[1]) ) )
+#     theta_des = atan(  u[0] / ( g + (1.0/tau_w)*(kw*wdes - xv[1]) ) )
+#     return phi_des, theta_des
+#     # Predict angles we need at next time step
+#     # phi_next   = atan( -varsUAV.u{1}(2) / ...
+#     #     ( g + (1/tau_w)*(kw*varsVert.u{1} - varsVert.x{1}(2)) ) );
+#     # theta_next = atan(  varsUAV.u{1}(1) / ...
+#     #     ( g + (1/tau_w)*(kw*varsVert.u{1} - varsVert.x{1}(2)) ) );
+#     # % Chose control signal to achieve desired angles at next time step
+#     # phi_cmd   = (phi_next   - Aphi(1, 1)  *  phi - Aphi(1, 2)  * w_1 )/Bphi(1);
+#     # theta_cmd = (theta_next - Atheta(1, 1)*theta  - Atheta(1, 2)*w_2)/Btheta(1);
 
 # ----------------- PARAMETERS -----------------
 # hs = 5.0;
@@ -87,24 +87,24 @@ Bv = np.matrix([
 [nUSV, mUSV] = Bb.shape
 [nv, mv]     = Bv.shape
 
-Phi = np.zeros(( (T+1)*nUAV, nUAV ))
-Lambda = np.zeros(( (T+1)*nUAV, T*mUAV ))
-Phi_b = np.zeros(( (T+1)*nUSV, nUSV ))
-Lambda_b = np.zeros(( (T+1)*nUSV, T*mUSV ))
-Phi_v = np.zeros(( (T+1)*nv, nv ))
-Lambda_v =  np.zeros(( (T+1)*nv, T*mv ))
-
-for j in range(T+1):
-    Phi[  j*nUAV:(j+1)*nUAV, :] = np.linalg.matrix_power(A, j)
-    Phi_b[j*nUSV:(j+1)*nUSV, :] = np.linalg.matrix_power(Ab, j)
-    Phi_v[ j*nv :(j+1)*nv,   :] = np.linalg.matrix_power(Av, j)
-    for k in range(j):  # range(0) returns empty list
-        Lambda[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
-            np.linalg.matrix_power(A, j-k-1)*B
-        Lambda_b[j*nUSV:(j+1)*nUSV, k*mUSV:(k+1)*mUSV] = \
-            np.linalg.matrix_power(Ab, j-k-1)*Bb
-        Lambda_v[  j*nv:(j+1)*nv,    k*mv:(k+1)*mv   ] = \
-            np.linalg.matrix_power(Av, j-k-1)*Bv
+# Phi = np.zeros(( (T+1)*nUAV, nUAV ))
+# Lambda = np.zeros(( (T+1)*nUAV, T*mUAV ))
+# Phi_b = np.zeros(( (T+1)*nUSV, nUSV ))
+# Lambda_b = np.zeros(( (T+1)*nUSV, T*mUSV ))
+# Phi_v = np.zeros(( (T+1)*nv, nv ))
+# Lambda_v =  np.zeros(( (T+1)*nv, T*mv ))
+#
+# for j in range(T+1):
+#     Phi[  j*nUAV:(j+1)*nUAV, :] = np.linalg.matrix_power(A, j)
+#     Phi_b[j*nUSV:(j+1)*nUSV, :] = np.linalg.matrix_power(Ab, j)
+#     Phi_v[ j*nv :(j+1)*nv,   :] = np.linalg.matrix_power(Av, j)
+#     for k in range(j):  # range(0) returns empty list
+#         Lambda[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
+#             np.linalg.matrix_power(A, j-k-1)*B
+#         Lambda_b[j*nUSV:(j+1)*nUSV, k*mUSV:(k+1)*mUSV] = \
+#             np.linalg.matrix_power(Ab, j-k-1)*Bb
+#         Lambda_v[  j*nv:(j+1)*nv,    k*mv:(k+1)*mv   ] = \
+#             np.linalg.matrix_power(Av, j-k-1)*Bv
 
 # -------------------------- COST MATRICES -----------------------
 

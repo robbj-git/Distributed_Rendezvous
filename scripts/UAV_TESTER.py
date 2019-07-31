@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from Dynamics import *              # THESE ARE SUPER NECESSARY
+from matrices_and_parameters import *              # THESE ARE SUPER NECESSARY
 from IMPORT_ME import *
 from helper_classes import Parameters
 from helper_functions import mat_to_multiarray_stamped, get_dist_traj
@@ -27,12 +27,7 @@ import random
 # import threading
 from problemClasses import *
 # from UAV_simulation import UAV_simulator
-from UAV_simulation_NEW import UAV_simulator
-from USV_simulation import USV_simulator
-
-CVXGEN = "CVXGEN"
-CVXPy = "CVXPy"
-OSQP = "OSQP"
+from UAV_simulation import UAV_simulator
 
 lookahead = 0   # Only for parallel. TODO: Move to IMPORT_ME.py???
 
@@ -62,10 +57,8 @@ class ProblemParams():
         self.PARALLEL = PARALLEL
         self.SAMPLING_RATE = SAMPLING_RATE
         self.SAMPLING_TIME = SAMPLING_TIME
-        self.USE_ROS = USE_ROS
+        self.USE_HIL = USE_HIL
         self.INTER_ITS = INTER_ITS
-        self.T = T
-        self.T_inner = 1
         self.A = A
         self.B = B
         self.Ab = Ab
@@ -78,8 +71,8 @@ class ProblemParams():
         self.Qv = Qv
         self.Pv = Pv
         self.Rv = Rv
-        self.used_solver = CVXPy
-        self.vert_used_solver = CVXPy
+        self.used_solver = used_hor_solver
+        self.vert_used_solver = used_vert_solver
         self.lookahead = lookahead
         self.KUAV = KUAV
         self.KUSV = KUSV
@@ -87,6 +80,9 @@ class ProblemParams():
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
             wmin, wmax, wmin_land, kl, vmax)
         self.delay_len = delay_len
+        self.ADD_DROPOUT = ADD_DROPOUT
+        self.dropout_lower_bound = dropout_lower_bound
+        self.dropout_upper_bound = dropout_upper_bound
 
 problem_params = ProblemParams()
 x_m = np.matrix([[0.0], [0.0], [0.0], [0.0]])
@@ -119,6 +115,7 @@ for N in range(hor_max, hor_min-1, -1):
     UAV_test_round = -1
     next_test_round = 0
     problem_params.T = N
+    problem_params.T_inner = 30
 
     mean_list = np.empty((NUM_TESTS, 1))
     mean_list.fill(np.nan)
@@ -239,7 +236,12 @@ for N in range(hor_max, hor_min-1, -1):
         break
 
 #DEBUG
-my_uav_simulator.plot_results(True)
+try:
+    my_uav_simulator.plot_results(True)
+except:
+    # Exception is sometimes thrown when window is closed
+    pass
+
 instruct_pub.publish(Int32(N))
 if not cancelled:
     print "ENTERING HERE! COMMUNICATION ISSUES AFTER THIS POINT AREN'T A BIG DEAL"

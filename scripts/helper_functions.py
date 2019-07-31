@@ -98,3 +98,17 @@ def fill_lost_values(matrix):
             non_nan_val = matrix[:, col:col+1]
 
     return matrix
+
+def get_cmd_angle(u, wdes, xv):
+    # The angles that we want now, not to be confused with angle_cmd
+    phi_des =   atan( -u[1] / ( g + (1.0/tau_w)*(kw*wdes - xv[1]) ) )
+    theta_des = atan(  u[0] / ( g + (1.0/tau_w)*(kw*wdes - xv[1]) ) )
+    return phi_des, theta_des
+    # Predict angles we need at next time step
+    # phi_next   = atan( -varsUAV.u{1}(2) / ...
+    #     ( g + (1/tau_w)*(kw*varsVert.u{1} - varsVert.x{1}(2)) ) );
+    # theta_next = atan(  varsUAV.u{1}(1) / ...
+    #     ( g + (1/tau_w)*(kw*varsVert.u{1} - varsVert.x{1}(2)) ) );
+    # % Chose control signal to achieve desired angles at next time step
+    # phi_cmd   = (phi_next   - Aphi(1, 1)  *  phi - Aphi(1, 2)  * w_1 )/Bphi(1);
+    # theta_cmd = (theta_next - Atheta(1, 1)*theta  - Atheta(1, 2)*w_2)/Btheta(1);

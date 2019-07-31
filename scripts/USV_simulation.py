@@ -11,11 +11,23 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon, Circle
 from matplotlib.collections import PatchCollection
 import time
-from IMPORT_ME import ADD_DROPOUT
 
 class USV_simulator():
 
+
     def __init__(self, problem_params):
+        pp = problem_params
+        self.experiment_index = -1  # Used in store_data()
+        self.T = pp.T
+        self.T_inner = pp.T_inner
+        self.Ab = pp.Ab
+        self.Bb = pp.Bb
+        self.used_solver = pp.used_solver
+        self.params = pp.params
+        self.delay_len = pp.delay_len
+        [self.nUAV, self.mUAV] = pp.B.shape
+        [self.nUSV, self.mUSV] = pp.Bb.shape
+
         self.experiment_index = -1
         self.T = problem_params.T
         self.T_inner = problem_params.T_inner
@@ -28,44 +40,32 @@ class USV_simulator():
         self.lookahead = problem_params.lookahead
         self.used_solver = problem_params.used_solver
         self.params = problem_params.params
+        self.ds = self.params.ds
         self.delay_len = problem_params.delay_len
         [self.nUAV, self.mUAV] = B.shape
         [self.nUSV, self.mUSV] = self.Bb.shape
-        # [nv, mv] = Bv.shape
-        # [self.nUAV, self.mUAV, self.nUSV, self.mUSV, self.nv, self.mv] = \
-        #     [nUAV, mUAV, nUSV, mUSV, nv, mv]
-        # [self.nUSV, self.mUSV, self.nUAV, self.mUAV] = \
-        #     [nUSV, mUSV, nUAV, mUAV]
-        self.CENTRALISED = problem_params.CENTRALISED
-        self.DISTRIBUTED = problem_params.DISTRIBUTED
-        self.PARALLEL = problem_params.PARALLEL
-        self.SAMPLING_RATE = problem_params.SAMPLING_RATE
-        self.SAMPLING_TIME = problem_params.SAMPLING_TIME
-        self.USE_ROS = problem_params.USE_ROS
-        self.INTER_ITS = problem_params.INTER_ITS
-        self.KUSV = problem_params.KUSV
-        SAMPLING_RATE = self.SAMPLING_RATE
-        USE_ROS = self.USE_ROS
+        self.CENTRALISED = pp.CENTRALISED
+        self.DISTRIBUTED = pp.DISTRIBUTED
+        self.PARALLEL = pp.PARALLEL
+        self.SAMPLING_RATE = pp.SAMPLING_RATE
+        self.USE_HIL = pp.USE_HIL
+        self.INTER_ITS = pp.INTER_ITS
+        self.KUSV = pp.KUSV
+        self.ADD_DROPOUT = pp.ADD_DROPOUT
+        self.dropout_lower_bound = pp.dropout_lower_bound
+        self.dropout_upper_bound = pp.dropout_upper_bound
+        self.USV_stopped_at_iter = np.nan
 
-        self.problemUSV = USVProblem(self.T, self.Ab, self.Bb,  Q, P, R,\
+        self.problemUSV = USVProblem(pp.T, pp.Ab, pp.Bb,  pp.Q, pp.P, pp.R,\
             self.nUAV, self.used_solver, self.params)
 
-        self.problemUSVFast = FastUSVProblem(self.T_inner, self.Ab, self.Bb, Q, P, R,\
-            self.params)
-
-        # These must be initialised here since they appear in callbacks
-        self.UAV_trajectories = np.empty((self.nUAV*(self.T+1), 1))
-        self.x_log = np.empty((self.nUAV, 1))
-        # self.UAVApprox = StateApproximator(self.nUAV, self.T, self.delay_len, anti_switch=False)
-        self.UAVApprox = StampedTrajQueue(0.0)
-        self.input_queue = StampedMsgQueue(0.0)
-        self.i = 0
-        self.USV_stopped_at_iter = -1   # This one breaks even though it shouldn't, so I added it here to be safe
+        self.problemUSVFast = FastUSVProblem(pp.T_inner, pp.Ab, pp.Bb,\
+            pp.Q, pp.P, pp.R, pp.params)
 
         # --------------------------- ROS SETUP ----------------------------------
         # rospy.init_node('USV_main')
         rospy.Subscriber('experiment_index', Int8, self.experiment_index_callback)
-        if self.DISTRIBUTED:
+        if not self.CENTRALISED:
             self.traj_pub = rospy.Publisher('USV_traj', Float32MultiArrayStamped, queue_size = 10)
             self.UAV_traj_sub = rospy.Subscriber(\
                 'UAV_traj', Float32MultiArrayStamped, self.UAV_traj_callback)
@@ -73,245 +73,219 @@ class USV_simulator():
             self.state_pub = rospy.Publisher('USV_state', StateStamped, queue_size = 10)
             self.USV_input_sub = rospy.Subscriber(\
                 'USV_input', AccelStamped, self.USV_input_callback)
-        self.rate = rospy.Rate(SAMPLING_RATE)
+        self.rate = rospy.Rate(self.SAMPLING_RATE)
 
     def simulate_problem(self, sim_len, xb_val):
-        xb_m = xb_val
-        CENTRALISED = self.CENTRALISED
-        DISTRIBUTED = self.DISTRIBUTED
-        PARALLEL = self.PARALLEL
-        SAMPLING_RATE = self.SAMPLING_RATE
-        USE_ROS = self.USE_ROS
-        nUAV = self.nUAV
-        mUAV = self.mUAV
-        nUSV = self.nUSV
-        mUSV = self.mUSV
-        T = self.T
-        Ab = self.Ab
-        Bb = self.Bb
-        KUSV = self.KUSV
-        lookahead = self.lookahead
-        amin_b = self.params.amin_b
-        amax_b = self.params.amax_b
-        self.i = 0
+        self.reset(sim_len, xb_val)
 
-        xb_log  = np.empty((nUSV, sim_len+1))
-        xb_log.fill(np.nan)
-        uUSV_log = np.empty((mUSV, sim_len))
-        uUSV_log.fill(np.nan)
-        self.USV_trajectories = np.empty((nUSV*(T+1), sim_len))
-        self.USV_trajectories.fill(np.nan)
-        USV_times = np.empty((1, sim_len))
-        USV_times.fill(np.nan)
-        self.UAV_trajectories = np.empty((nUAV*(T+1), sim_len)) # Only for debug
-        self.UAV_trajectories.fill(np.nan)
-        # x_traj = np.empty((nUAV*(T+1), 1))
-        # x_traj.fill(np.nan)
-        x_traj = None   #TEST
-        self.x_log = np.empty((nUAV, sim_len))                  # Only for debug
-        self.x_log.fill(np.nan)
-        self.uUSV = np.zeros((mUSV, 1))
-        # self.UAVApprox = StateApproximator(self.nUAV, self.T, self.delay_len)
-        self.UAVApprox = StampedTrajQueue(0.0)
-        self.input_queue = StampedMsgQueue(0.0)
-        iteration_durations = []
-        dist_solution_durations = []
-        self.USV_stopped_at_iter = -1
-        t_since_update = 0
-        dist = np.inf   # Stores horizontal distance from UAV
-        USV_should_stop = False
+        self.xb = xb_val
 
-        if CENTRALISED and PARALLEL:
-            print '######################################################'
-            print 'Parallel solving is not supported for centralised case'
-            print '######################################################'
-            return
+        if not self.CENTRALISED:
+            while self.x_traj is None:
+                # TODO: Sometimes self.xb_traj seems to be something other than an array, fix that
+                self.send_traj_to_UAV(np.asarray(self.xb_traj))
+                try:
+                    self.x_traj = self.UAVApprox.get_traj()
+                except IndexError:
+                    # This happens if the queue is empty
+                    self.x_traj = None
+                if rospy.is_shutdown():
+                    return
+                self.rate.sleep()
+
+        # If centralised, get first control input
+        if self.CENTRALISED:
+            uUSV_msg = None
+            while uUSV_msg is None:
+                self.send_state_to_UAV(self.xb)
+                try:
+                    uUSV_msg = self.input_queue.get()
+                except IndexError:
+                    pass
+                if rospy.is_shutdown():
+                    return
+                self.rate.sleep()
+            self.uUSV = np.array([[uUSV_msg.accel.linear.x],\
+                [uUSV_msg.accel.linear.y]])
 
         start = time.time()
-        for i in range(sim_len):        # TODO: Change to keep on going sort of for ever?
-            # print i
+        for i in range(sim_len):
             self.i = i
             if rospy.is_shutdown():
-                break
+                return
 
-            # Weird indexing to preserves dimensions
-            xb_log[:, i:i+1]  = xb_m
-
-            # # DEBUG
-            # if i == 40 and DISTRIBUTED:
-            #     self.UAVApprox.set_delay_time(1.0)
-            #     # print "NOOOOOOOOOOOOOW!!!!!!!!"
-            # if i == 300 and DISTRIBUTED:
-            #     self.UAVApprox.set_delay_time(0.0)
-            # # END DEBUG
-            # # DEBUG
-            # if i == 40 and CENTRALISED:
-            #     self.input_queue.set_delay_time(1.0)
-            #     # print "NOOOOOOOOOOOOOW!!!!!!!!"
-            # if i == 300 and CENTRALISED:
-            #     self.input_queue.set_delay_time(0.0)
-            # # END DEBUG
-            # ------------------- SOLVE OPTIMISATION PROBLEMS --------------------
-            if i==0 or not PARALLEL:
-                if DISTRIBUTED:
+            # Receive data from UAV
+            if not i == 0:
+                if self.CENTRALISED:
                     try:
-                        x_traj = self.UAVApprox.get_traj()
+                        uUSV_msg = self.input_queue.get()
+                        self.uUSV = np.array([[uUSV_msg.accel.linear.x],\
+                            [uUSV_msg.accel.linear.y]])
+                    except IndexError:
+                        self.uUSV = np.zeros((self.mUSV, 1))
+                elif self.DISTRIBUTED or \
+                    (self.PARALLEL and i % self.INTER_ITS == 0):
+                    try:
+                        self.x_traj = self.UAVApprox.get_traj()
                     except IndexError:
                         # Use shifted old trajectory if no new trajectory is available
-                        x_traj = shift_trajectory(x_traj, nUAV, 1)
+                        self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
 
-                    # self.UAV_trajectories[:, self.i:self.i+1] = x_traj
-                    if x_traj is None: #np.isnan(x_traj).any():     #TEST
-                        # We don't know where UAV is, apply no control input
-                        self.uUSV = np.matrix([[0], [0]])
-                        xb_traj = np.asarray(\
-                            self.problemUSV.predict_trajectory( xb_m, np.zeros((mUSV*T, 1)) ))
-                        # Needed for parallel
-                        self.problemUSV.xb.value = xb_traj
-                        self.problemUSV.ub.value = np.zeros((mUSV*T, 1))
-                        # For parallel case: Since problemUSV wasn't actually solved,
-                        # we need to have non-zero t_since_update so that rest of
-                        # program doesn't think the problem was just solved and will
-                        # therefore try to access solution variables
-                        self.problemUSV.t_since_update = 0
-                        t_since_update = self.problemUSV.t_since_update
-                    else:
-                        start_dist = time.time()
-                        self.problemUSV.solve(xb_m, x_traj, USV_should_stop)
-                        duration = time.time() - start_dist
-                        dist_solution_durations.append(duration)
-                        xb_traj = self.problemUSV.xb.value
+            # # Make the USV stop once the vehicles are within safe landing distance
+            # if not self.CENTRALISED and not self.USV_should_stop:
+            #     self.dist = np.sqrt(np.square( self.xb[0,0] - self.x_traj[0,0])\
+            #         + np.square( self.xb[1,0] - self.x_traj[1,0] ))
+            #     self.USV_should_stop = False if self.dist > self.ds else True
+            #     if self.USV_should_stop:
+            #         self.USV_stopped_at_iter = self.i
 
-                        self.uUSV = self.problemUSV.ub[ 0:mUSV, 0:1].value
-                        # THE CODE IN ELSE IS UNREACHABLE, I'M NOT SURE WHAT I WAS THINKING!!!
-                        # NO SUPRISE PARALLEL COMPLETELY SUCKED!!!!!
-                        # if not PARALLEL or t_since_update == 0:
-                        #     self.uUSV = self.problemUSV.ub[ 0:mUSV, 0:1].value
-                        # else:
-                        #     # Using linear feedback intermediate controller
-                        #     self.uUSV = KUSV*(xb_m  -  self.problemUSV.\
-                        #         x[t_since_update*nUSV:(t_since_update+1)*nUSV].value)
-                        #     self.uUSV = -np.clip(self.uUSV, amin_b, amax_b)
-                elif CENTRALISED:
-                    # In centralised case, we don't solve anything
-                    pass
-            elif i%self.INTER_ITS == 0 and PARALLEL:
-                if DISTRIBUTED:
-                    try:
-                        x_traj = self.UAVApprox.get_traj()
-                    except IndexError:
-                        # Use shifted old trajectory if no new trajectory is available
-                        x_traj = shift_trajectory(x_traj, nUAV, 1)
-                    # self.UAV_trajectories[:, self.i:self.i+1] = x_traj
-                    if x_traj is None:      #np.isnan(x_traj).any():    #TEST
-                        # We don't know where UAV is, apply no control input
-                        self.uUSV = np.matrix([[0], [0]])
-                        xb_traj = np.asarray(\
-                            self.problemUSV.predict_trajectory( xb_m, np.zeros((mUSV*T,1)) ))
-                        # Needed for parallel
-                        self.problemUSV.xb.value = xb_traj
-                        self.problemUSV.ub.value = np.zeros((mUSV*T, 1))
-                        # In general, t_since_update increases with each iteration
-                        # If it's not reset to 1 here, it can grow arbitrarily large
-                        # without the problem ever being solved (happens if USV never
-                        # receives information about the UAV). The intermediate
-                        # controller further on will fail to work if it thinks that the
-                        # knows xb_traj is too outdated. Therefore, by setting
-                        # t_since_update to 1, we're telling it that this xb_traj is
-                        # actually up to date
-                        self.problemUSV.t_since_update = 0
-                        t_since_update = self.problemUSV.t_since_update
-                    else:
-                        self.problemUSV.solve_threaded(xb_m, x_traj, USV_should_stop)
-                elif CENTRALISED:
-                    # In centralised case, we don't solve anything
-                    pass
+            # ------- Solving Problem --------
+            if self.DISTRIBUTED or (self.PARALLEL and i == 0):
+                self.solve_distributed_problem(self.xb, self.x_traj)
+            elif self.PARALLEL and i % self.INTER_ITS == 0:
+                self.problemUSV.solve_threaded(self.xb, self.x_traj)
 
-            # -------- SET uUSV FOR DISTRIBUTED CASE ---------------
-            if DISTRIBUTED and PARALLEL:
-                if self.problemUSV.t_since_update == 0:
-                    # self.uUSV = self.problemUSV.ub[ 0:mUSV, 0:1].value
-                    xb_traj = shift_trajectory(self.problemUSV.xb.value, nUSV,\
-                        self.problemUSV.t_since_prev_update)
-                else:
-                    # Shifts x_traj, so it becomes the most accurate prediction possible
-                    xb_traj = shift_trajectory(xb_traj, nUSV, 1)
-                # self.uUSV = KUSV*(xb_m  -  xb_traj[(t_since_update+lookahead)*nUSV:\
-                #     (t_since_update+1+lookahead)*nUSV])
-                # self.uUSV = -np.clip(self.uUSV, amin_b, amax_b)
-                self.problemUSVFast.solve(xb_m[0:(self.T_inner+1)*nUSV], xb_traj[0:(self.T_inner+1)*nUSV])
-                self.uUSV = self.problemUSVFast.ub[ 0:mUSV, 0:1].value
+            if not self.CENTRALISED:
+                # Update values in xb_traj and x_traj
+                self.update_trajectories()
 
+            if self.PARALLEL:
+                self.solve_inner_problem(self.xb, self.xb_traj)
+
+            (self.uUSV) = self.get_control()
+
+            self.update_logs(self.i)
+
+            # ------- Simulate Dynamics / Apply Control --------
+            if self.CENTRALISED:
+                self.send_state_to_UAV(self.xb)
+            if self.DISTRIBUTED or \
+                (self.PARALLEL and self.problemUSV.t_since_update == 0):
+                self.send_traj_to_UAV(self.xb_traj)
+
+            if self.PARALLEL and self.problemUSV.last_solution_is_used:
                 self.problemUSV.t_since_update += 1
-                t_since_update = self.problemUSV.t_since_update
-            elif CENTRALISED:
-                uUSV_msg = self.input_queue.get()
-                if uUSV_msg is None:
-                    self.uUSV = np.zeros((mUSV, 1))
-                else:
-                    self.uUSV = np.array([[uUSV_msg.accel.linear.x],[uUSV_msg.accel.linear.y]])
 
-            # ----------------- SIMULATE DYNAMICS -------------------
-            self.UAV_trajectories[:, i:i+1] = x_traj
-            if x_traj is not None:
-                self.x_log[:, self.i:self.i+1] = x_traj[0:nUAV, 0:1]
-            else:
-                pass
-                # We don't know where UAV is, leave default value (nan)
+            self.xb = self.Ab*self.xb + self.Bb*self.uUSV
 
-            # # if DISTRIBUTED and not np.isnan(x_traj).any() and not USV_should_stop:
-            # if DISTRIBUTED and x_traj is not None and not USV_should_stop:
-            #     dist = np.sqrt( np.square(xb_m[0,0] - x_traj[0,0])\
-            #         + np.square(xb_m[1,0] - x_traj[1,0]) )
-            #     USV_should_stop = False if dist > self.params.ds else True
-            #     if USV_should_stop:
-            #         USV_stopped_at_iter = self.i
-
-            if DISTRIBUTED:
-                # We only have access to predicted trajectory in distributed case.
-                # In centralised case, it is UAV_main that calculates it
-                self.USV_trajectories[:, i:i+1] = xb_traj
-            uUSV_log[:, i:i+1] = self.uUSV;
-            USV_times[:, i:i+1] = rospy.get_time()
-
-            # print xb_m
-            # print self.uUSV
-            # print '------'
-            xb_m = Ab*xb_m + Bb*self.uUSV
-
-            if CENTRALISED and (not PARALLEL or t_since_update == 1):
-                # t_since_update == 1 means that we just solved the problem
-                # usually we check t_since_update == 0, but this block comes
-                # just after incrementing t_since_update
-                state_msg = StateStamped()
-                state_msg.pose.position.x = xb_m[0]
-                state_msg.pose.position.y = xb_m[1]
-                state_msg.twist.linear.x = xb_m[2]
-                state_msg.twist.linear.y = xb_m[3]
-                state_msg.header.stamp = rospy.Time.now()
-                if not ADD_DROPOUT or not (i >= 80 and i <= 130): #DEBUG
-                    self.state_pub.publish(state_msg)
-            elif DISTRIBUTED and (not PARALLEL or t_since_update == 1):
-                # t_since_update == 1 means that we just solved the problem
-                # usually we check t_since_update == 0, but this block comes
-                # just after incrementing t_since_update
-                traj_msg = mat_to_multiarray_stamped(xb_traj, T+1, nUSV)
-                traj_msg.header.stamp = rospy.Time.now()
-                if not ADD_DROPOUT or not (i >= 80 and i <= 130): #DEBUG
-                    self.traj_pub.publish(traj_msg)  # TODO: CHANGE THIS. JUST DON'T USE A QUEUE
-
-            # ---------------------------- SLEEP ---------------------------------
+            # ------- Sleep --------
             end = time.time()
-            iteration_durations.append(end-start)
+            self.iteration_durations.append(end-start)
             self.rate.sleep()
             start = time.time()
 
-        xb_log[:, -nUSV:sim_len+1]  = xb_m
-        self.xb_log = xb_log
-        self.uUSV_log = uUSV_log
-        self.iteration_durations = iteration_durations
-        self.dist_solution_durations = dist_solution_durations
-        self.USV_times = USV_times
+        # ------------ END OF LOOP ------------
+        self.xb_log[:, sim_len:sim_len+1] = self.xb
+        if not self.CENTRALISED:
+            self.x_log[:, sim_len:sim_len+1] = self.x_traj[0:self.nUAV, 0:1]
+
+    def reset(self, sim_len, xb_0):
+        self.xb_log = np.full((self.nUSV, sim_len+1), np.nan)
+        self.uUSV_log = np.full((self.mUSV, sim_len), np.nan)
+
+        if not self.CENTRALISED:
+            self.USV_traj_log = np.full((self.nUSV*(self.T+1), sim_len), np.nan)
+            self.x_log = np.full((self.nUAV, sim_len+1), np.nan)
+            self.UAV_traj_log = np.full( (self.nUAV*(self.T+1), sim_len),\
+                np.nan )
+        if self.PARALLEL:
+            self.USV_inner_traj_log = np.full((self.nUSV*(self.T_inner+1),\
+                sim_len), np.nan )
+
+        self.USV_times = np.full((1, sim_len), np.nan)
+        self.iteration_durations = []
+        if self.DISTRIBUTED:
+            self.hor_solution_durations = []
+        if self.PARALLEL:
+            self.hor_inner_solution_durations = []
+
+        # Initial predicted trajectory assumes no control signal applied
+        self.xb_traj = self.problemUSV.predict_trajectory(xb_0, \
+            np.zeros( (self.mUSV*self.T, 1) ))
+        self.x_traj = None  # Always contains most up-to-date UAV predicted traj
+        # Always contains most up-to-date current distance between vehicles
+        self.dist = None
+
+        self.USV_should_stop = False
+        self.UAVApprox = StampedTrajQueue(0.0)
+        self.input_queue = StampedMsgQueue(0.0)
+
+    def solve_distributed_problem(self, xb, x_traj):
+        T = self.T
+        nUAV = self.nUAV
+        nUSV = self.nUSV
+        start_time = time.time()
+        self.problemUSV.solve(xb, x_traj, self.USV_should_stop)
+        end_time = time.time()
+        self.hor_solution_durations.append(end_time - start_time)
+
+    def solve_inner_problem(self, xb, xb_traj):
+        start = time.time()
+        self.problemUSVFast.solve(xb[0:(self.T_inner+1)*self.nUSV],\
+            xb_traj[0:(self.T_inner+1)*self.nUAV])
+        end = time.time()
+        self.hor_inner_solution_durations.append(end - start)
+
+    def get_control(self):
+        if self.CENTRALISED:
+            # Input was set in beggining of the main loop already
+            return self.uUSV
+        elif self.DISTRIBUTED:
+            return self.problemUSV.ub[0:self.mUSV, 0:1].value
+        elif self.PARALLEL:
+            return self.problemUSVFast.ub[0:self.mUSV, 0:1].value
+
+    def update_trajectories(self):
+        if self.CENTRALISED:
+            # There are no trajectories to update
+            pass
+        elif self.DISTRIBUTED:
+            self.xb_traj = self.problemUSV.xb.value
+        elif self.PARALLEL:
+            if self.problemUSV.t_since_update == 0:
+                self.xb_traj = self.problemUSV.xb.value
+                self.problemUSV.last_solution_is_used = True
+            else:
+                self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
+
+    def update_logs(self, i):
+        self.xb_log[:, i:i+1] = self.xb
+        self.uUSV_log[:, i:i+1] = self.uUSV
+        self.USV_times[:, i:i+1] = rospy.get_time()
+
+        if not self.CENTRALISED:
+            self.USV_traj_log[:, i:i+1] = self.xb_traj
+            self.UAV_traj_log[:, i:i+1] = self.x_traj
+            self.x_log[:, i:i+1] = self.x_traj[0:self.nUAV, 0:1]
+
+        if self.PARALLEL:
+            self.USV_inner_traj_log[:, i:i+1] = self.problemUSVFast.xb.value
+
+    def send_traj_to_UAV(self, xb_traj):
+        traj_msg = mat_to_multiarray_stamped(xb_traj, self.T+1, self.nUSV)
+        traj_msg.header.stamp = rospy.Time.now()
+        if self.ADD_DROPOUT and (self.i >= self.dropout_lower_bound and \
+            self.i <= self.dropout_upper_bound):
+            #DEBUG Adds message dropout
+            pass
+        else:
+            self.traj_pub.publish(traj_msg)
+
+    def send_state_to_UAV(self, xb):
+        if self.ADD_DROPOUT and (self.i >= self.dropout_lower_bound and \
+            self.i <= self.dropout_upper_bound):
+            #DEBUG Adds message dropout
+            pass
+        else:
+            state_msg = StateStamped()
+            state_msg.pose.position.x = xb[0]
+            state_msg.pose.position.y = xb[1]
+            state_msg.twist.linear.x = xb[2]
+            state_msg.twist.linear.y = xb[3]
+            state_msg.header.stamp = rospy.Time.now()
+            self.state_pub.publish(state_msg)
+
+    # ------------------------------------------
 
     def store_data(self):
         while self.experiment_index < 0:
@@ -332,15 +306,19 @@ class USV_simulator():
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/uUSV_log.txt', self.uUSV_log)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_iteration_durations.txt', self.iteration_durations)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_time_stamps.txt', self.USV_times)
+        if not self.CENTRALISED:
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_traj_log.txt', self.USV_traj_log)
         if self.DISTRIBUTED:
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_trajectories.txt', self.USV_trajectories)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_horizontal_durations.txt', self.dist_solution_durations)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_horizontal_durations.txt', self.hor_solution_durations)
+        if self.PARALLEL:
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_inner_horizontal_durations.txt', self.hor_inner_solution_durations)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_inner_traj_log.txt', self.USV_inner_traj_log)
 
     def plot_results(self, real_time):
         fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
         plt.title("USV Simulation")
 
-        [_, sim_len] = self.USV_trajectories.shape
+        [_, sim_len] = self.xb_log.shape
         dl = self.params.dl
         ds = self.params.ds
         hs = self.params.hs
@@ -355,24 +333,10 @@ class USV_simulator():
                                      (-10, 0)], True)
         p2 = PatchCollection([forbidden_area_1, forbidden_area_2], alpha=0.4)
 
-        if self.PARALLEL:
-            # TODO: This shouldn't be necessary anymore!
-            # There will be gaps in received trajectory info, fill the gaps out
-            ref_vec = np.empty((self.nUSV*(self.T+1), 1))
-            ref_vec.fill(np.nan)
-            for j in range(sim_len):
-                if np.isnan(self.UAV_trajectories[:, j]).any():
-                    self.UAV_trajectories[:, j:j+1] = ref_vec
-                else:
-                    ref_vec = self.UAV_trajectories[:, j:j+1]
-                # ref_col = j - j%self.INTER_ITS
-                # self.UAV_trajectories[:, j] = self.UAV_trajectories[:, ref_col]
-
         if real_time:
-            if self.UAV_trajectories is None:
-                num_UAV_trajs = 0
-            else:
-                [_, num_UAV_trajs] = self.UAV_trajectories.shape
+            num_UAV_trajs = 0
+            if not self.CENTRALISED and self.UAV_traj_log is not None:
+                [_, num_UAV_trajs] = self.UAV_traj_log.shape
             for t in range(sim_len):
                 if rospy.is_shutdown():
                     break
@@ -380,18 +344,16 @@ class USV_simulator():
                 p1 = PatchCollection([safe_circle], alpha=0.1)
                 ax1.add_collection(p1)
                 if num_UAV_trajs > t:
-                    UAV_traj = np.reshape(self.UAV_trajectories[:,t],\
+                    UAV_traj = np.reshape(self.UAV_traj_log[:,t],\
                         (self.nUAV, self.T+1), order='F')
                     # print UAV_traj[0, 0:self.T+1]
                     ax1.plot(UAV_traj[0, 0:self.T+1], UAV_traj[1, 0:self.T+1], 'g')
-                if self.DISTRIBUTED:
-                    # We only have access to trajectory in distributed case
-                    USV_traj = np.reshape(self.USV_trajectories[:,t],\
+                if not self.CENTRALISED:
+                    USV_traj = np.reshape(self.USV_traj_log[:,t],\
                         (self.nUSV, self.T+1), order='F')
                     ax1.plot(USV_traj[0, 0:self.T+1],\
                         USV_traj[1, 0:self.T+1], 'y')
                     ax1.plot(self.x_log[0, 0:t+1], self.x_log[1, 0:t+1], 'bx')
-
                 # pred_dist = np.sqrt( (UAV_traj[0, 0:T+1]-USV_traj[0, 0:T+1])**2 + \
                 #     (UAV_traj[1, 0:T+1]-USV_traj[1, 0:T+1])**2 )
 
@@ -431,6 +393,11 @@ class USV_simulator():
 
         plt.show()
 
+    # Allows for stopping an object from receiving ROS messages.
+    # Useful if a new instance is created, but old object is still kept
+    # for other purposes. If this function is not called, the old and new
+    # instances will both be subscribed to the same topic. I can't remember
+    # right now why that is a problem, but it did cause me issues previously.
     def deinitialise(self):
         if self.DISTRIBUTED:
             self.UAV_traj_sub.unregister()
@@ -439,8 +406,9 @@ class USV_simulator():
 
     # -------------- CALLBACKS ---------------
 
+    # Receives planned trajectory of the UAV
     def UAV_traj_callback(self, msg):
-        # global UAVApprox, UAV_trajectories, x_log
+        # global UAVApprox, UAV_traj_log, x_log
         nUAV = self.nUAV
         T = self.T
         xhat_m_traj = np.empty((nUAV, T+1))
@@ -451,23 +419,26 @@ class USV_simulator():
 
         temp = np.reshape(xhat_m_traj, (-1, 1), order='F')
 
-        # self.UAV_trajectories[:, self.i:self.i+1] =  temp
+        # self.UAV_traj_log[:, self.i:self.i+1] =  temp
         # self.x_log[:, self.i:self.i+1] = temp[0:nUAV, 0:1]
         # num_times_to_add = 1
         # if self.PARALLEL:
         #     num_times_to_add = self.INTER_ITS
         # for i in range(num_times_to_add):
-        #     self.UAV_trajectories = temp if (self.UAV_trajectories is None) else\
-        #         np.concatenate((self.UAV_trajectories, temp), axis=1)
+        #     self.UAV_traj_log = temp if (self.UAV_traj_log is None) else\
+        #         np.concatenate((self.UAV_traj_log, temp), axis=1)
         #     self.x_log = temp[0:nUAV, 0:1] if (self.x_log is None) else\
         #         np.concatenate((self.x_log, temp[0:nUAV, 0:1]), axis=1)
 
         self.UAVApprox.put_traj(msg)
 
+    # Used in centralised case. Received control input that should be applied
     def USV_input_callback(self, msg):
         self.input_queue.put(msg)
         # print time.time()
         # self.uUSV = np.array([[msg.accel.linear.x],[msg.accel.linear.y]])
 
+    # Used for the function store_data(), to store data into the same folder
+    # as the UAV_simulation_NEW.py
     def experiment_index_callback(self, msg):
         self.experiment_index = msg.data

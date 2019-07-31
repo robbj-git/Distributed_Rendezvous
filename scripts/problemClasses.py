@@ -335,6 +335,7 @@ class USVProblem():
         [self.nUSV, self.mUSV] = Bb.shape
         self.t_since_update = 0
         self.t_since_prev_update = 0
+        self.last_solution_is_used = False
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
         if type == 'CVXGEN':
@@ -437,6 +438,7 @@ class USVProblem():
                 self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
         self.t_since_prev_update = self.t_since_update
         self.t_since_update = 0
+        self.last_solution_is_used = False
         end = time.time()
         self.last_solution_duration = end - start
 
@@ -680,7 +682,7 @@ class VerticalProblem():
             start = time.time()
             self.update_OSQP(xv_m, np.diag(self.b2.value))
             results = self.problemOSQP.solve()
-            if results.x[0] is not None:
+            if results.xv[0] is not None:
                 self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
                 self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):], (-1, 1))
             else:
@@ -706,25 +708,31 @@ class VerticalProblem():
                 print e
                 # Using np.full() doesn't seem to work, since "variables must be
                 # real". Using this approach seems to circumvent that limitation
-                self.wdes.value = np.empty((self.T, 1))
+                # np.zeros() is used instead of np.empty() since np.empty()
+                # sometimes contains non-real values, causing an exception
+                self.wdes.value = np.zeros((self.T, 1))
                 self.wdes.value.fill(np.nan)
-                self.xv.value = np.empty( (self.nv*(self.T+1), 1))
+                self.xv.value = np.zeros( (self.nv*(self.T+1), 1))
                 self.xv.value.fill(np.nan)
             # Exception is not thrown in problem was unbounded or infeasible
             if self.problemVert.status == 'unbounded' or\
                 self.problemVert.status == 'infeasible':
                 print "Vertical problem: Problem was unbounded or infeasible"
-                self.wdes.value = np.empty((self.T, 1))
+                # Using np.full() doesn't seem to work, since "variables must be
+                # real". Using this approach seems to circumvent that limitation
+                # np.zeros() is used instead of np.empty() since np.empty()
+                # sometimes contains non-real values, causing an exception
+                self.wdes.value = np.zeros((self.T, 1))
                 self.wdes.value.fill(np.nan)
-                self.xv.value = np.empty( (self.nv*(self.T+1), 1))
+                self.xv.value = np.zeros( (self.nv*(self.T+1), 1))
                 self.xv.value.fill(np.nan)
+                print "Survided setting values to nan"
+
         self.t_since_prev_update = self.t_since_update
         self.t_since_update = 0
         self.last_solution_is_used = False
         end = time.time()
         self.last_solution_duration = end - start
-        # Constraints are clearly violated, even a few iterations before the crash
-        # Maybe just decrease something? UAV Velocity?
         # # DEBUG DEBUG DEBUG DEBUG
         # params = self.params
         # SCLHS = (params.dl-params.ds)*np.dot(self.height_extractor,self.xv.value)

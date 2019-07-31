@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from Dynamics import *              # THESE ARE SUPER NECESSARY
+from matrices_and_parameters import *              # THESE ARE SUPER NECESSARY
 from IMPORT_ME import *
 from helper_classes import Parameters
 from helper_functions import mat_to_multiarray_stamped, get_dist_traj
@@ -24,12 +24,9 @@ import osqp
 import thread
 # import threading
 from problemClasses import *
-from USV_simulation_NEW import USV_simulator
+from USV_simulation import USV_simulator
 import pdb
 import random
-
-CVXGEN = "CVXGEN"
-CVXPy = "CVXPy"
 
 lookahead = 0   # Only for parallel
 
@@ -66,10 +63,8 @@ class ProblemParams():
         self.PARALLEL = PARALLEL
         self.SAMPLING_RATE = SAMPLING_RATE
         self.SAMPLING_TIME = SAMPLING_TIME
-        self.USE_ROS = USE_ROS
+        self.USE_HIL = USE_HIL
         self.INTER_ITS = INTER_ITS
-        self.T = T
-        self.T_inner = 1
         self.A = A
         self.B = B
         self.Ab = Ab
@@ -82,13 +77,16 @@ class ProblemParams():
         self.Qv = Qv
         self.Pv = Pv
         self.Rv = Rv
-        self.used_solver = CVXPy
+        self.used_solver = used_hor_solver
         self.lookahead = lookahead
         self.KUAV = KUAV
         self.KUSV = KUSV
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
             wmin, wmax, wmin_land, kl, vmax)
         self.delay_len = delay_len
+        self.ADD_DROPOUT = ADD_DROPOUT
+        self.dropout_lower_bound = dropout_lower_bound
+        self.dropout_upper_bound = dropout_upper_bound
 
 problem_params = ProblemParams()
 
@@ -111,7 +109,6 @@ ever_took_too_long = False
 if PARALLEL:
     hor_max = 180#260#120#150   212 was good I think
     hor_min = 180#260#180#120#100
-    problem_params.T_inner = 30
 else:
     hor_max = 79#80#37#63#80#56
     hor_min = 79#30#37#63#25#20
@@ -121,6 +118,7 @@ for N in range(hor_max, hor_min-1, -1):
     USV_test_round = -1
     next_test_round = 0
     problem_params.T = N
+    problem_params.T_inner = 30
 
     # Wait for UAV tester before creating next simulator
     # If the UAV and USV testers have simulators with different time horizons,
@@ -199,11 +197,17 @@ for N in range(hor_max, hor_min-1, -1):
 print "started sleeping"
 if not quit_horizon >= 0:
     # Sleep for a while, give UAV-tester a chance to finish
-    time.sleep(30)
+    time.sleep(10)
 
 print "stopped sleeping"
 
-my_usv_simulator.plot_results(True)
+try:
+    my_usv_simulator.plot_results(True)
+except Exception as e:
+    # Sometimes exception is thrown when plotting window is closed
+    print e
+    pass
+
 store_pub.publish(Int32(1))
 if quit_horizon >= 0:
     print "Storing!"

@@ -2,7 +2,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
-from Dynamics import dl, ds, hs, nv
+from matrices_and_parameters import dl, ds, hs, nv
 import os
 from matplotlib.patches import Polygon, Circle
 from matplotlib.collections import PatchCollection
@@ -109,10 +109,13 @@ def combine_multiple_results(dirs):
 def print_data(dir):
     UAV_iteration_durations = \
         np.loadtxt(dir_path + dir + '/UAV_iteration_durations.txt')
-    UAV_horizontal_durations = np.loadtxt(\
-        dir_path + dir +'/UAV_horizontal_durations.txt')
-    UAV_vertical_durations = np.loadtxt(\
-        dir_path + dir +'/vertical_durations.txt')
+    try:
+        UAV_horizontal_durations = np.loadtxt(\
+            dir_path + dir +'/UAV_horizontal_durations.txt')
+        UAV_vertical_durations = np.loadtxt(\
+            dir_path + dir +'/vert_solution_durations.txt')
+    except:
+        print "Failed getting UAV solution durations, assuming that problem type is PARALLEL"
 
     test_means = np.loadtxt(dir_path + dir + '/MEAN.txt')
     test_medians = np.loadtxt(dir_path + dir + '/MEDIAN.txt')
@@ -128,9 +131,11 @@ def print_data(dir):
     except:
         print 'Found no stored landing times'
     t_0 = np.maximum(UAV_time_stamps[0], USV_time_stamps[0])
+    print USV_time_stamps[-1]
 
-    #DEBUG, UAV_time_stamps just happened to have last element equal to nan
-    UAV_time_stamps[-1] = UAV_time_stamps[-2] + 0.05
+    # EDIT: CAN PROBABLY BE DELETED, SHOULDN'T OCCUR ANYMORE
+    # #DEBUG, UAV_time_stamps just happened to have last element equal to nan
+    # UAV_time_stamps[-1] = UAV_time_stamps[-2] + 0.05
 
     UAV_time_stamps = UAV_time_stamps - t_0
     USV_time_stamps = USV_time_stamps - t_0
