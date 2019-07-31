@@ -194,7 +194,9 @@ class USV_simulator():
 
         self.USV_times = np.full((1, sim_len), np.nan)
         self.iteration_durations = []
-        if self.DISTRIBUTED:
+        if not self.CENTRALISED:
+            # Only relevant in distributed case, but needs to be defined in parallel
+            # case anyway, since solve_distributed_problem() is called once even then
             self.hor_solution_durations = []
         if self.PARALLEL:
             self.hor_inner_solution_durations = []
