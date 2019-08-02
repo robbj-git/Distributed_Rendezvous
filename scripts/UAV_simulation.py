@@ -333,8 +333,10 @@ class UAV_simulator():
         if np.isnan(wdes).any():
             # If solution of vertical problem failed, make the UAV rise
             wdes = self.params.wmax
+            print "WDES WAS NAN AT ITERATION", self.i
         return wdes
 
+    # In parallel case, also stores solution duration of parallel problem
     def update_hor_trajectories(self):
         if self.CENTRALISED:
             self.x_traj  = self.problemCent.x.value
@@ -344,6 +346,8 @@ class UAV_simulator():
         elif self.PARALLEL:
             if self.problemUAV.t_since_update == 0:
                 self.x_traj = self.problemUAV.x.value
+                self.hor_solution_durations.append(\
+                    self.problemUAV.last_solution_duration)
                 self.problemUAV.last_solution_is_used = True
             else:
                 self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
@@ -355,6 +359,7 @@ class UAV_simulator():
             get_dist_traj(self.x_traj, self.xb_traj, self.T, self.nUAV,\
             self.nUSV, True)
 
+    # In parallel case, also stores solution duration of parallel problem
     def update_vert_trajectories(self):
         # Sometimes xv.value is None here. I suspect this can occur when,
         # in problemClasses.py, in VerticalProblem.solve(), xv.value is
@@ -371,6 +376,8 @@ class UAV_simulator():
             elif self.PARALLEL:
                 if self.problemVert.t_since_update == 0:
                     self.xv_traj = self.problemVert.xv.value
+                    self.vert_solution_durations.append(\
+                        self.problemVert.last_solution_duration)
                     self.problemVert.last_solution_is_used = True
                 else:
                     self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
@@ -472,9 +479,8 @@ class UAV_simulator():
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/uUAV_log.txt', self.uUAV_log)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_iteration_durations.txt', self.iteration_durations)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_time_stamps.txt', self.UAV_times)
-        if not self.PARALLEL:
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_solution_durations.txt', self.vert_solution_durations)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_horizontal_durations.txt', self.hor_solution_durations)
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_solution_durations.txt', self.vert_solution_durations)
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_horizontal_durations.txt', self.hor_solution_durations)
         if self.CENTRALISED:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_traj_log.txt', self.USV_traj_log)
         if self.PARALLEL:

@@ -109,13 +109,23 @@ def combine_multiple_results(dirs):
 def print_data(dir):
     UAV_iteration_durations = \
         np.loadtxt(dir_path + dir + '/UAV_iteration_durations.txt')
+
+    # Figure out problem type based on which files exist
+    is_centralised = False
+    is_distributed = False
+    is_parallel = False
     try:
-        UAV_horizontal_durations = np.loadtxt(\
-            dir_path + dir +'/UAV_horizontal_durations.txt')
-        UAV_vertical_durations = np.loadtxt(\
-            dir_path + dir +'/vert_solution_durations.txt')
+        np.loadtxt(dir_path + dir +'/UAV_horizontal_durations.txt')
     except:
         print "Failed getting UAV solution durations, assuming that problem type is PARALLEL"
+        is_parallel = True
+    try:
+        np.loadtxt(dir_path + dir +'/USV_iteration_durations.txt')
+    except:
+        print "Failed loading USV iteration durations, assuming that problem type is CENTRALISED"
+        is_centralised = True
+    is_distributed = not is_centralised and not is_parallel
+
 
     test_means = np.loadtxt(dir_path + dir + '/MEAN.txt')
     test_medians = np.loadtxt(dir_path + dir + '/MEDIAN.txt')
@@ -125,13 +135,21 @@ def print_data(dir):
     test_medians_vert = np.loadtxt(dir_path + dir + '/VERT_MEDIAN.txt')
     UAV_time_stamps = np.loadtxt(dir_path + dir + '/UAV_time_stamps.txt')
     USV_time_stamps = np.loadtxt(dir_path + dir + '/USV_time_stamps.txt')
+    # mean_UAV_iteration_duration = np.mean(np.loadtxt(dir_path + dir + 'UAV_iteration_durations.txt'))
+    # mean_hor_solution_duration = np.mean(np.loadtxt(dir_path + dir + 'UAV_horizontal_durations.txt'))
+    # mean_vert_solution_duration = np.mean(np.loadtxt(dir_path + dir + 'vert_solution_durations.txt'))
+    # mean_USV_iteration_duration = np.mean(np.loadtxt(dir_path + dir + 'USV_iteration_durations.txt'))
+    # mean_USV_solution_duration = np.mean(np.loadtxt(dir_path + dir + 'USV_iteration_durations.txt'))
+    # if is_parallel:
+    #     mean_inner_hor_solution_duration
+    #     mean_inner_vert_solution_duration
+    #     mean_inner_USV_solution_duration
     try:
         landing_times = np.loadtxt(dir_path + dir + '/LANDING_TIMES.txt')
         print "min:", landing_times.min(), ', max:', landing_times.max(), ', mean:', np.mean(landing_times)
     except:
         print 'Found no stored landing times'
     t_0 = np.maximum(UAV_time_stamps[0], USV_time_stamps[0])
-    print USV_time_stamps[-1]
 
     # EDIT: CAN PROBABLY BE DELETED, SHOULDN'T OCCUR ANYMORE
     # #DEBUG, UAV_time_stamps just happened to have last element equal to nan

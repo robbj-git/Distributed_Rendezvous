@@ -202,6 +202,7 @@ class UAVProblem():
         self.nUSV = nUSV
         self.type = type
         self.params = params
+        # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
         [self.nUAV, self.mUAV] = B.shape
         self.t_since_update = 0
@@ -331,7 +332,8 @@ class USVProblem():
         self.nUAV = nUAV
         self.type = type
         self.params = params
-        self.last_solution_duration = np.nan # Most recent time taken to solve problem
+        # When problem is solved in parallel, this variable makes it easier to access solution duration
+        self.last_solution_duration = np.nan
         [self.nUSV, self.mUSV] = Bb.shape
         self.t_since_update = 0
         self.t_since_prev_update = 0
@@ -464,6 +466,7 @@ class VerticalProblem():
         self.t_since_update = 0
         self.t_since_prev_update = 0    # TODO: Us this used still?
         self.last_solution_is_used = False
+        # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
@@ -726,7 +729,6 @@ class VerticalProblem():
                 self.wdes.value.fill(np.nan)
                 self.xv.value = np.zeros( (self.nv*(self.T+1), 1))
                 self.xv.value.fill(np.nan)
-                print "Survided setting values to nan"
 
         self.t_since_prev_update = self.t_since_update
         self.t_since_update = 0

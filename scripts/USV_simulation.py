@@ -131,19 +131,20 @@ class USV_simulator():
                         # Use shifted old trajectory if no new trajectory is available
                         self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
 
-            # # Make the USV stop once the vehicles are within safe landing distance
-            # if not self.CENTRALISED and not self.USV_should_stop:
-            #     self.dist = np.sqrt(np.square( self.xb[0,0] - self.x_traj[0,0])\
-            #         + np.square( self.xb[1,0] - self.x_traj[1,0] ))
-            #     self.USV_should_stop = False if self.dist > self.ds else True
-            #     if self.USV_should_stop:
-            #         self.USV_stopped_at_iter = self.i
+            # Make the USV stop once the vehicles are within safe landing distance
+            if not self.CENTRALISED and not self.USV_should_stop:
+                self.dist = np.sqrt(np.square( self.xb[0,0] - self.x_traj[0,0])\
+                    + np.square( self.xb[1,0] - self.x_traj[1,0] ))
+                self.USV_should_stop = False if self.dist > self.ds else True
+                if self.USV_should_stop:
+                    self.USV_stopped_at_iter = self.i
 
             # ------- Solving Problem --------
             if self.DISTRIBUTED or (self.PARALLEL and i == 0):
                 self.solve_distributed_problem(self.xb, self.x_traj)
             elif self.PARALLEL and i % self.INTER_ITS == 0:
-                self.problemUSV.solve_threaded(self.xb, self.x_traj)
+                self.problemUSV.solve_threaded(self.xb, self.x_traj,\
+                    self.USV_should_stop)
 
             if not self.CENTRALISED:
                 # Update values in xb_traj and x_traj
@@ -195,8 +196,6 @@ class USV_simulator():
         self.USV_times = np.full((1, sim_len), np.nan)
         self.iteration_durations = []
         if not self.CENTRALISED:
-            # Only relevant in distributed case, but needs to be defined in parallel
-            # case anyway, since solve_distributed_problem() is called once even then
             self.hor_solution_durations = []
         if self.PARALLEL:
             self.hor_inner_solution_durations = []
@@ -237,6 +236,7 @@ class USV_simulator():
         elif self.PARALLEL:
             return self.problemUSVFast.ub[0:self.mUSV, 0:1].value
 
+    # In parallel case, also stores solution duration of parallel problem
     def update_trajectories(self):
         if self.CENTRALISED:
             # There are no trajectories to update
@@ -246,6 +246,8 @@ class USV_simulator():
         elif self.PARALLEL:
             if self.problemUSV.t_since_update == 0:
                 self.xb_traj = self.problemUSV.xb.value
+                self.hor_solution_durations.append(\
+                    self.problemUSV.last_solution_duration)
                 self.problemUSV.last_solution_is_used = True
             else:
                 self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
@@ -297,11 +299,12 @@ class USV_simulator():
         i = self.experiment_index
         dir_path = '/home/student/robbj_experiment_results/'
         info_str = 'USV used solver: ' + self.used_solver + '\n'
-        try:
-            info_str += 'USV stopped at iteration: ' + str(self.USV_stopped_at_iter)
-        except Exception as e:
-            print e
-            print 'For some reason it still says that USV_stopped_at_iter is undefined...'
+        info_str += 'USV stopped at iteration: ' + str(self.USV_stopped_at_iter)
+        # try:
+        #     info_str += 'USV stopped at iteration: ' + str(self.USV_stopped_at_iter)
+        # except Exception as e:
+        #     print e
+        #     print 'For some reason it still says that USV_stopped_at_iter is undefined...'
 
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_info.txt', [info_str], fmt="%s")
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/xb_log.txt', self.xb_log)
@@ -310,7 +313,6 @@ class USV_simulator():
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_time_stamps.txt', self.USV_times)
         if not self.CENTRALISED:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_traj_log.txt', self.USV_traj_log)
-        if self.DISTRIBUTED:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_horizontal_durations.txt', self.hor_solution_durations)
         if self.PARALLEL:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_inner_horizontal_durations.txt', self.hor_inner_solution_durations)
