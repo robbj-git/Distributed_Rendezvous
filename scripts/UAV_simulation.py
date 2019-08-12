@@ -255,6 +255,7 @@ class UAV_simulator():
         self.vert_inner_traj_log = np.full((self.nv *(self.T_inner+1), sim_len)\
             , np.nan)
         self.USV_traj_log = np.full((self.nUSV*(self.T+1), sim_len), np.nan)
+        self.wdes_traj_log = np.full((self.mv*self.T, sim_len), np.nan)
         # Associate one time value with each iteration of the simulation
         self.UAV_times = np.full((1, sim_len), np.nan)
         self.iteration_durations = []
@@ -269,6 +270,9 @@ class UAV_simulator():
             np.zeros( (self.mUAV*self.T, 1) ))
         self.xb_traj = None # Always contains most up-to-date USV predicted traj
         self.xv_traj = None # Always contains most up-to-date predicted vertical traj
+        # Always contains most up-to-date predicted (by outer problem in
+        # parallel case) vertical input trajectory
+        self.wdes_traj = np.full((self.mv*self.T, 1), np.nan)
         # Always contains most up-to-date predicted horizontal distance between vehicles
         self.dist_traj = None
         if not self.CENTRALISED:
@@ -370,10 +374,21 @@ class UAV_simulator():
             np.isnan(self.problemVert.xv.value).any():
             # xv is set to all nan if solving vertical problem fails
             self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
+            self.wdes_traj.fill(np.nan)
         else:
+            # In parallel case, wdes_traj will only take on a new value after
+            # each solution of the outer vertical problem. No shifting is done
+            # inbetween those solutions as that wouldn't make sense. wdes won't
+            # follow this trajectory anyway in parallel case, it is just stored
+            # to see the intentions of the outer MPC for debugging purposes
+            self.wdes_traj = self.problemVert.wdes.value
             if not self.PARALLEL:
                 self.xv_traj = self.problemVert.xv.value
             elif self.PARALLEL:
+                # Note that the first element of self.xv_traj won't in general
+                # match self.xv in parallel case. Since it takes a few iterations
+                # for the parallel problem to be solved, xv will have changed from
+                # the initial value used in the problem solution
                 if self.problemVert.t_since_update == 0:
                     self.xv_traj = self.problemVert.xv.value
                     self.vert_solution_durations.append(\
@@ -383,16 +398,15 @@ class UAV_simulator():
                     self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
 
     def update_logs(self, i):
-        # update x_log, xv_log, xb_log, uUAV_log, wdes_log, uUSV_log (cent?)
-        # UAV_traj_log, vert_traj_log, USV_traj_log (cent?)
-        # UAV_inner_traj_log, vert_inner_traj_log
         self.x_log[ :, i:i+1] = self.x
         self.xv_log[:, i:i+1] = self.xv
         self.uUAV_log[:, i:i+1] = self.uUAV
         self.wdes_log[:, i:i+1] = self.wdes
         self.UAV_traj_log[:, i:i+1]  = self.x_traj
         self.vert_traj_log[:, i:i+1] = self.xv_traj
+        self.wdes_traj_log[:, i:i+1] = self.wdes_traj
         self.USV_traj_log[:, i:i+1] = self.xb_traj
+
         self.UAV_times[:, i:i+1] = rospy.get_time()
 
         if self.CENTRALISED:
@@ -534,6 +548,8 @@ class UAV_simulator():
             distance = fill_lost_values(np.reshape(distance, (1, -1)))
             signum = fill_lost_values(np.sign(self.x_log[0:1, :] - self.xb_log[0:1, :]))
             distance = np.dot(np.diag(distance.flatten()), signum.T)
+            # ax3.plot(range(sim_len), self.wdes_log.T)
+            # ax3.plot(range(sim_len+1), self.xv_log[1, :].T)
             for t in range(sim_len):
                 if rospy.is_shutdown():
                     break
@@ -569,7 +585,8 @@ class UAV_simulator():
 
                 # ax1.arrow(x_log[0,t], x_log[1,t], uUAV_log[0,t], uUAV_log[1,t]) # <--- ACCELERATION, AWESOME STUFF!
                 ax2.plot(distance[0:t+1], self.xv_log[0, 0:t+1], 'b')
-                # ax2.plot(range(T+1), vert_traj[0, :], 'g')
+                ax2.plot(pred_dist, vert_traj[0, :], 'g')
+                ax2.plot(pred_dist[0:self.T_inner+1], vert_inner_traj[0, :], 'y')
                 # ax2.plot(range(T+1), used_vert_traj, 'y')
                 # DEBUG block
                 # print np.concatenate((pred_dist, used_dist_traj), axis=1)

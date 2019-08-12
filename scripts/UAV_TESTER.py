@@ -91,12 +91,11 @@ prev_simulator = None
 my_uav_simulator =  None
 
 # -------------- TESTING LOOP ----------------
-# NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
+# NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
 NUM_TESTS = 1
 if PARALLEL:
     hor_max = 180#260#120#150
     hor_min = 180#260#180#120#100
-    problem_params.T_inner = 30
 else:
     hor_max = 79#80#37#63#80#56
     hor_min = 79#30#37#63#25#20
@@ -174,6 +173,12 @@ for N in range(hor_max, hor_min-1, -1):
 
         my_uav_simulator.simulate_problem(sim_len, x_m, xv_m)
         print "FINISHED SIMULATING!"
+        print "Mean iteration:", np.mean(my_uav_simulator.iteration_durations)
+        print "Mean horizontal:", np.mean(my_uav_simulator.hor_solution_durations)
+        print "Mean vertical", np.mean(my_uav_simulator.vert_solution_durations)
+        if PARALLEL:
+            print "Mean horizontal inner:", np.mean(my_uav_simulator.hor_inner_solution_durations)
+            print "Mean vertical inner:", np.mean(my_uav_simulator.vert_inner_solution_durations)
         # # DEBUG storing
         # my_uav_simulator.store_data()
         # DEBUG plotting
@@ -238,8 +243,9 @@ for N in range(hor_max, hor_min-1, -1):
 #DEBUG
 try:
     my_uav_simulator.plot_results(True)
-except:
+except Exception as e:
     # Exception is sometimes thrown when window is closed
+    print e
     pass
 
 instruct_pub.publish(Int32(N))

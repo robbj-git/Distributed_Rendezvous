@@ -173,8 +173,11 @@ for N in range(hor_max, hor_min-1, -1):
         # except:
         #     pass
         print "Finished simulation round", i, "with horizon", N
-        print np.mean(my_usv_simulator.iteration_durations)
-        print np.median(my_usv_simulator.iteration_durations)
+        print "Mean iteration:", np.mean(my_usv_simulator.iteration_durations)
+        if not CENTRALISED:
+            print "Mean solution:", np.mean(my_usv_simulator.hor_solution_durations)
+        if PARALLEL:
+            print "Mean inner solution", np.mean(my_usv_simulator.hor_inner_solution_durations)
         # ------------- FOR PARALLEL ------------
         if PARALLEL and np.mean(my_usv_simulator.hor_solution_durations) > SAMPLING_TIME\
             and np.median(my_usv_simulator.hor_solution_durations) > SAMPLING_TIME:

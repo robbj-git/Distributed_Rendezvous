@@ -547,18 +547,46 @@ class VerticalProblem():
         P_col = range(nv*(T+1) + mv*T)
         self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
         self.q_OSQP = 0
-        self.l_OSQP = np.bmat([[np.dot(self.Phi_v,np.zeros((nv, 1)))],\
-            [np.full((4*(T+1), 1), -np.inf)],\
-            [params.wmin*np.ones((mv*T, 1))]] )
-        self.u_OSQP = np.bmat([[np.dot(self.Phi_v,np.zeros((nv, 1)))],\
-            [self.vert_constraints_vector],\
-            [params.wmax*np.ones((mv*T, 1))]] )
-        A_temp = np.bmat([\
-            [np.eye(nv*(T+1)), -self.Lambda_v],\
-            [self.vert_constraints_matrix, np.zeros((4*(T+1), mv*T))],\
-            [np.zeros((mv*T, nv*(T+1))), np.eye(mv*T)]
-            ])
-        self.A_OSQP = csc_matrix(A_temp)
+        # Honestly, I can't quite remember wth I was doing here, remade it below
+        # self.l_OSQP = np.bmat([[np.dot(self.Phi_v,np.zeros((nv, 1)))],\
+        #     [np.full((4*(T+1), 1), -np.inf)],\
+        #     [params.wmin*np.ones((mv*T, 1))]] )
+        # self.u_OSQP = np.bmat([[np.dot(self.Phi_v,np.zeros((nv, 1)))],\
+        #     [self.vert_constraints_vector],\
+        #     [params.wmax*np.ones((mv*T, 1))]] )
+        # A_temp = np.bmat([\
+        #     [np.eye(nv*(T+1)), -self.Lambda_v],\
+        #     [self.vert_constraints_matrix, np.zeros((4*(T+1), mv*T))],\
+        #     [np.zeros((mv*T, nv*(T+1))), np.eye(mv*T)]
+        #     ])
+        # self.A_OSQP = csc_matrix(A_temp)
+        self.l_OSQP = np.bmat([
+            [np.dot(self.Phi_v, np.zeros((nv, 1)))],    # Dynamics
+            [np.dot(params.wmin,np.ones((2*T+1, 1)))],  # Velocity and input constraints
+            [np.dot(params.wmin_land,np.ones((T+1, 1)))], # Touchdown constraints
+            [np.zeros((T+1, 1))],                        # Altitude constraints
+            [-np.full((T+1,1), np.inf)]                  # Safety constraints
+        ])
+        self.u_OSQP = np.bmat([
+            [np.dot(self.Phi_v, np.zeros((nv, 1)))],      # Dynamics
+            [np.full((T+1, 1), np.inf)],                  # Velocity constraints
+            [np.full((T,   1), params.wmax)],             # Input constraints
+            [np.full((T+1, 1), np.inf)],                  # Touchdown constraints
+            [np.full((T+1, 1), np.inf)],                  # Altitude constraints
+            [-np.dot(params.hs,np.zeros((T+1, 1))) + \
+                np.dot(params.hs*params.dl, np.ones((T+1, 1)))] # Safety constraints
+        ])
+        self.A_temp = np.bmat([
+            [np.eye(nv*(T+1)), -self.Lambda_v],         # Dynamics
+            [velocity_extractor, np.zeros((T+1, T))],   # Velocity constraints
+            [np.zeros((T, nv*(T+1))), np.eye(T)],       # Input constraints
+            [velocity_extractor + np.dot(params.kl,height_extractor),\
+                np.zeros((T+1, T))],                    # Touchdown constraints
+            [height_extractor, np.zeros((T+1, T))],     # Altitude constraints
+            [np.dot(params.dl-params.ds,height_extractor),\
+                np.zeros((T+1, T))]                     # Safety constraints
+        ])
+        self.A_OSQP = csc_matrix(self.A_temp)
 
     def create_optimisation_problem(self):
         T = self.T
@@ -588,11 +616,11 @@ class VerticalProblem():
         # Safety constraints
         constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
             <= cp.diag(self.b)*(params.hs*params.dl - params.hs*self.dist)]
-        constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
-            <= cp.diag(self.b)*(params.hs*params.dl + params.hs*self.dist)]
+        # constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
+        #     <= cp.diag(self.b)*(params.hs*params.dl + params.hs*self.dist)]
         # Safe height constraints
-        constraintsVert += [self.height_extractor*self.xv \
-            >= params.hs*(np.ones(( T+1, 1 )) - self.b)]
+        constraintsVert += [-self.height_extractor*self.xv \
+            <= -params.hs*(np.ones(( T+1, 1 )) - self.b)]
 
         # # RIDICULOUS DEBUG!!!!
         # new_mat = np.bmat([[self.vert_constraints_matrix, np.zeros((4*(T+1),T))], \
@@ -660,6 +688,7 @@ class VerticalProblem():
         start = time.time()
         T = self.T
         nv = self.nv
+        # TODO: Rename xv_m to just xv, or xv_0?
         self.xv_0.value = xv_m
         # USV vertical state assumed constant
         self.xb_v.value = np.ones((nv*(T+1), 1))*xbv_m
@@ -683,11 +712,14 @@ class VerticalProblem():
                 (self.nv*(self.T+1), 1), order='F')
         elif self.type == 'OSQP':
             start = time.time()
-            self.update_OSQP(xv_m, np.diag(self.b2.value))
+            self.update_OSQP(xv_m, dist, self.b.value)
             results = self.problemOSQP.solve()
-            if results.xv[0] is not None:
+            if results.x[0] is not None:
                 self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
                 self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):], (-1, 1))
+                # #DEBUG
+                # print "CONSTRAINT SATISFACTION:"
+                # self.print_constraints_satisfied(self.xv.value, self.wdes.value)
             else:
                 # Optimisation failed
                 print results.info.status
@@ -706,6 +738,9 @@ class VerticalProblem():
                 stats = self.problemVert.solver_stats
                 self.num_iters_log.append(stats.num_iters)
                 self.durations.append(duration)
+                # #DEBUG
+                # print "CONSTRAINT SATISFACTION CVXPY:"
+                # self.print_constraints_satisfied(self.xv.value, self.wdes.value)
             except cp.error.SolverError as e:
                 print "Vertical problem:"
                 print e
@@ -758,14 +793,37 @@ class VerticalProblem():
     def predict_trajectory(self, xv_0, wdes_traj):
         return np.dot(self.Phi_v, xv_0) + np.dot(self.Lambda_v, wdes_traj)
 
-    def update_OSQP(self, x0, safe_states_extractor):
-        self.l_OSQP = np.bmat([[np.dot(self.Phi_v, x0)],\
-            [np.full((4*(self.T+1), 1), -np.inf)],\
-            [self.params.wmin*np.ones((self.mv*self.T, 1))]] )
-        self.u_OSQP = np.bmat([[np.dot(self.Phi_v, x0)],\
-            [self.vert_constraints_vector],\
-            [self.params.wmax*np.ones((self.mv*self.T, 1))]] )
-        P_temp = 2*np.bmat([[np.dot(safe_states_extractor, self.Qv_big),\
+    def update_OSQP(self, x0, dist_traj, binary_traj):
+        b1 = np.diag(np.ravel(binary_traj))
+        b2 = np.diag(np.ravel( np.kron( binary_traj, np.ones((2, 1)))  ))
+        params = self.params
+        T = self.T
+        self.l_OSQP = np.bmat([
+            [np.dot(self.Phi_v, x0)],             # Dynamics
+            [np.dot(params.wmin,np.ones((2*T+1, 1)))],# Velocity and input constraints
+            [np.dot(params.wmin_land,np.ones((T+1, 1)))], # Touchdown constraints
+            # Altitude constraints
+            [np.dot( (np.eye(T+1)-b1), np.full((T+1,1), params.hs) ) ],
+            [-np.full((T+1, 1), np.inf)]            # Safety constraints
+        ])
+        self.u_OSQP = np.bmat([
+            [np.dot(self.Phi_v, x0)],                     # Dynamics
+            [np.full((T+1, 1), np.inf)],                  # Velocity constraints
+            [np.full((T,   1), params.wmax)],             # Input constraints
+            [np.full((T+1, 1), np.inf)],                  # Touchdown constraints
+            [np.full((T+1, 1), np.inf)],                  # Altitude constraints
+            [-np.dot(params.hs, np.dot(b1, dist_traj)) + \
+                np.dot(params.hs*params.dl,np.ones((T+1, 1)))]# Safety constraints
+        ])
+
+
+        # self.l_OSQP = np.bmat([[np.dot(self.Phi_v, x0)],\
+        #     [np.full((4*(self.T+1), 1), -np.inf)],\
+        #     [self.params.wmin*np.ones((self.mv*self.T, 1))]] )
+        # self.u_OSQP = np.bmat([[np.dot(self.Phi_v, x0)],\
+        #     [self.vert_constraints_vector],\
+        #     [self.params.wmax*np.ones((self.mv*self.T, 1))]] )
+        P_temp = 2*np.bmat([[np.dot(b2, self.Qv_big),\
             np.zeros((self.nv*(self.T+1), self.mv*self.T))],\
             [np.zeros((self.mv*self.T, self.nv*(self.T+1))), self.Rv_big]])
         P_data = np.diagonal(P_temp)
@@ -774,6 +832,69 @@ class VerticalProblem():
         # P_new = csc_matrix((P_data, (P_row, P_col)))
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP)
         self.problemOSQP.update(Px=P_data)
+
+    # DEBUG: Checks if a solution satisfies all constraints
+    def print_constraints_satisfied(self, xv_traj, uv_traj):
+        # I'm not sure if this one works, it always seems to show that constraints
+        # are violated, even when I think they're not
+        vec = np.bmat([[xv_traj],[uv_traj]])
+        lower = self.l_OSQP <= np.dot(self.A_temp, vec)
+        upper = np.dot(self.A_temp, vec) <= self.u_OSQP
+        # Get indices of rows where constraints where violated
+        lower_violations = np.where(lower == False)[0]
+        upper_violations = np.where(upper == False)[0]
+        dynamics_violations_l = 0
+        dynamics_violations_u = 0
+        velocity_violations_l = 0
+        velocity_violations_u = 0
+        input_violations_l = 0
+        input_violations_u = 0
+        touchdown_violations_l = 0
+        touchdown_violations_u = 0
+        altitude_violations_l = 0
+        altitude_violations_u = 0
+        safety_violations_l = 0
+        safety_violations_u = 0
+
+        n = self.nv
+        T = self.T
+
+        for index in lower_violations:
+            if index < n*(T+1):
+                dynamics_violations_l += 1
+            elif index < (n+1)*(T+1):
+                velocity_violations_l += 1
+            elif index < (n+1)*(T+1) + T:
+                input_violations_l += 1
+            elif index < (n+3)*(T+1):
+                touchdown_violations_l += 1
+            elif index < (n+4)*(T+1):
+                altitude_violations_l += 1
+            elif index < (n+5)*(T+1):
+                safety_violations_l += 1
+
+        for index in upper_violations:
+            if index < n*(T+1):
+                dynamics_violations_u += 1
+            elif index < (n+1)*(T+1):
+                velocity_violations_u += 1
+            elif index < (n+1)*(T+1) + T:
+                input_violations_u += 1
+            elif index < (n+3)*(T+1):
+                touchdown_violations_u += 1
+            elif index < (n+4)*(T+1):
+                altitude_violations_u += 1
+            elif index < (n+5)*(T+1):
+                safety_violations_u += 1
+
+        print "Violated", dynamics_violations_l, "lower and", dynamics_violations_u, "upper dynamics constraints"
+        print "Violated", velocity_violations_l, "lower and", velocity_violations_u, "upper velocity constraints"
+        print "Violated", input_violations_l, "lower and", input_violations_u, "upper input constraints"
+        print "Violated", touchdown_violations_l, "lower and", touchdown_violations_u, "upper touchdown constraints"
+        print "Violated", altitude_violations_l, "lower and", altitude_violations_u, "upper altitude constraints"
+        print "Violated", safety_violations_l, "lower and", safety_violations_u, "upper safety constraints"
+        # print sum( lower ), 'of', self.A_temp.shape[0], 'satisfied'
+        # print sum( upper ), 'of', self.A_temp.shape[0], 'satisfied'
 
 class DistributedProblem():
 

@@ -2,9 +2,9 @@ from math import ceil
 
 USE_HIL = False     # Should the UAV communicate with the HIL setup?
 # SET ONE OF THESE TO TRUE
-CENTRALISED = False
+CENTRALISED = True
 DISTRIBUTED = False
-PARALLEL = True
+PARALLEL = False
 
 SAMPLING_RATE = 20              # Dynamics change if this changes
 SAMPLING_TIME = 1.0/SAMPLING_RATE
@@ -22,7 +22,7 @@ CVXPy = "CVXPy"
 OSQP = "OSQP"
 
 used_hor_solver = CVXPy
-used_vert_solver = CVXPy
+used_vert_solver = OSQP
 
 INTER_ITS = 5  # Number of iteration between each solution of the parallel optimisaion problem
 
