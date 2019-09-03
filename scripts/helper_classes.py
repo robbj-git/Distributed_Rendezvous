@@ -1,6 +1,7 @@
 from rendezvous_problem.msg import Float32MultiArrayStamped
 from helper_functions import shift_traj_msg, get_traj_dir, get_cos_angle_between
 from IMPORT_ME import SAMPLING_TIME
+from matrices_and_parameters import n_UAV, n_USV, nv, wmax, wmin, wmin_land, kl
 import numpy as np
 import Queue
 import rospy
@@ -129,6 +130,7 @@ class StampedTrajQueue():
     def put_traj(self, traj_msg):
         if self.traj_queue.full():
             print "Duuuude, queue was totally full, despite having infinite length...?"
+            # Attempt to remove element from queue
             try:
                 self.traj_queue.get_nowait()
             except Queue.Empty:
@@ -137,6 +139,18 @@ class StampedTrajQueue():
 
     def set_delay_time(self, new_delay_time):
         self.delay_duration = rospy.Duration.from_sec(new_delay_time)
+
+class DataAnalysisParams():
+
+    def __init__(self):
+        self.nUAV = n_UAV
+        self.nUSV = n_USV
+        self.nv = nv
+        self.T = np.nan
+        self.wmax = wmax
+        self.wmin = wmin
+        self.wmin_land = wmin_land
+        self.kl = kl
 
 # class StateApproximator():
 #

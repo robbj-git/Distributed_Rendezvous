@@ -96,9 +96,14 @@ NUM_TESTS = 1
 if PARALLEL:
     hor_max = 180#260#120#150
     hor_min = 180#260#180#120#100
-else:
+elif CENTRALISED:
+    hor_max = 68
+    hor_min = 68
+elif DISTRIBUTED:
     hor_max = 79#80#37#63#80#56
     hor_min = 79#30#37#63#25#20
+
+hor_inner = 30#15
 cancelled = False
 
 # Need to create a simulator, because simulators call rospy.node_init(), and
@@ -114,7 +119,7 @@ for N in range(hor_max, hor_min-1, -1):
     UAV_test_round = -1
     next_test_round = 0
     problem_params.T = N
-    problem_params.T_inner = 30
+    problem_params.T_inner = hor_inner
 
     mean_list = np.empty((NUM_TESTS, 1))
     mean_list.fill(np.nan)
@@ -178,6 +183,7 @@ for N in range(hor_max, hor_min-1, -1):
         print "Mean vertical", np.mean(my_uav_simulator.vert_solution_durations)
         if PARALLEL:
             print "Mean horizontal inner:", np.mean(my_uav_simulator.hor_inner_solution_durations)
+            print "Median horizontal inner:", np.median(my_uav_simulator.hor_inner_solution_durations)
             print "Mean vertical inner:", np.mean(my_uav_simulator.vert_inner_solution_durations)
         # # DEBUG storing
         # my_uav_simulator.store_data()
@@ -194,7 +200,7 @@ for N in range(hor_max, hor_min-1, -1):
         UAV_time_stamps = my_uav_simulator.UAV_times
         t_0 = UAV_time_stamps[0, 0]
         UAV_time_stamps = UAV_time_stamps - t_0
-        for j in range(len(z_traj)):
+        for j in range(len(z_traj)-1):
             if z_traj[j] > 0.1:
                 land_time = UAV_time_stamps[0, j]
             else:
@@ -240,13 +246,13 @@ for N in range(hor_max, hor_min-1, -1):
         instruct_pub.publish(Int32(N))
         break
 
-#DEBUG
-try:
-    my_uav_simulator.plot_results(True)
-except Exception as e:
-    # Exception is sometimes thrown when window is closed
-    print e
-    pass
+# #DEBUG
+# try:
+#     my_uav_simulator.plot_results(True)
+# except Exception as e:
+#     # Exception is sometimes thrown when window is closed
+#     print e
+#     pass
 
 instruct_pub.publish(Int32(N))
 if not cancelled:
@@ -256,7 +262,8 @@ if not cancelled:
         + str(hor_max) + "\nnumber of trials: " + str(NUM_TESTS)
     exp_index = my_uav_simulator.store_data(test_info_str = test_info_str)
 
-    dir_path = '/home/student/robbj_experiment_results/'
+    # dir_path = '/home/student/robbj_experiment_results/'
+    dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/MEAN.txt', mean_list)
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/MEDIAN.txt', median_list)
 

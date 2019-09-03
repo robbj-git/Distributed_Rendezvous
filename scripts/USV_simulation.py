@@ -8,6 +8,7 @@ from rendezvous_problem.msg import Float32MultiArrayStamped, StateStamped
 from geometry_msgs.msg import AccelStamped
 from std_msgs.msg import Int8
 import matplotlib.pyplot as plt
+import os
 from matplotlib.patches import Polygon, Circle
 from matplotlib.collections import PatchCollection
 import time
@@ -66,6 +67,9 @@ class USV_simulator():
         # rospy.init_node('USV_main')
         rospy.Subscriber('experiment_index', Int8, self.experiment_index_callback)
         if not self.CENTRALISED:
+            # UAVApprox needs to be initialised here, since UAV_traj_callback
+            # can start being called, and it contains a reference to UAVApprox
+            self.UAVApprox = StampedTrajQueue(self.delay_len)
             self.traj_pub = rospy.Publisher('USV_traj', Float32MultiArrayStamped, queue_size = 10)
             self.UAV_traj_sub = rospy.Subscriber(\
                 'UAV_traj', Float32MultiArrayStamped, self.UAV_traj_callback)
@@ -77,10 +81,11 @@ class USV_simulator():
 
     def simulate_problem(self, sim_len, xb_val):
         self.reset(sim_len, xb_val)
-
+        # self.USV_should_stop = True # DEBUG
         self.xb = xb_val
 
         if not self.CENTRALISED:
+            self.i = 0  # Needs to be defined here since it's referenced in send_traj_to_UAV()
             while self.x_traj is None:
                 # TODO: Sometimes self.xb_traj seems to be something other than an array, fix that
                 self.send_traj_to_UAV(np.asarray(self.xb_traj))
@@ -93,9 +98,11 @@ class USV_simulator():
                     return
                 self.rate.sleep()
 
+
         # If centralised, get first control input
         if self.CENTRALISED:
             uUSV_msg = None
+            self.i = 0  # Needs to be defined here since it's referenced in send_state_to_UAV()
             while uUSV_msg is None:
                 self.send_state_to_UAV(self.xb)
                 try:
@@ -131,13 +138,14 @@ class USV_simulator():
                         # Use shifted old trajectory if no new trajectory is available
                         self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
 
-            # Make the USV stop once the vehicles are within safe landing distance
-            if not self.CENTRALISED and not self.USV_should_stop:
-                self.dist = np.sqrt(np.square( self.xb[0,0] - self.x_traj[0,0])\
-                    + np.square( self.xb[1,0] - self.x_traj[1,0] ))
-                self.USV_should_stop = False if self.dist > self.ds else True
-                if self.USV_should_stop:
-                    self.USV_stopped_at_iter = self.i
+            # TODO: Make this togglable from IMPORT_ME
+            # # Make the USV stop once the vehicles are within safe landing distance
+            # if not self.CENTRALISED and not self.USV_should_stop:
+            #     self.dist = np.sqrt(np.square( self.xb[0,0] - self.x_traj[0,0])\
+            #         + np.square( self.xb[1,0] - self.x_traj[1,0] ))
+            #     self.USV_should_stop = False if self.dist > self.ds else True
+            #     if self.USV_should_stop:
+            #         self.USV_stopped_at_iter = self.i
 
             # ------- Solving Problem --------
             if self.DISTRIBUTED or (self.PARALLEL and i == 0):
@@ -208,8 +216,8 @@ class USV_simulator():
         self.dist = None
 
         self.USV_should_stop = False
-        self.UAVApprox = StampedTrajQueue(0.0)
-        self.input_queue = StampedMsgQueue(0.0)
+        self.UAVApprox = StampedTrajQueue(self.delay_len)
+        self.input_queue = StampedMsgQueue(self.delay_len)
 
     def solve_distributed_problem(self, xb, x_traj):
         T = self.T
@@ -272,6 +280,7 @@ class USV_simulator():
             self.i <= self.dropout_upper_bound):
             #DEBUG Adds message dropout
             pass
+            print "DID DROP!"
         else:
             self.traj_pub.publish(traj_msg)
 
@@ -297,7 +306,15 @@ class USV_simulator():
                 break
 
         i = self.experiment_index
-        dir_path = '/home/student/robbj_experiment_results/'
+        # dir_path = '/home/student/robbj_experiment_results/'
+        dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
+
+        if os.path.isdir(dir_path + 'Experiment_' + str(i)):
+            # Directory exists, assumed to be created by UAV
+            pass
+        else:
+            os.mkdir(dir_path + 'Experiment_' + str(i))
+
         info_str = 'USV used solver: ' + self.used_solver + '\n'
         info_str += 'USV stopped at iteration: ' + str(self.USV_stopped_at_iter)
         # try:
@@ -323,6 +340,7 @@ class USV_simulator():
         plt.title("USV Simulation")
 
         [_, sim_len] = self.xb_log.shape
+        sim_len = sim_len - 1
         dl = self.params.dl
         ds = self.params.ds
         hs = self.params.hs
@@ -433,7 +451,6 @@ class USV_simulator():
         #         np.concatenate((self.UAV_traj_log, temp), axis=1)
         #     self.x_log = temp[0:nUAV, 0:1] if (self.x_log is None) else\
         #         np.concatenate((self.x_log, temp[0:nUAV, 0:1]), axis=1)
-
         self.UAVApprox.put_traj(msg)
 
     # Used in centralised case. Received control input that should be applied

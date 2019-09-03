@@ -1,6 +1,7 @@
 from math import ceil
+from sys import maxint
 
-USE_HIL = False     # Should the UAV communicate with the HIL setup?
+USE_HIL = True     # Should the UAV communicate with the HIL setup?
 # SET ONE OF THESE TO TRUE
 CENTRALISED = True
 DISTRIBUTED = False
@@ -34,7 +35,9 @@ FOUND_HORIZON = 1
 # Simulated minimum delay between a sent and received message
 delay_time = 0.75   # Measured in seconds
 # delay_len = int(ceil(delay_time/SAMPLING_TIME))   # Measured in number of iterations
-delay_len = 0 #DEBUG
+delay_len = -maxint - 1 #DEBUG, set delay to lowest possible value, so that ...
+# ...no artificial delay is added even when scripts are running on separate...
+# ...machines with non-synchronised clocks
 
 # Number of iterations simulation should last
 sim_len = 500

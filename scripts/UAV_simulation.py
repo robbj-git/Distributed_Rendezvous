@@ -68,8 +68,8 @@ class UAV_simulator():
 
         self.i = 0
         # These must be created already in the constructor since they are used in ROS callbacks
-        self.USVApprox = StampedTrajQueue(0.0)
-        self.USV_state_queue = StampedMsgQueue(0.0)
+        self.USVApprox = StampedTrajQueue(self.delay_len)
+        self.USV_state_queue = StampedMsgQueue(self.delay_len)
 
         self.x = np.full((self.nUAV, 1), np.nan)
         self.xv = np.full((self.nv, 1), np.nan)
@@ -226,7 +226,7 @@ class UAV_simulator():
                 self.x  =  self.A*self.x  +  self.B*self.uUAV
                 self.xv = self.Av*self.xv + self.Bv*self.wdes
             else:
-                self.publish_HIL_control()
+                self.publish_HIL_control(self.uUAV, self.wdes)
 
             # ------- Sleep --------
             end = time.time()
@@ -256,6 +256,8 @@ class UAV_simulator():
             , np.nan)
         self.USV_traj_log = np.full((self.nUSV*(self.T+1), sim_len), np.nan)
         self.wdes_traj_log = np.full((self.mv*self.T, sim_len), np.nan)
+        self.s_log = np.full((1, sim_len), np.nan)
+        self.obj_val_log = np.full((1, sim_len), np.nan)
         # Associate one time value with each iteration of the simulation
         self.UAV_times = np.full((1, sim_len), np.nan)
         self.iteration_durations = []
@@ -281,8 +283,8 @@ class UAV_simulator():
         else: # if self.CENTRALISED
             self.uUSV_log = np.full((self.mUSV, sim_len), np.nan)
 
-        self.USVApprox = StampedTrajQueue(0.0)
-        self.USV_state_queue = StampedMsgQueue(0.0)
+        self.USVApprox = StampedTrajQueue(self.delay_len)
+        self.USV_state_queue = StampedMsgQueue(self.delay_len)
 
     def solve_centralised_problem(self, x, xb):
         start_time = time.time()
@@ -406,6 +408,8 @@ class UAV_simulator():
         self.vert_traj_log[:, i:i+1] = self.xv_traj
         self.wdes_traj_log[:, i:i+1] = self.wdes_traj
         self.USV_traj_log[:, i:i+1] = self.xb_traj
+        self.s_log[:, i:i+1] = self.problemVert.s.value
+        self.obj_val_log[:, i:i+1] = self.problemVert.obj_val
 
         self.UAV_times[:, i:i+1] = rospy.get_time()
 
@@ -463,7 +467,9 @@ class UAV_simulator():
         sim_len -= 1
         i = 0
         dir_already_exists = True
-        dir_path = '/home/student/robbj_experiment_results/'
+        dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
+        print "DIR PATH:", dir_path
+        # dir_path = '/home/student/robbj_experiment_results/'
         while dir_already_exists:
             i += 1
             dir_already_exists = os.path.isdir(dir_path + 'Experiment_' + str(i))
@@ -495,6 +501,8 @@ class UAV_simulator():
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_time_stamps.txt', self.UAV_times)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_solution_durations.txt', self.vert_solution_durations)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_horizontal_durations.txt', self.hor_solution_durations)
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_log.txt', self.s_log)
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/obj_val_log.txt', self.obj_val_log)
         if self.CENTRALISED:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_traj_log.txt', self.USV_traj_log)
         if self.PARALLEL:

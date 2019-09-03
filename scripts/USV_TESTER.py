@@ -90,7 +90,7 @@ class ProblemParams():
 
 problem_params = ProblemParams()
 
-xb_m = np.matrix([[30.0], [15.0], [0.0], [0.0]])
+xb_m = np.matrix([[4.0], [5.0], [0.0], [0.0]])
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
@@ -109,16 +109,21 @@ ever_took_too_long = False
 if PARALLEL:
     hor_max = 180#260#120#150   212 was good I think
     hor_min = 180#260#180#120#100
-else:
+elif CENTRALISED:
+    hor_max = 68
+    hor_min = 68
+elif DISTRIBUTED:
     hor_max = 79#80#37#63#80#56
     hor_min = 79#30#37#63#25#20
+
+hor_inner = 30#15
 
 for N in range(hor_max, hor_min-1, -1):
     took_too_long = False
     USV_test_round = -1
     next_test_round = 0
     problem_params.T = N
-    problem_params.T_inner = 30
+    problem_params.T_inner = hor_inner
 
     # Wait for UAV tester before creating next simulator
     # If the UAV and USV testers have simulators with different time horizons,
@@ -204,12 +209,13 @@ if not quit_horizon >= 0:
 
 print "stopped sleeping"
 
-try:
-    my_usv_simulator.plot_results(True)
-except Exception as e:
-    # Sometimes exception is thrown when plotting window is closed
-    print e
-    pass
+# try:
+# my_usv_simulator.plot_results(True)
+# except Exception as e:
+#     # Sometimes exception is thrown when plotting window is closed
+#     print "Error while plotting:"
+#     print e
+#     pass
 
 store_pub.publish(Int32(1))
 if quit_horizon >= 0:

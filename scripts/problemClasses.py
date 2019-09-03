@@ -472,6 +472,10 @@ class VerticalProblem():
         self.create_optimisation_problem()
         self.durations = [] #DEBUG
         self.num_iters_log = [] #DEBUG
+        self.obj_val = np.nan
+        self.state_obj_val = np.nan
+        self.input_obj_val = np.nan
+        self.slack_obj_val = np.nan
         if type == 'CVXGEN':
             self.ROS_init()
 
@@ -540,11 +544,13 @@ class VerticalProblem():
         ])
 
         # ------------- OSQP Matrices --------------
-        P_temp = 2*np.bmat([[self.Qv_big, np.zeros((nv*(T+1), mv*T))],\
-            [np.zeros((mv*T, nv*(T+1))), self.Rv_big]])
+        C = 10000*(T+1)
+        P_temp = 2*np.bmat([[self.Qv_big, np.zeros((nv*(T+1), mv*T+1))],\
+            [np.zeros((mv*T, nv*(T+1))), self.Rv_big, np.zeros((mv*T, 1)) ],\
+            [np.zeros(( 1, nv*(T+1)+mv*T )), np.full((1,1), C) ]])
         P_data = np.diagonal(P_temp)
-        P_row = range(nv*(T+1) + mv*T)
-        P_col = range(nv*(T+1) + mv*T)
+        P_row = range(nv*(T+1) + mv*T + 1)
+        P_col = range(nv*(T+1) + mv*T + 1)
         self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
         self.q_OSQP = 0
         # Honestly, I can't quite remember wth I was doing here, remade it below
@@ -576,16 +582,28 @@ class VerticalProblem():
             [-np.dot(params.hs,np.zeros((T+1, 1))) + \
                 np.dot(params.hs*params.dl, np.ones((T+1, 1)))] # Safety constraints
         ])
+        # INCLUDES SOFT CONSTRAINTS
         self.A_temp = np.bmat([
-            [np.eye(nv*(T+1)), -self.Lambda_v],         # Dynamics
-            [velocity_extractor, np.zeros((T+1, T))],   # Velocity constraints
-            [np.zeros((T, nv*(T+1))), np.eye(T)],       # Input constraints
+            [np.eye(nv*(T+1)), -self.Lambda_v, np.zeros((nv*(T+1), 1))],        # Dynamics
+            [velocity_extractor, np.zeros((T+1, T)), np.ones((T+1, 1))],   # Velocity constraints
+            [np.zeros((T, nv*(T+1))), np.eye(T), np.zeros((T, 1))],      # Input constraints
             [velocity_extractor + np.dot(params.kl,height_extractor),\
-                np.zeros((T+1, T))],                    # Touchdown constraints
-            [height_extractor, np.zeros((T+1, T))],     # Altitude constraints
+                np.zeros((T+1, T)), np.ones((T+1, 1))],                    # Touchdown constraints
+            [height_extractor, np.zeros((T+1, T)), np.zeros((T+1, 1))],    # Altitude constraints
             [np.dot(params.dl-params.ds,height_extractor),\
-                np.zeros((T+1, T))]                     # Safety constraints
+                np.zeros((T+1, T)), np.zeros((T+1, 1))]                    # Safety constraints
         ])
+        # DOES NOT INCLUDE SOFT CONSTRAINTS
+        # self.A_temp = np.bmat([
+        #     [np.eye(nv*(T+1)), -self.Lambda_v, np.zeros((nv*(T+1), 1))],        # Dynamics
+        #     [velocity_extractor, np.zeros((T+1, T)), np.zeros((T+1, 1))],   # Velocity constraints
+        #     [np.zeros((T, nv*(T+1))), np.eye(T), np.zeros((T, 1))],      # Input constraints
+        #     [velocity_extractor + np.dot(params.kl,height_extractor),\
+        #         np.zeros((T+1, T)), np.zeros((T+1, 1))],                    # Touchdown constraints
+        #     [height_extractor, np.zeros((T+1, T)), np.zeros((T+1, 1))],    # Altitude constraints
+        #     [np.dot(params.dl-params.ds,height_extractor),\
+        #         np.zeros((T+1, T)), np.zeros((T+1, 1))]                    # Safety constraints
+        # ])
         self.A_OSQP = csc_matrix(self.A_temp)
 
     def create_optimisation_problem(self):
@@ -594,6 +612,7 @@ class VerticalProblem():
         params = self.params
         self.xv = cp.Variable(( nv*(T+1), 1 ))
         self.wdes = cp.Variable(( T, 1 ))
+        self.s = cp.Variable((1, 1))
         self.xb_v = cp.Parameter(( nv*(T+1), 1 ))
         self.xv_0 = cp.Parameter(( nv, 1 ))
         self.dist = cp.Parameter(( T+1, 1 ))
@@ -716,16 +735,22 @@ class VerticalProblem():
             results = self.problemOSQP.solve()
             if results.x[0] is not None:
                 self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
-                self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):], (-1, 1))
+                self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):-1], (-1, 1))
+                self.s.value  = np.full((1,1), results.x[-1])
+                self.obj_val = results.info.obj_val
                 # #DEBUG
                 # print "CONSTRAINT SATISFACTION:"
                 # self.print_constraints_satisfied(self.xv.value, self.wdes.value)
             else:
                 # Optimisation failed
-                print results.info.status
-                self.wdes.value = np.empty((self.T, 1))
+                print "STATUS:", results.info.status
+                # Using np.full() doesn't seem to work, since "variables must be
+                # real". Using this approach seems to circumvent that limitation
+                # np.zeros() is used instead of np.empty() since np.empty()
+                # sometimes contains non-real values, causing an exception
+                self.wdes.value = np.zeros((self.T, 1))
                 self.wdes.value.fill(np.nan)
-                self.xv.value = np.empty(((self.T+1)*self.nv, 1))
+                self.xv.value = np.zeros(((self.T+1)*self.nv, 1))
                 self.xv.value.fill(np.nan)
             duration = time.time() - start
             self.num_iters_log.append(results.info.iter)
@@ -816,16 +841,13 @@ class VerticalProblem():
                 np.dot(params.hs*params.dl,np.ones((T+1, 1)))]# Safety constraints
         ])
 
-
-        # self.l_OSQP = np.bmat([[np.dot(self.Phi_v, x0)],\
-        #     [np.full((4*(self.T+1), 1), -np.inf)],\
-        #     [self.params.wmin*np.ones((self.mv*self.T, 1))]] )
-        # self.u_OSQP = np.bmat([[np.dot(self.Phi_v, x0)],\
-        #     [self.vert_constraints_vector],\
-        #     [self.params.wmax*np.ones((self.mv*self.T, 1))]] )
+        C = 10000*(T+1)
         P_temp = 2*np.bmat([[np.dot(b2, self.Qv_big),\
-            np.zeros((self.nv*(self.T+1), self.mv*self.T))],\
-            [np.zeros((self.mv*self.T, self.nv*(self.T+1))), self.Rv_big]])
+                np.zeros((self.nv*(self.T+1), self.mv*(self.T+1)))],\
+            [np.zeros((self.mv*self.T, self.nv*(self.T+1))), self.Rv_big,\
+                np.zeros((self.mv*self.T, 1))],\
+            [np.zeros(( 1, self.nv*(self.T+1)+self.mv*self.T )),\
+                np.full((1,1), C) ]])
         P_data = np.diagonal(P_temp)
         # P_row = range(self.nv*(self.T+1) + self.mv*self.T)
         # P_col = range(self.nv*(self.T+1) + self.mv*self.T)
@@ -1295,9 +1317,13 @@ class FastVerticalProblem():
                 self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):], (-1, 1))
             else:
                 # Optimisation failed
-                self.wdes.value = np.empty((self.T, 1))
+                # Using np.full() doesn't seem to work, since "variables must be
+                # real". Using this approach seems to circumvent that limitation
+                # np.zeros() is used instead of np.empty() since np.empty()
+                # sometimes contains non-real values, causing an exception
+                self.wdes.value = np.zeros((self.T, 1))
                 self.wdes.value.fill(np.nan)
-                self.xv.value = np.empty(((self.T+1)*self.nv, 1))
+                self.xv.value = np.zeros(((self.T+1)*self.nv, 1))
                 self.xv.value.fill(np.nan)
             duration = time.time() - start
             self.num_iters_log.append(results.info.iter)
@@ -1313,7 +1339,7 @@ class FastVerticalProblem():
             except cp.error.SolverError as e:
                 print "Vertical problem:"
                 print e
-                self.wdes.value = np.empty((self.T, 1))
+                self.wdes.value = np.zeros((self.T, 1))
                 self.wdes.value.fill(np.nan)
         end = time.time()
         self.last_solution_duration = end - start
