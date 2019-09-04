@@ -82,7 +82,7 @@ class ProblemParams():
         self.KUAV = KUAV
         self.KUSV = KUSV
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax)
+            wmin, wmax, wmin_land, kl, vmax, vmax_b)
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
         self.dropout_lower_bound = dropout_lower_bound
@@ -94,7 +94,7 @@ xb_m = np.matrix([[4.0], [5.0], [0.0], [0.0]])
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 100
+NUM_TESTS = 1
 prev_simulator = None
 my_usv_simulator = None
 
@@ -108,14 +108,14 @@ took_too_long_horizon = -1
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
 if PARALLEL:
-    hor_max = 240#180#260#120#150
-    hor_min = 150#180#260#180#120#100
+    hor_max = 221#240
+    hor_min = 221#150
 elif CENTRALISED:
-    hor_max = 90#68
-    hor_min = 40#68
+    hor_max = 74#90
+    hor_min = 74#40
 elif DISTRIBUTED:
-    hor_max = 100#79#80#37#63#80#56
-    hor_min = 50#79#30#37#63#25#20
+    hor_max = 80#100
+    hor_min = 80#50
 
 hor_inner = 30#15
 
