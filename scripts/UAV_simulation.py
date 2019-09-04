@@ -475,6 +475,7 @@ class UAV_simulator():
             dir_already_exists = os.path.isdir(dir_path + 'Experiment_' + str(i))
 
         os.mkdir(dir_path + 'Experiment_' + str(i))
+        os.mkdir(dir_path + 'Experiment_' + str(i) + '/UAV')
         experiment_index_pub.publish(Int8(i))
 
         info_str = str(datetime.datetime.now()) + '\ntype: '
@@ -512,6 +513,12 @@ class UAV_simulator():
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_inner_traj_log.txt', self.vert_inner_traj_log)
         if test_info_str is not None:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/test_info.txt', [test_info_str], fmt="%s")
+
+        if self.CENTRALISED:
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV/xb_log.txt', self.xb_log)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV/uUSV_log.txt', self.uUSV_log)
+        if not self.CENTRALISED:
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV/USV_traj_log.txt', self.USV_traj_log)
 
         return i
 
@@ -640,7 +647,7 @@ class UAV_simulator():
     def deinitialise(self):
         if self.CENTRALISED:
             self.USV_state_sub.unregister()
-        elif self.DISTRIBUTED:
+        else:
             self.USV_traj_sub.unregister()
             self.traj_pub.unregister()
         if self.USE_HIL:

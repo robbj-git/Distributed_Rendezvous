@@ -217,6 +217,7 @@ class UAVProblem():
         T = self.T
         nUAV = self.nUAV
         mUAV = self.mUAV
+        params = self.params
 
         # Cost Matrices
         self.Q_big  = np.kron(np.eye(T+1), self.Q)
@@ -232,6 +233,36 @@ class UAVProblem():
             for k in range(j):  # range(0) returns empty list
                 self.Lambda[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
                     np.linalg.matrix_power(self.A, j-k-1)*self.B
+
+        # # ------------- OSQP Matrices --------------
+        # velocity_extractor = np.zeros(( 2*(T+1), nUAV*(T+1) ))
+        # for i in range(T+1):
+        #     for j in range(2):
+        #         velocity_extractor[ i, nUAV*i+2+j ] = 1
+        #
+        # P_temp = 2*np.bmat([[self.Q_big, np.zeros((nUAV*(T+1), mUAV*T))],\
+        #     [np.zeros((mUAV*T, nUAV*(T+1))), self.R_big]])
+        # P_data = np.diagonal(P_temp)
+        # P_row = range(nUAV*(T+1) + mUAV*T)
+        # P_col = range(nUAV*(T+1) + mUAV*T)
+        # self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
+        # self.q_OSQP = 0
+        # self.l_OSQP = np.bmat([
+        #     [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # Dynamics
+        #     [np.full((T*mUAV, 1), params.amin)],          # Input constraints
+        #     [np.full((T,   1), -params.vmax)]             # Velocity constraints
+        # ])
+        # self.u_OSQP = np.bmat([
+        #     [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # Dynamics
+        #     [np.full((T*mUAV, 1), params.amax)],          # Input constraints
+        #     [np.full((T,   1), params.vmax)]              # Velocity constraints
+        # ])
+        # self.A_temp = np.bmat([
+        #     [np.eye(nUAV*(T+1)), -self.Lambda],                # Dynamics
+        #     [np.zeros((T*mUAV, nUAV*(T+1))), np.eye(T*mUAV)],  # Input constraints
+        #     [velocity_extractor, np.zeros((2*(T+1), T*mUAV))], # Velocity constraints
+        # ])
+        # self.A_OSQP = csc_matrix(self.A_temp)
 
     def create_optimisation_problem(self):
         T = self.T
@@ -254,6 +285,9 @@ class UAVProblem():
         # constraintsUAV += [self.u  >= self.params.amin]
 
         self.problemUAV = cp.Problem(cp.Minimize(objectiveUAV), constraintsUAV)
+
+        # self.problemOSQP = osqp.OSQP()
+        # self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False)
 
     def ROS_init(self):
         print('Waiting for uav problem solver')
@@ -297,7 +331,15 @@ class UAVProblem():
             resp = self.service(self.req)
             self.u.value = np.reshape(resp.u_traj.array.data, (-1, 1), order='F')
             self.x.value = np.reshape(resp.x_traj.array.data, (-1, 1), order='F' )
-        else:
+        # elif self.type == 'OSQP':
+        #     start = time.time()
+        #     self.update_OSQP(x_m)
+        #     results = self.problemOSQP.solve()
+        #     self.x.value = np.reshape(results.x[0:self.nUAV*(self.T+1)], (-1, 1))
+        #     self.u.value = np.reshape(results.x[self.nUAV*(self.T+1):], (-1, 1))
+        #     duration = time.time() - start
+        #     self.durations.append(duration)
+        else:   # self.type == 'CVXPy'
             self.problemUAV.solve(solver=cp.OSQP, warm_start=True, verbose=False)
             if self.x.value is None:
                 print "x was None, u was", self.u.value #DEBUG
@@ -319,6 +361,23 @@ class UAVProblem():
 
     def predict_trajectory(self, x_0, u_traj):
         return np.dot(self.Phi, x_0) + np.dot(self.Lambda, u_traj)
+
+    # def update_OSQP(self, x0):
+    #     b1 = np.diag(np.ravel(binary_traj))
+    #     b2 = np.diag(np.ravel( np.kron( binary_traj, np.ones((2, 1)))  ))
+    #     params = self.params
+    #     T = self.T
+    #     self.l_OSQP = np.bmat([
+    #         [np.dot(self.Phi, x0)],                       # Dynamics
+    #         [np.full((T*mUAV, 1), amin)],                 # Input constraints
+    #         [np.full((T,   1), -params.vmax)]             # Velocity constraints
+    #     ])
+    #     self.u_OSQP = np.bmat([
+    #         [np.dot(self.Phi, x0)],                      # Dynamics
+    #         [np.full((T*mUAV, 1), amax)],                # Input constraints
+    #         [np.full((T,   1), params.vmax)]             # Velocity constraints
+    #     ])
+    #     self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP)
 
 class USVProblem():
 

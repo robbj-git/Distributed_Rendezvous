@@ -335,6 +335,11 @@ class USV_simulator():
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_inner_horizontal_durations.txt', self.hor_inner_solution_durations)
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_inner_traj_log.txt', self.USV_inner_traj_log)
 
+
+        if not self.CENTRALISED:
+            os.mkdir(dir_path + 'Experiment_' + str(i) + '/USV')
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV/UAV_traj_log.txt', self.UAV_traj_log)
+
     def plot_results(self, real_time):
         fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
         plt.title("USV Simulation")
@@ -421,8 +426,9 @@ class USV_simulator():
     # instances will both be subscribed to the same topic. I can't remember
     # right now why that is a problem, but it did cause me issues previously.
     def deinitialise(self):
-        if self.DISTRIBUTED:
+        if not self.CENTRALISED:
             self.UAV_traj_sub.unregister()
+            # self.traj_pub.unregister()    This results in an error message for some reason?
         elif self.CENTRALISED:
             self.USV_input_sub.unregister()
 

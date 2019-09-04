@@ -92,16 +92,16 @@ my_uav_simulator =  None
 
 # -------------- TESTING LOOP ----------------
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 1
+NUM_TESTS = 100
 if PARALLEL:
-    hor_max = 180#260#120#150
-    hor_min = 180#260#180#120#100
+    hor_max = 240#180#260#120#150
+    hor_min = 150#180#260#180#120#100
 elif CENTRALISED:
-    hor_max = 68
-    hor_min = 68
+    hor_max = 90#68
+    hor_min = 40#68
 elif DISTRIBUTED:
-    hor_max = 79#80#37#63#80#56
-    hor_min = 79#30#37#63#25#20
+    hor_max = 100#79#80#37#63#80#56
+    hor_min = 50#79#30#37#63#25#20
 
 hor_inner = 30#15
 cancelled = False
@@ -114,7 +114,6 @@ cancelled = False
 # my_uav_simulator.deinitialise() # We don't want it to receive callbacks
 
 for N in range(hor_max, hor_min-1, -1):
-    # print "N:", N
     took_too_long = False
     UAV_test_round = -1
     next_test_round = 0
@@ -140,9 +139,9 @@ for N in range(hor_max, hor_min-1, -1):
     # If the UAV and USV testers have simulators with different time horizons,
     # some of the callbacks between them will mess up
     round_pub.publish(Int32(-1))
-    # while USV_test_round != -1:
     # Sometimes other tester had time to switch to round 0 too quickly and round -1 was never registered
-    while USV_test_round > 0:
+    # while USV_test_round > 0:
+    while USV_test_round != -1:
         if rospy.is_shutdown():
             break
         if random.randint(1, 101) == 100:
@@ -157,6 +156,9 @@ for N in range(hor_max, hor_min-1, -1):
         my_uav_simulator.deinitialise()
     prev_simulator = my_uav_simulator
     my_uav_simulator = UAV_simulator(problem_params)
+
+    # Makes sure that UAV receives info about round being -1 before the round changes to 0
+    time.sleep(0.5)
 
     for i in range(NUM_TESTS):
         UAV_test_round += 1
@@ -223,10 +225,10 @@ for N in range(hor_max, hor_min-1, -1):
             or hor_median_list[i] > SAMPLING_TIME*INTER_ITS\
             or vert_mean_list[i] > SAMPLING_TIME*INTER_ITS \
             or vert_median_list[i] > SAMPLING_TIME*INTER_ITS):
-            # took_too_long = True
+            took_too_long = True
             print "TOOK TO LONG!"
-            # instruct_pub.publish(Int32(NEXT_HORIZON))
-            # break
+            instruct_pub.publish(Int32(NEXT_HORIZON))
+            break
         if not PARALLEL and (np.mean(my_uav_simulator.iteration_durations) > SAMPLING_TIME\
             or np.median(my_uav_simulator.iteration_durations) > SAMPLING_TIME):
             print "Uh-oh, took too long!"

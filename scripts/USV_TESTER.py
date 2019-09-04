@@ -94,11 +94,12 @@ xb_m = np.matrix([[4.0], [5.0], [0.0], [0.0]])
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 1
+NUM_TESTS = 100
 prev_simulator = None
 my_usv_simulator = None
 
 ever_took_too_long = False
+took_too_long_horizon = -1
 
 # Need to create a simulator, because simulators call rospy.node_init(), and
 # that function must be called before anything can be published, but it also
@@ -107,14 +108,14 @@ ever_took_too_long = False
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
 if PARALLEL:
-    hor_max = 180#260#120#150   212 was good I think
-    hor_min = 180#260#180#120#100
+    hor_max = 240#180#260#120#150
+    hor_min = 150#180#260#180#120#100
 elif CENTRALISED:
-    hor_max = 68
-    hor_min = 68
+    hor_max = 90#68
+    hor_min = 40#68
 elif DISTRIBUTED:
-    hor_max = 79#80#37#63#80#56
-    hor_min = 79#30#37#63#25#20
+    hor_max = 100#79#80#37#63#80#56
+    hor_min = 50#79#30#37#63#25#20
 
 hor_inner = 30#15
 
@@ -129,9 +130,9 @@ for N in range(hor_max, hor_min-1, -1):
     # If the UAV and USV testers have simulators with different time horizons,
     # some of the callbacks between them will mess up
     round_pub.publish(Int32(-1))
-    #while UAV_test_round != -1:
     # Sometimes other tester had time to switch to round 0 too quickly and round -1 was never registered
-    while UAV_test_round > 0:
+    # while UAV_test_round > 0:
+    while UAV_test_round != -1:
         if rospy.is_shutdown() or should_finish:
             break
         if random.randint(1, 101) == 100:
@@ -145,6 +146,9 @@ for N in range(hor_max, hor_min-1, -1):
         my_usv_simulator.deinitialise()
     prev_simulator = my_usv_simulator
     my_usv_simulator = USV_simulator(problem_params)
+
+    # Makes sure that UAV receives info about round being -1 before the round changes to 0
+    time.sleep(0.5)
 
     for i in range(NUM_TESTS):
         USV_test_round += 1
@@ -187,15 +191,14 @@ for N in range(hor_max, hor_min-1, -1):
         if PARALLEL and np.mean(my_usv_simulator.hor_solution_durations) > SAMPLING_TIME\
             and np.median(my_usv_simulator.hor_solution_durations) > SAMPLING_TIME:
             took_too_long = True
-            break
         # ---------- FOR NON PARALLEL -----------
         if not PARALLEL and np.mean(my_usv_simulator.iteration_durations) > SAMPLING_TIME\
             and np.median(my_usv_simulator.iteration_durations) > SAMPLING_TIME:
             took_too_long = True
-            break
     if took_too_long:
         print 'USV TEST ACTUALLY TOOK TOO LONG!!!!!!!!!!!!!!'
         ever_took_too_long = True
+        took_too_long_horizon = N
     if should_finish:
         should_finish = False
         print "Still asked to finish"
@@ -205,7 +208,7 @@ for N in range(hor_max, hor_min-1, -1):
 print "started sleeping"
 if not quit_horizon >= 0:
     # Sleep for a while, give UAV-tester a chance to finish
-    time.sleep(10)
+    time.sleep(20)
 
 print "stopped sleeping"
 
@@ -228,6 +231,6 @@ if quit_horizon >= 0:
         # my_usv_simulator will not be the correct simulator.
         prev_simulator.store_data()
     if ever_took_too_long:
-        print 'OMG HOW ON EARTH DID IT EVER TAKE TOO LONG?????'
+        print 'OMG HOW ON EARTH DID IT EVER TAKE TOO LONG????? Horizon:', took_too_long_horizon
 else:
     print "nope, no storing", rospy.Time.now()
