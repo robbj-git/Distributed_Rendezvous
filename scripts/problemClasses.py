@@ -246,7 +246,10 @@ class UAVProblem():
         P_row = range(nUAV*(T+1) + mUAV*T)
         P_col = range(nUAV*(T+1) + mUAV*T)
         self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
-        self.q_OSQP = 0
+        self.q_OSQP = -2*np.bmat([
+            [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUSV, 1 )) )],
+            [np.zeros((T*mUAV, 1))]
+        ])
         self.l_OSQP = np.bmat([
             [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # Dynamics
             [np.full((T*mUAV, 1), params.amin)],          # Input constraints
@@ -332,7 +335,7 @@ class UAVProblem():
             self.u.value = np.reshape(resp.u_traj.array.data, (-1, 1), order='F')
             self.x.value = np.reshape(resp.x_traj.array.data, (-1, 1), order='F' )
         elif self.type == 'OSQP':
-            self.update_OSQP(x_m)
+            self.update_OSQP(x_m, xbhat_m)
             results = self.problemOSQP.solve()
             self.x.value = np.reshape(results.x[0:self.nUAV*(self.T+1)], (-1, 1))
             self.u.value = np.reshape(results.x[self.nUAV*(self.T+1):], (-1, 1))
@@ -359,7 +362,7 @@ class UAVProblem():
     def predict_trajectory(self, x_0, u_traj):
         return np.dot(self.Phi, x_0) + np.dot(self.Lambda, u_traj)
 
-    def update_OSQP(self, x0):
+    def update_OSQP(self, x0, xb_traj):
         params = self.params
         T = self.T
         self.l_OSQP = np.bmat([
@@ -372,7 +375,11 @@ class UAVProblem():
             [np.full((T*self.mUAV, 1), params.amax)],    # Input constraints
             [np.full((2*(T+1),   1), params.v_max)]      # Velocity constraints
         ])
-        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP)
+        self.q_OSQP = -2*np.bmat([
+            [np.dot( self.Q_big, xb_traj )],
+            [np.zeros((T*self.mUAV, 1))]
+        ])
+        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
 
 class USVProblem():
 
@@ -431,7 +438,10 @@ class USVProblem():
         P_row = range(nUSV*(T+1) + mUSV*T)
         P_col = range(nUSV*(T+1) + mUSV*T)
         self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
-        self.q_OSQP = 0
+        self.q_OSQP = -2*np.bmat([
+            [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUAV, 1 )) )],
+            [np.zeros((T*mUSV, 1))]
+        ])
         self.l_OSQP = np.bmat([
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],      # Dynamics
             [np.full((T*mUSV, 1), params.amin_b)],          # Input constraints
@@ -520,7 +530,7 @@ class USVProblem():
             self.xb.value = np.reshape(resp.xb_traj.array.data, (-1, 1),\
                 order='F' )
         elif self.type == 'OSQP':
-            self.update_OSQP(xb_m)
+            self.update_OSQP(xb_m, xhat_m)
             results = self.problemOSQP.solve()
             self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
             self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):], (-1, 1))
@@ -543,7 +553,7 @@ class USVProblem():
     def predict_trajectory( self, xb_0, ub_traj):
         return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
 
-    def update_OSQP(self, xb0):
+    def update_OSQP(self, xb0, x_traj):
         params = self.params
         T = self.T
         self.l_OSQP = np.bmat([
@@ -556,7 +566,11 @@ class USVProblem():
             [np.full((T*self.mUSV, 1), params.amax_b)],    # Input constraints
             [np.full((2*(T+1),   1), params.v_max_b)]      # Velocity constraints
         ])
-        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP)
+        self.q_OSQP = -2*np.bmat([
+            [np.dot( self.Q_big, x_traj )],
+            [np.zeros((T*self.mUSV, 1))]
+        ])
+        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
 
 class VerticalProblem():
 

@@ -212,13 +212,13 @@ if not quit_horizon >= 0:
 
 print "stopped sleeping"
 
-# try:
-# my_usv_simulator.plot_results(True)
-# except Exception as e:
-#     # Sometimes exception is thrown when plotting window is closed
-#     print "Error while plotting:"
-#     print e
-#     pass
+try:
+    my_usv_simulator.plot_results(True)
+except Exception as e:
+    # Sometimes exception is thrown when plotting window is closed
+    print "Error while plotting:"
+    print e
+    pass
 
 store_pub.publish(Int32(1))
 if quit_horizon >= 0:
