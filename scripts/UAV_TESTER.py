@@ -78,7 +78,7 @@ class ProblemParams():
         self.KUSV = KUSV
         self.KVert = KVert
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax, vmax_b)
+            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b)
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
         self.dropout_lower_bound = dropout_lower_bound
@@ -94,8 +94,8 @@ my_uav_simulator =  None
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
 NUM_TESTS = 1
 if PARALLEL:
-    hor_max = 221#240
-    hor_min = 221#150
+    hor_max = 100#221#240
+    hor_min = 100#221#150
 elif CENTRALISED:
     hor_max = 74#90
     hor_min = 74#40
@@ -229,7 +229,7 @@ for N in range(hor_max, hor_min-1, -1):
             print "TOOK TO LONG!"
             instruct_pub.publish(Int32(NEXT_HORIZON))
             break
-        if not PARALLEL and (np.mean(my_uav_simulator.iteration_durations) > SAMPLING_TIME\
+        if (np.mean(my_uav_simulator.iteration_durations) > SAMPLING_TIME\
             or np.median(my_uav_simulator.iteration_durations) > SAMPLING_TIME):
             print "Uh-oh, took too long!"
             took_too_long = True
@@ -248,13 +248,13 @@ for N in range(hor_max, hor_min-1, -1):
         instruct_pub.publish(Int32(N))
         break
 
-#DEBUG
-try:
-    my_uav_simulator.plot_results(True)
-except Exception as e:
-    # Exception is sometimes thrown when window is closed
-    print e
-    pass
+# #DEBUG
+# try:
+#     my_uav_simulator.plot_results(True)
+# except Exception as e:
+#     # Exception is sometimes thrown when window is closed
+#     print e
+#     pass
 
 instruct_pub.publish(Int32(N))
 if not cancelled:

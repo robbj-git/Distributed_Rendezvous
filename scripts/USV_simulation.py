@@ -61,7 +61,7 @@ class USV_simulator():
             self.nUAV, self.used_solver, self.params)
 
         self.problemUSVFast = FastUSVProblem(pp.T_inner, pp.Ab, pp.Bb,\
-            pp.Q, pp.P, pp.R, pp.params)
+            pp.Q, pp.P, pp.R, self.used_solver, pp.params)
 
         # --------------------------- ROS SETUP ----------------------------------
         # rospy.init_node('USV_main')
@@ -117,6 +117,7 @@ class USV_simulator():
 
         start = time.time()
         for i in range(sim_len):
+            # print i
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -176,10 +177,11 @@ class USV_simulator():
                 self.problemUSV.t_since_update += 1
 
             self.xb = self.Ab*self.xb + self.Bb*self.uUSV
-
             # ------- Sleep --------
             end = time.time()
             self.iteration_durations.append(end-start)
+            # if end-start > 0.05:
+            #     print end-start
             self.rate.sleep()
             start = time.time()
 

@@ -82,7 +82,7 @@ class ProblemParams():
         self.KUAV = KUAV
         self.KUSV = KUSV
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax, vmax_b)
+            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b)
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
         self.dropout_lower_bound = dropout_lower_bound
@@ -90,7 +90,7 @@ class ProblemParams():
 
 problem_params = ProblemParams()
 
-xb_m = np.matrix([[4.0], [5.0], [0.0], [0.0]])
+xb_m = np.matrix([[4.0], [5.0], [-4.0], [-5.0]])
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
@@ -108,8 +108,8 @@ took_too_long_horizon = -1
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
 if PARALLEL:
-    hor_max = 221#240
-    hor_min = 221#150
+    hor_max = 100#221#240
+    hor_min = 100#221#150
 elif CENTRALISED:
     hor_max = 74#90
     hor_min = 74#40
@@ -187,13 +187,17 @@ for N in range(hor_max, hor_min-1, -1):
             print "Mean solution:", np.mean(my_usv_simulator.hor_solution_durations)
         if PARALLEL:
             print "Mean inner solution", np.mean(my_usv_simulator.hor_inner_solution_durations)
-        # ------------- FOR PARALLEL ------------
-        if PARALLEL and np.mean(my_usv_simulator.hor_solution_durations) > SAMPLING_TIME\
-            and np.median(my_usv_simulator.hor_solution_durations) > SAMPLING_TIME:
+        if np.mean(my_usv_simulator.iteration_durations) > SAMPLING_TIME and \
+            np.median(my_usv_simulator.iteration_durations) > SAMPLING_TIME:
+            print "ITERATION TOOK TOO LONG"
             took_too_long = True
-        # ---------- FOR NON PARALLEL -----------
-        if not PARALLEL and np.mean(my_usv_simulator.iteration_durations) > SAMPLING_TIME\
-            and np.median(my_usv_simulator.iteration_durations) > SAMPLING_TIME:
+        # ------------- FOR PARALLEL ------------
+        if PARALLEL and \
+            np.mean(my_usv_simulator.hor_solution_durations) > \
+                INTER_ITS*SAMPLING_TIME and\
+            np.median(my_usv_simulator.hor_solution_durations) > \
+                INTER_ITS*SAMPLING_TIME:
+            print "SOLUTION TOOK TOO LONG"
             took_too_long = True
     if took_too_long:
         print 'USV TEST ACTUALLY TOOK TOO LONG!!!!!!!!!!!!!!'
@@ -212,13 +216,13 @@ if not quit_horizon >= 0:
 
 print "stopped sleeping"
 
-try:
-    my_usv_simulator.plot_results(True)
-except Exception as e:
-    # Sometimes exception is thrown when plotting window is closed
-    print "Error while plotting:"
-    print e
-    pass
+# try:
+#     my_usv_simulator.plot_results(True)
+# except Exception as e:
+#     # Sometimes exception is thrown when plotting window is closed
+#     print "Error while plotting:"
+#     print e
+#     pass
 
 store_pub.publish(Int32(1))
 if quit_horizon >= 0:

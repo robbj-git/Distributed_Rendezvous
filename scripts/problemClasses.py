@@ -19,6 +19,7 @@ import time
 
 # Supresses warning during division by 0. Division by zero will always occur
 # in one of the functions, but it is correctly handled afterwards
+# EDIT: Is this still true? TODO: Check it out
 np.seterr(divide='ignore', invalid='ignore')
 
 class CentralisedProblem():
@@ -83,24 +84,64 @@ class CentralisedProblem():
                 self.Lambda_j[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
                     J_mat*np.linalg.matrix_power(self.A, j-k-1)*self.B
 
-        # NOT USED, COULD PROBABLY DELETE
-        # # Input constraints (amax > 0, amin < 0 assumed)
-        # # mUAV = mUSV = 2 also assumed
-        # self.in_constr_matrix = np.bmat([
-        #     [np.sqrt(2*params.amax) * np.kron(np.eye(T), np.mat(' 1  1'))],
-        #     [np.sqrt(2*params.amax) * np.kron(np.eye(T), np.mat('-1 -1'))],
-        #     [np.sqrt(2*params.amax) * np.kron(np.eye(T), np.mat(' 1 -1'))],
-        #     [np.sqrt(2*params.amax) * np.kron(np.eye(T), np.mat('-1  1'))]
-        # ])
-        # self.in_constr_vector = 2*params.amax * np.ones(( 4*T, 1 ))
-        #
-        # self.in_constr_matrix_b = np.bmat([
-        #     [np.sqrt(2*params.amax_b) * np.kron(np.eye(T), np.mat(' 1  1'))],
-        #     [np.sqrt(2*params.amax_b) * np.kron(np.eye(T), np.mat('-1 -1'))],
-        #     [np.sqrt(2*params.amax_b) * np.kron(np.eye(T), np.mat('-1  1'))],
-        #     [np.sqrt(2*params.amax_b) * np.kron(np.eye(T), np.mat(' 1 -1'))]
-        # ])
-        # self.in_constr_vector_b = 2*params.amax_b * np.ones(( 4*T, 1 ))
+        # ------------- OSQP Matrices --------------
+        # Assumes nUAV = nUSV, mUAV = mUSV
+        velocity_extractor = np.zeros(( 2*(T+1), nUAV*(T+1) ))
+        for i in range(T+1):
+            for j in range(2):
+                velocity_extractor[ 2*i+j, nUAV*i+2+j ] = 1
+
+        zeros = np.zeros((nUAV*(T+1), mUAV*T))
+        zeros_sqr = np.zeros((mUAV*T, mUAV*T))
+        zeros_tall = np.zeros((nUAV*(T+1), 1))
+        zeros_short = np.zeros((mUAV*T, 1))
+        C = np.full((1, 1), 10000*(T+1))
+        P_temp = 2*np.bmat([
+            [self.Q_big, zeros, -self.Q_big, zeros, zeros_tall],
+            [zeros.T, self.R_big, zeros.T, zeros_sqr, zeros_short],
+            [-self.Q_big, zeros, self.Q_big, zeros, zeros_tall],
+            [zeros.T, zeros_sqr, zeros.T,  self.R_big, zeros_short],
+            [zeros_tall.T, zeros_short.T, zeros_tall.T, zeros_short.T, C]
+        ])
+        # P_data = np.diagonal(P_temp)
+        # P_row = range(2*nUAV*(T+1) + 2*mUAV*T)
+        # P_col = range(2*nUAV*(T+1) + 2*mUAV*T)
+        # self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
+        self.P_OSQP = csc_matrix(P_temp)
+        self.l_OSQP = np.bmat([
+            [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # UAV Dynamics
+            [np.full((T*mUAV, 1), params.amin)],          # UAV Input constraints
+            [np.full((2*(T+1),   1), -params.v_max)],     # UAV Velocity constraints
+            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],    # USV Dynamics
+            [np.full((T*mUSV, 1), params.amin_b)],        # USV Input constraints
+            [np.full((2*(T+1),   1), -params.v_max_b)]    # USV Velocity constraints
+        ])
+        self.u_OSQP = np.bmat([
+            [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # UAV Dynamics
+            [np.full((T*mUAV, 1), params.amax)],          # UAV Input constraints
+            [np.full((2*(T+1),   1), params.v_max)],      # UAV Velocity constraints
+            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],    # USV Dynamics
+            [np.full((T*mUSV, 1), params.amax_b)],        # USV Input constraints
+            [np.full((2*(T+1),   1), -params.v_min_b)]    # USV Velocity constraints
+        ])
+        self.q_OSQP = 0
+        A_temp_UAV = np.bmat([
+            [np.eye(nUAV*(T+1)), -self.Lambda],                # Dynamics
+            [np.zeros((T*mUAV, nUAV*(T+1))), np.eye(T*mUAV)],  # Input constraints
+            [velocity_extractor, np.zeros((2*(T+1), T*mUAV))], # Velocity constraints
+        ])
+        A_temp_USV = np.bmat([
+            [np.eye(nUSV*(T+1)), -self.Lambda_b, np.zeros( (nUSV*(T+1), 1) )],           # Dynamics
+            [np.zeros((T*mUSV, nUSV*(T+1))), np.eye(T*mUSV), np.zeros( (T*mUSV, 1) )],   # Input constraints
+            [velocity_extractor, np.zeros((2*(T+1), T*mUSV)), np.ones((2*(T+1), 1))],    # Velocity constraints
+        ])
+        zeros = np.zeros( (nUAV*(T+1) + mUAV*T + 2*(T+1), nUAV*(T+1) + mUAV*T) )
+        # zeros = np.zeros( (nUAV*(T+1) + mUAV*T, nUAV*(T+1) + mUAV*T) )
+        self.A_temp = np.bmat([
+            [A_temp_UAV, zeros, np.zeros( (nUAV*(T+1) + T*mUAV + 2*(T+1), 1) )],
+            [zeros, A_temp_USV]
+        ])
+        self.A_OSQP = csc_matrix(self.A_temp)
 
     def create_optimisation_problem(self):
         T = self.T
@@ -143,6 +184,9 @@ class CentralisedProblem():
 
         self.problemCent = cp.Problem(cp.Minimize(objectiveCent), constraintsCent)
 
+        self.problemOSQP = osqp.OSQP()
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 200)
+
     def ROS_init(self):
         print('Waiting for centralised problem solver')
         rospy.wait_for_service('centralised_problem')
@@ -168,7 +212,6 @@ class CentralisedProblem():
     def solve(self, x_m, xb_m):
         self.x_0.value = x_m
         self.xb_0.value = xb_m
-
         if self.type == 'CVXGEN':
             self.x_0_msg.array.data = np.asarray(x_m).flatten(order='F')   # TODO: Send in ndarray, then flatten will be enough
             self.xb_0_msg.array.data = np.asarray(xb_m).flatten(order='F') # TODO: Send in ndarray, then flatten will be enough
@@ -183,12 +226,51 @@ class CentralisedProblem():
                 (self.mUAV*self.T, 1), order='F')
             self.ub.value = np.reshape(resp.ub_traj.array.data,\
                 (self.mUSV*self.T, 1), order='F')
+        elif self.type == 'OSQP':
+            self.update_OSQP(x_m, xb_m)
+            results = self.problemOSQP.solve()
+            T = self.T
+            nUAV = self.nUAV
+            mUAV = self.mUAV
+            self.x.value = np.reshape(results.x[0:nUAV*(T+1)], (-1, 1))
+            self.u.value = np.reshape(results.x[nUAV*(T+1):nUAV*(T+1)+mUAV*T], (-1, 1))
+            self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T:2*nUAV*(T+1)+mUAV*T], (-1, 1))
+            self.ub.value = np.reshape(results.x[2*nUAV*(T+1)+mUAV*T:-1], (-1, 1))
+            self.s = results.x[-1:]
+            # print results.info.status, results.info.iter, #DEBUG PRINT
+            # if results.info.run_time > 0.01:
+            #     print results.info.iter
+            # else:
+            #     print ""
         else:
             self.problemCent.solve(solver=cp.OSQP, warm_start=True, verbose=False)
         self.t_since_update = 0
 
     def solve_threaded(self, x_m, xb_m):
         thread.start_new_thread(self.solve, (x_m, xb_m))
+
+    def update_OSQP(self, x0, xb0):
+        params = self.params
+        T = self.T
+        mUAV = self.mUAV
+        mUSV = self.mUSV
+        self.l_OSQP = np.bmat([
+            [np.dot(self.Phi, x0)],                       # UAV Dynamics
+            [np.full((T*mUAV, 1), params.amin)],          # UAV Input constraints
+            [np.full((2*(T+1),   1), -params.v_max)],     # UAV Velocity constraints
+            [np.dot(self.Phi_b, xb0)],                    # USV Dynamics
+            [np.full((T*mUSV, 1), params.amin_b)],        # USV Input constraints
+            [np.full((2*(T+1),   1), -params.v_max_b)]    # USV Velocity constraints
+        ])
+        self.u_OSQP = np.bmat([
+            [np.dot(self.Phi, x0)],                       # UAV Dynamics
+            [np.full((T*mUAV, 1), params.amax)],          # UAV Input constraints
+            [np.full((2*(T+1),   1), params.v_max)],      # UAV Velocity constraints
+            [np.dot(self.Phi_b, xb0)],                    # USV Dynamics
+            [np.full((T*mUSV, 1), params.amax_b)],        # USV Input constraints
+            [np.full((2*(T+1),   1), -params.v_min_b)]    # USV Velocity constraints
+        ])
+        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP)
 
 class UAVProblem():
 
@@ -238,14 +320,14 @@ class UAVProblem():
         velocity_extractor = np.zeros(( 2*(T+1), nUAV*(T+1) ))
         for i in range(T+1):
             for j in range(2):
-                velocity_extractor[ i, nUAV*i+2+j ] = 1
+                velocity_extractor[ 2*i+j, nUAV*i+2+j ] = 1
 
         P_temp = 2*np.bmat([[self.Q_big, np.zeros((nUAV*(T+1), mUAV*T))],\
             [np.zeros((mUAV*T, nUAV*(T+1))), self.R_big]])
-        P_data = np.diagonal(P_temp)
-        P_row = range(nUAV*(T+1) + mUAV*T)
-        P_col = range(nUAV*(T+1) + mUAV*T)
-        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
+        # P_data = np.diagonal(P_temp)
+        # P_row = range(nUAV*(T+1) + mUAV*T)
+        # P_col = range(nUAV*(T+1) + mUAV*T)
+        self.P_OSQP = csc_matrix(P_temp)
         self.q_OSQP = -2*np.bmat([
             [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUSV, 1 )) )],
             [np.zeros((T*mUAV, 1))]
@@ -290,7 +372,7 @@ class UAVProblem():
         self.problemUAV = cp.Problem(cp.Minimize(objectiveUAV), constraintsUAV)
 
         self.problemOSQP = osqp.OSQP()
-        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False)
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 500)
 
     def ROS_init(self):
         print('Waiting for uav problem solver')
@@ -430,17 +512,23 @@ class USVProblem():
         velocity_extractor = np.zeros(( 2*(T+1), nUSV*(T+1) ))
         for i in range(T+1):
             for j in range(2):
-                velocity_extractor[ i, nUSV*i+2+j ] = 1
+                velocity_extractor[ 2*i+j, nUSV*i+2+j ] = 1
 
-        P_temp = 2*np.bmat([[self.Q_big, np.zeros((nUSV*(T+1), mUSV*T))],\
-            [np.zeros((mUSV*T, nUSV*(T+1))), self.R_big]])
-        P_data = np.diagonal(P_temp)
-        P_row = range(nUSV*(T+1) + mUSV*T)
-        P_col = range(nUSV*(T+1) + mUSV*T)
-        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
+        dim1 = nUSV*(T+1)
+        dim2 = mUSV*T
+        C= np.full((1,1), 10000*(T+1))
+        P_temp = 2*np.bmat([[self.Q_big, np.zeros((dim1, dim2)), np.zeros((dim1, 1))],
+            [np.zeros((dim2, dim1)), self.R_big, np.zeros((dim2, 1))],
+            [np.zeros((1, dim1)), np.zeros((1, dim2)), C]
+        ])
+        # P_data = np.diagonal(P_temp)
+        # P_row = range(nUSV*(T+1) + mUSV*T)
+        # P_col = range(nUSV*(T+1) + mUSV*T)
+        # self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
+        self.P_OSQP = csc_matrix(P_temp)
         self.q_OSQP = -2*np.bmat([
             [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUAV, 1 )) )],
-            [np.zeros((T*mUSV, 1))]
+            [np.zeros((T*mUSV+1, 1))]
         ])
         self.l_OSQP = np.bmat([
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],      # Dynamics
@@ -450,12 +538,12 @@ class USVProblem():
         self.u_OSQP = np.bmat([
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],      # Dynamics
             [np.full((T*mUSV, 1), params.amax_b)],        # Input constraints
-            [np.full((2*(T+1),   1), params.v_max_b)]      # Velocity constraints
+            [np.full((2*(T+1),   1), -params.v_min_b)]      # Velocity constraints
         ])
         self.A_temp = np.bmat([
-            [np.eye(nUSV*(T+1)), -self.Lambda_b],              # Dynamics
-            [np.zeros((T*mUSV, nUSV*(T+1))), np.eye(T*mUSV)],  # Input constraints
-            [velocity_extractor, np.zeros((2*(T+1), T*mUSV))], # Velocity constraints
+            [np.eye(nUSV*(T+1)), -self.Lambda_b, np.zeros((dim1, 1))],              # Dynamics
+            [np.zeros((T*mUSV, nUSV*(T+1))), np.eye(dim2), np.zeros((dim2,1))],     # Input constraints
+            [velocity_extractor, np.zeros((2*(T+1), dim2)), np.ones((2*(T+1), 1))], # Velocity constraints
         ])
         self.A_OSQP = csc_matrix(self.A_temp)
 
@@ -481,7 +569,7 @@ class USVProblem():
         self.problemUSV = cp.Problem(cp.Minimize(objectiveUSV), constraintsUSV)
 
         self.problemOSQP = osqp.OSQP()
-        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False)
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 500)
 
     def ROS_init(self):
         print('Waiting for usv problem solver')
@@ -511,11 +599,9 @@ class USVProblem():
 
     def solve(self, xb_m, xhat_m, USV_should_stop = False):
         start = time.time()
-        # print self.x_hat.value.shape
-        # print (self.nUAV*(self.T+1), 1)
-        # print xhat_m.shape
         self.x_hat.value = xhat_m
         self.xb_0.value = xb_m
+        # print xb_m[-2:]
         if USV_should_stop:
             self.ub.value = np.zeros((self.mUSV*self.T, 1))
             self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
@@ -533,7 +619,8 @@ class USVProblem():
             self.update_OSQP(xb_m, xhat_m)
             results = self.problemOSQP.solve()
             self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
-            self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):], (-1, 1))
+            self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):-1], (-1, 1))
+            self.s = results.x[-1]
         else:
             self.problemUSV.solve(solver=cp.OSQP, warm_start=True, verbose=False)
             if self.xb.value is None:
@@ -557,18 +644,18 @@ class USVProblem():
         params = self.params
         T = self.T
         self.l_OSQP = np.bmat([
-            [np.dot(self.Phi_b, xb0)],                       # Dynamics
+            [np.dot(self.Phi_b, xb0)],                      # Dynamics
             [np.full((T*self.mUSV, 1), params.amin_b)],     # Input constraints
             [np.full((2*(T+1),   1), -params.v_max_b)]      # Velocity constraints
         ])
         self.u_OSQP = np.bmat([
-            [np.dot(self.Phi_b, xb0)],                      # Dynamics
+            [np.dot(self.Phi_b, xb0)],                     # Dynamics
             [np.full((T*self.mUSV, 1), params.amax_b)],    # Input constraints
-            [np.full((2*(T+1),   1), params.v_max_b)]      # Velocity constraints
+            [np.full((2*(T+1),   1), -params.v_min_b)]     # Velocity constraints
         ])
         self.q_OSQP = -2*np.bmat([
             [np.dot( self.Q_big, x_traj )],
-            [np.zeros((T*self.mUSV, 1))]
+            [np.zeros((T*self.mUSV+1, 1))]
         ])
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
 
@@ -666,14 +753,14 @@ class VerticalProblem():
         ])
 
         # ------------- OSQP Matrices --------------
-        C = 10000*(T+1)
+        self.C = 0#10000*(T+1)
         P_temp = 2*np.bmat([[self.Qv_big, np.zeros((nv*(T+1), mv*T+1))],\
             [np.zeros((mv*T, nv*(T+1))), self.Rv_big, np.zeros((mv*T, 1)) ],\
-            [np.zeros(( 1, nv*(T+1)+mv*T )), np.full((1,1), C) ]])
-        P_data = np.diagonal(P_temp)
-        P_row = range(nv*(T+1) + mv*T + 1)
-        P_col = range(nv*(T+1) + mv*T + 1)
-        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
+            [np.zeros(( 1, nv*(T+1)+mv*T )), np.full((1,1), self.C) ]])
+        # P_data = np.diagonal(P_temp)
+        # P_row = range(nv*(T+1) + mv*T + 1)
+        # P_col = range(nv*(T+1) + mv*T + 1)
+        self.P_OSQP = csc_matrix(P_temp)
         self.q_OSQP = 0
         # Honestly, I can't quite remember wth I was doing here, remade it below
         # self.l_OSQP = np.bmat([[np.dot(self.Phi_v,np.zeros((nv, 1)))],\
@@ -775,8 +862,9 @@ class VerticalProblem():
         self.problemVert = \
             cp.Problem(cp.Minimize(objectiveVert), constraintsVert)
 
+        # max_iter = 400 if self.PARALLEL else 200
         self.problemOSQP = osqp.OSQP()
-        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False)
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 300)
 
     def ROS_init(self):
         if self.T == 100:
@@ -860,6 +948,8 @@ class VerticalProblem():
                 self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):-1], (-1, 1))
                 self.s.value  = np.full((1,1), results.x[-1])
                 self.obj_val = results.info.obj_val
+                # print results.info.iter # DEBUG PRINT
+                # print self.xv.value[-2]
                 # #DEBUG
                 # print "CONSTRAINT SATISFACTION:"
                 # self.print_constraints_satisfied(self.xv.value, self.wdes.value)
@@ -963,13 +1053,12 @@ class VerticalProblem():
                 np.dot(params.hs*params.dl,np.ones((T+1, 1)))]# Safety constraints
         ])
 
-        C = 10000*(T+1)
         P_temp = 2*np.bmat([[np.dot(b2, self.Qv_big),\
                 np.zeros((self.nv*(self.T+1), self.mv*(self.T+1)))],\
             [np.zeros((self.mv*self.T, self.nv*(self.T+1))), self.Rv_big,\
                 np.zeros((self.mv*self.T, 1))],\
             [np.zeros(( 1, self.nv*(self.T+1)+self.mv*self.T )),\
-                np.full((1,1), C) ]])
+                np.full((1,1), self.C) ]])
         P_data = np.diagonal(P_temp)
         # P_row = range(self.nv*(self.T+1) + self.mv*self.T)
         # P_col = range(self.nv*(self.T+1) + self.mv*self.T)
@@ -1151,13 +1240,14 @@ class DistributedProblem():
 # (no safety constraints).
 class FastUAVProblem():
 
-    def __init__(self, T, A, B, Q, P, R, params):
+    def __init__(self, T, A, B, Q, P, R, type, params):
         self.T = T
         self.A = A
         self.B = B
         self.Q = Q
         self.P = P
         self.R = R
+        self.type = type
         self.params = params
         self.last_solution_duration = np.nan
         [self.nUAV, self.mUAV] = B.shape
@@ -1185,6 +1275,21 @@ class FastUAVProblem():
                 self.Lambda[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
                     np.linalg.matrix_power(self.A, j-k-1)*self.B
 
+        # ------------------ OSQP Matrices ------------------
+
+        P_temp = 2*np.bmat([[self.Q_big, np.zeros(((T+1)*nUAV, T*mUAV))],
+            [np.zeros((T*mUAV, (T+1)*nUAV,)), self.R_big]
+        ])
+        self.P_OSQP = csc_matrix(P_temp)
+        self.q_OSQP = -2*np.bmat([
+            [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUAV, 1 )) )],
+            [np.zeros((T*mUAV, 1))]
+        ])
+        self.l_OSQP = np.dot(self.Phi, np.zeros((nUAV, 1)))
+        self.u_OSQP = np.dot(self.Phi, np.zeros((nUAV, 1)))
+        self.A_temp = np.bmat([[np.eye(nUAV*(T+1)), -self.Lambda]])
+        self.A_OSQP = csc_matrix(self.A_temp)
+
     def create_optimisation_problem(self):
         T = self.T
         nUAV = self.nUAV
@@ -1209,13 +1314,23 @@ class FastUAVProblem():
         # constraintsUAV += [self.u  >= self.params.amin]
 
         self.problemUAV = cp.Problem(cp.Minimize(objectiveUAV), constraintsUAV)
+        self.problemOSQP = osqp.OSQP()
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 500)
 
     def solve(self, x_m, x_des_m):
         start = time.time()
         self.x_0.value = x_m
         self.x_des.value = x_des_m
 
-        self.problemUAV.solve(solver=cp.OSQP, warm_start=True, verbose=False)
+        if self.type == 'CVXPy':
+            self.problemUAV.solve(solver=cp.OSQP, warm_start=True, verbose=False)
+        elif self.type == 'OSQP':
+            self.update_OSQP(x_m, x_des_m)
+            results = self.problemOSQP.solve()
+            self.x.value = np.reshape(results.x[0:self.nUAV*(self.T+1)], (-1, 1))
+            self.u.value = np.reshape(results.x[self.nUAV*(self.T+1):], (-1, 1))
+
+        # EDIT: I'm not sure this ever happens anymore
         if self.x.value is None:
             print "x was None, u was", self.u.value #DEBUG
             # Sometimes a bug occurs where the solution returns only None
@@ -1223,21 +1338,30 @@ class FastUAVProblem():
             self.u.value = np.zeros((self.mUAV*self.T, 1))
             self.x.value = self.predict_trajectory(x_m, self.u.value)
 
-
         end = time.time()
         self.last_solution_duration = end - start
+
+    def update_OSQP(self, x0, x_des):
+        self.l_OSQP = np.dot(self.Phi, x0)
+        self.u_OSQP = np.dot(self.Phi, x0)
+        self.q_OSQP = -2*np.bmat([
+            [np.dot( self.Q_big, x_des )],
+            [np.zeros((self.T*self.mUAV, 1))]
+        ])
+        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
 
 # DO WE REALLY NEED TO INCLUDE INPUT IN COST FUNCTION? PROBABLY FOR GOOD MEASURE
 
 class FastUSVProblem():
 
-    def __init__(self, T, Ab, Bb, Q, P, R, params):
+    def __init__(self, T, Ab, Bb, Q, P, R, type, params):
         self.T = T
         self.Ab = Ab
         self.Bb = Bb
         self.Q = Q
         self.P = P
         self.R = R
+        self.type = type
         self.params = params
         self.last_solution_duration = np.nan # Most recent time taken to solve problem
         [self.nUSV, self.mUSV] = Bb.shape
@@ -1264,6 +1388,21 @@ class FastUSVProblem():
                 self.Lambda_b[j*nUSV:(j+1)*nUSV, k*mUSV:(k+1)*mUSV] = \
                     np.linalg.matrix_power(self.Ab, j-k-1)*self.Bb
 
+        # ------------------ OSQP Matrices ------------------
+
+        P_temp = 2*np.bmat([[self.Q_big, np.zeros(((T+1)*nUSV, T*mUSV))],
+            [np.zeros((T*mUSV, (T+1)*nUSV,)), self.R_big]
+        ])
+        self.P_OSQP = csc_matrix(P_temp)
+        self.q_OSQP = -2*np.bmat([
+            [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUSV, 1 )) )],
+            [np.zeros((T*mUSV, 1))]
+        ])
+        self.l_OSQP = np.dot(self.Phi_b, np.zeros((nUSV, 1)))
+        self.u_OSQP = np.dot(self.Phi_b, np.zeros((nUSV, 1)))
+        self.A_temp = np.bmat([[np.eye(nUSV*(T+1)), -self.Lambda_b]])
+        self.A_OSQP = csc_matrix(self.A_temp)
+
     def create_optimisation_problem(self):
         T = self.T
         nUSV = self.nUSV
@@ -1284,6 +1423,8 @@ class FastUSVProblem():
         # constraintsUSV += [self.ub >= self.params.amin_b ]
 
         self.problemUSV = cp.Problem(cp.Minimize(objectiveUSV), constraintsUSV)
+        self.problemOSQP = osqp.OSQP()
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 500)
 
     def solve(self, xb_m, xb_des_m, USV_should_stop = False):
         start = time.time()
@@ -1295,18 +1436,36 @@ class FastUSVProblem():
         if USV_should_stop:
             self.ub.value = np.zeros((self.mUSV*self.T, 1))
             self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
-        else:
+        elif self.type == 'CVXPy':
             self.problemUSV.solve(solver=cp.OSQP, warm_start=True, verbose=False)
-            if self.xb.value is None:
-                # Sometimes a bug occurs where the solution returns only None
-                # In that case, apply no control input
-                self.ub.value = np.zeros((self.mUSV*self.T, 1))
-                self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
+        elif self.type == 'OSQP':
+            self.update_OSQP(xb_m, xb_des_m)
+            results = self.problemOSQP.solve()
+            self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
+            self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):], (-1, 1))
+
+        # EDIT: I'm not sure this happens anymore
+        if self.xb.value is None:
+            # Sometimes a bug occurs where the solution returns only None
+            # In that case, apply no control input
+            self.ub.value = np.zeros((self.mUSV*self.T, 1))
+            self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
+
         end = time.time()
         self.last_solution_duration = end - start
 
+
     def predict_trajectory( self, xb_0, ub_traj):
         return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
+
+    def update_OSQP(self, xb0, xb_des):
+        self.l_OSQP = np.dot(self.Phi_b, xb0)
+        self.u_OSQP = np.dot(self.Phi_b, xb0)
+        self.q_OSQP = -2*np.block([
+            [np.dot( self.Q_big, xb_des )],
+            [np.zeros((self.T*self.mUSV, 1))]
+        ])
+        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
 
 class FastVerticalProblem():
 
@@ -1377,10 +1536,10 @@ class FastVerticalProblem():
         # ------------- OSQP Matrices --------------
         P_temp = 2*np.bmat([[self.Qv_big, np.zeros((nv*(T+1), mv*T))],\
             [np.zeros((mv*T, nv*(T+1))), self.Rv_big]])
-        P_data = np.diagonal(P_temp)
-        P_row = range(nv*(T+1) + mv*T)
-        P_col = range(nv*(T+1) + mv*T)
-        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
+        # P_data = np.diagonal(P_temp)
+        # P_row = range(nv*(T+1) + mv*T)
+        # P_col = range(nv*(T+1) + mv*T)
+        self.P_OSQP = csc_matrix(P_temp)
         self.q_OSQP = 0
         self.l_OSQP = np.bmat([\
             [np.dot(self.Phi_v,np.zeros((nv, 1)))],\
@@ -1422,7 +1581,7 @@ class FastVerticalProblem():
             cp.Problem(cp.Minimize(objectiveVert), constraintsVert)
 
         self.problemOSQP = osqp.OSQP()
-        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False)
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 300)
 
     def solve(self, xv_m, xv_des_m):
         start = time.time()

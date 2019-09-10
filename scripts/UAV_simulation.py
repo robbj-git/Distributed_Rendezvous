@@ -62,7 +62,7 @@ class UAV_simulator():
             pp.Rv, pp.vert_used_solver, pp.params)
 
         self.problemUAVFast = FastUAVProblem(pp.T_inner, pp.A, pp.B, pp.Q, pp.P,\
-            pp.R, pp.params)
+            pp.R, self.used_solver, pp.params)
         self.problemVertFast = FastVerticalProblem(pp.T_inner, pp.Av, pp.Bv,\
             pp.Qv, pp.Pv, pp.Rv, pp.vert_used_solver, pp.params)
 
@@ -151,6 +151,7 @@ class UAV_simulator():
 
         start = time.time()
         for i in range(sim_len):
+            # print i,    #DEBUG PRINT
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -227,10 +228,11 @@ class UAV_simulator():
                 self.xv = self.Av*self.xv + self.Bv*self.wdes
             else:
                 self.publish_HIL_control(self.uUAV, self.wdes)
-
             # ------- Sleep --------
             end = time.time()
             self.iteration_durations.append(end-start)
+            # if end-start > 0.05:  # DEBUG PRINT
+            #     print end-start
             self.rate.sleep()
             start = time.time()
 
@@ -305,6 +307,8 @@ class UAV_simulator():
             x_traj[0:(self.T_inner+1)*self.nUAV])
         end = time.time()
         self.hor_inner_solution_durations.append(end-start)
+        # if end-start > 0.03:
+        #     print end-start
 
     def solve_vertical_problem(self, xv, dist_traj):
         start_time = time.time()
@@ -498,6 +502,7 @@ class UAV_simulator():
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_traj_log.txt', self.UAV_traj_log)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_traj_log.txt', self.vert_traj_log)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/uUAV_log.txt', self.uUAV_log)
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/wdes_log.txt', self.wdes_log)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_iteration_durations.txt', self.iteration_durations)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_time_stamps.txt', self.UAV_times)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_solution_durations.txt', self.vert_solution_durations)
