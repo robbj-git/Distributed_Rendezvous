@@ -345,6 +345,8 @@ class USV_simulator():
             os.mkdir(dir_path + 'Experiment_' + str(i) + '/USV')
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV/UAV_traj_log.txt', self.UAV_traj_log)
 
+        return self.experiment_index
+
     def plot_results(self, real_time):
         fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
         plt.title("USV Simulation")

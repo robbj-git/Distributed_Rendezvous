@@ -126,6 +126,15 @@ for N in range(hor_max, hor_min-1, -1):
     problem_params.T = N
     problem_params.T_inner = hor_inner
 
+    it_mean_list = np.full((NUM_TESTS, 1), np.nan)
+    it_median_list = np.full((NUM_TESTS, 1), np.nan)
+    if not CENTRALISED:
+        hor_mean_list = np.full((NUM_TESTS, 1), np.nan)
+        hor_median_list = np.full((NUM_TESTS, 1), np.nan)
+    if PARALLEL:
+        hor_inner_mean_list = np.full((NUM_TESTS, 1), np.nan)
+        hor_inner_median_list = np.full((NUM_TESTS, 1), np.nan)
+
     # Wait for UAV tester before creating next simulator
     # If the UAV and USV testers have simulators with different time horizons,
     # some of the callbacks between them will mess up
@@ -181,6 +190,17 @@ for N in range(hor_max, hor_min-1, -1):
         #     my_usv_simulator.plot_results(True)
         # except:
         #     pass
+
+
+        it_mean_list[i] = np.mean(my_usv_simulator.iteration_durations)
+        it_median_list[i] = np.median(my_usv_simulator.iteration_durations)
+        if not CENTRALISED:
+            hor_mean_list[i] = np.mean(my_usv_simulator.hor_solution_durations)
+            hor_median_list[i] = np.median(my_usv_simulator.hor_solution_durations)
+        if PARALLEL:
+            hor_inner_mean_list[i] = np.mean(my_usv_simulator.hor_inner_solution_durations)
+            hor_inner_median_list[i] = np.median(my_usv_simulator.hor_inner_solution_durations)
+
         print "Finished simulation round", i, "with horizon", N
         print "Mean iteration:", np.mean(my_usv_simulator.iteration_durations)
         if not CENTRALISED:
@@ -228,13 +248,25 @@ store_pub.publish(Int32(1))
 if quit_horizon >= 0:
     print "Storing!"
     if N == quit_horizon:
-        my_usv_simulator.store_data()
+        exp_index = my_usv_simulator.store_data()
     else:
         # It is possible that the outer loop increments N while the UAV tester
         # is still at the previous value of N. If the UAV-tester then quits,
         # my_usv_simulator will not be the correct simulator.
-        prev_simulator.store_data()
+        exp_index = prev_simulator.store_data()
     if ever_took_too_long:
         print 'OMG HOW ON EARTH DID IT EVER TAKE TOO LONG????? Horizon:', took_too_long_horizon
+
+    dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
+    # TODO: Why and when is UAV notified about that the USV has finished storing?
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/MEAN_USV.txt', it_mean_list)
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/MEDIAN_USV.txt', it_median_list)
+    if not CENTRALISED:
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_MEAN_USV.txt', hor_mean_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_MEDIAN_USV.txt', hor_median_list)
+    if PARALLEL:
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_INNER_MEAN_USV.txt', hor_inner_mean_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_INNER_MEDIAN_USV.txt', hor_inner_median_list)
+
 else:
     print "nope, no storing", rospy.Time.now()

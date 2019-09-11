@@ -120,20 +120,18 @@ for N in range(hor_max, hor_min-1, -1):
     problem_params.T = N
     problem_params.T_inner = hor_inner
 
-    mean_list = np.empty((NUM_TESTS, 1))
-    mean_list.fill(np.nan)
-    median_list = np.empty((NUM_TESTS, 1))
-    median_list.fill(np.nan)
-    hor_mean_list = np.empty((NUM_TESTS, 1))
-    hor_mean_list.fill(np.nan)
-    hor_median_list = np.empty((NUM_TESTS, 1))
-    hor_median_list.fill(np.nan)
-    vert_mean_list = np.empty((NUM_TESTS, 1))
-    vert_mean_list.fill(np.nan)
-    vert_median_list = np.empty((NUM_TESTS, 1))
-    vert_median_list.fill(np.nan)
-    landing_list = np.empty((NUM_TESTS, 1))
-    landing_list.fill(np.nan)
+    mean_list = np.full((NUM_TESTS, 1), np.nan)
+    median_list = np.full((NUM_TESTS, 1), np.nan)
+    hor_mean_list = np.full((NUM_TESTS, 1), np.nan)
+    hor_median_list = np.full((NUM_TESTS, 1), np.nan)
+    vert_mean_list = np.full((NUM_TESTS, 1), np.nan)
+    vert_median_list = np.full((NUM_TESTS, 1), np.nan)
+    landing_list = np.full((NUM_TESTS, 1), np.nan)
+    if PARALLEL:
+        hor_inner_mean_list = np.full((NUM_TESTS, 1), np.nan)
+        hor_inner_median_list = np.full((NUM_TESTS, 1), np.nan)
+        vert_inner_mean_list = np.full((NUM_TESTS, 1), np.nan)
+        vert_inner_median_list = np.full((NUM_TESTS, 1), np.nan)
 
     # Wait for USV tester before creating next simulator
     # If the UAV and USV testers have simulators with different time horizons,
@@ -214,6 +212,11 @@ for N in range(hor_max, hor_min-1, -1):
         hor_median_list[i] = np.median(my_uav_simulator.hor_solution_durations)
         vert_mean_list[i] = np.mean(my_uav_simulator.vert_solution_durations)
         vert_median_list[i] = np.median(my_uav_simulator.vert_solution_durations)
+        if PARALLEL:
+            hor_inner_mean_list[i] = np.mean(my_uav_simulator.hor_inner_solution_durations)
+            hor_inner_median_list[i] = np.median(my_uav_simulator.hor_inner_solution_durations)
+            vert_inner_mean_list[i] = np.mean(my_uav_simulator.vert_inner_solution_durations)
+            vert_inner_median_list[i] = np.median(my_uav_simulator.vert_inner_solution_durations)
         print "Finished simulation round", i, "with horizon", N
         print hor_mean_list[i]
         # print hor_median_list[i]
@@ -268,14 +271,17 @@ if not cancelled:
     dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/MEAN.txt', mean_list)
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/MEDIAN.txt', median_list)
-
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_MEAN.txt', hor_mean_list)
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_MEDIAN.txt', hor_median_list)
-
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/VERT_MEAN.txt', vert_mean_list)
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/VERT_MEDIAN.txt', vert_median_list)
-
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/LANDING_TIMES.txt', landing_list)
+
+    if PARALLEL:
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_INNER_MEAN.txt', hor_inner_mean_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_INNER_MEDIAN.txt', hor_inner_median_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/VERT_INNER_MEAN.txt', vert_inner_mean_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/VERT_INNER_MEDIAN.txt', vert_inner_median_list)
 
     # Wait for USV to finish storing data. If we exit before this, USV will never receive experiment index
     while USV_has_stored_data == 0:

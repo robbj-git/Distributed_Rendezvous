@@ -38,6 +38,7 @@ class CentralisedProblem():
         self.t_since_update = 0
         [self.nUAV, self.mUAV] = B.shape
         [self.nUSV, self.mUSV] = Bb.shape
+        self.last_solution_duration = np.nan
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
         if self.type == 'CVXGEN':
@@ -209,6 +210,7 @@ class CentralisedProblem():
         self.req = centralised_problemRequest()
 
     def solve(self, x_m, xb_m):
+        start = time.time()
         self.x_0.value = x_m
         self.xb_0.value = xb_m
         if self.type == 'CVXGEN':
@@ -244,6 +246,8 @@ class CentralisedProblem():
         else:
             self.problemCent.solve(solver=cp.OSQP, warm_start=True, verbose=False)
         self.t_since_update = 0
+        end = time.time()
+        self.last_solution_duration = end - start
 
     def solve_threaded(self, x_m, xb_m):
         thread.start_new_thread(self.solve, (x_m, xb_m))
@@ -1130,113 +1134,6 @@ class VerticalProblem():
         print "Violated", safety_violations_l, "lower and", safety_violations_u, "upper safety constraints"
         # print sum( lower ), 'of', self.A_temp.shape[0], 'satisfied'
         # print sum( upper ), 'of', self.A_temp.shape[0], 'satisfied'
-
-class DistributedProblem():
-
-    def __init__(self, T, A, B, Ab, Bb, Q, P, R,\
-        delay_len, x_traj_0, xb_traj_0, type, params):
-        self.T = T
-        [self.nUAV, self.mUAV] = B.shape
-        [self.nUSV, self.mUSV] = Bb.shape
-        self.problemUAV = UAVProblem(T, A,  B,  Q, P, R, self.nUSV, type, params)
-        self.problemUSV = USVProblem(T, Ab, Bb, Q, P, R, self.nUAV, type, params)
-        self.x = None
-        self.u = None
-        self.xb = cp.Variable(( self.nUSV*(T+1), 1 ))
-        self.ub = cp.Variable(( self.mUSV*T, 1 ))
-        # self.xb.value = np.nan*np.ones((self.nUSV*(T+1), 1))
-        # self.ub.value = np.nan*np.ones((self.mUSV*(T+1), 1))
-        self.t_since_update = 0
-        self.xhat_queue  = Queue.Queue()
-        self.xbhat_queue = Queue.Queue()
-        self.delay_len = delay_len
-        self.xb_traj_0  = xb_traj_0            # Used for DEBUG
-        for i in range(delay_len):
-            self.xhat_queue.put(x_traj_0)
-            self.xbhat_queue.put(xb_traj_0)
-        self.xbhat_queue.put(xb_traj_0)
-
-        self.ignore_changes = False
-        self.its_since_started_ignoring = 0
-        self.num_rapid_changes = 0
-        self.its_since_rapid_change = 0
-        self.xbhat_m = np.nan
-
-    def get_xbhat_m(self):
-        xbhat_m_new = self.xbhat_queue.get()
-        quit_early = False
-        if np.isnan(self.xbhat_m).any():
-            # self.xbhat_m never before set
-            quit_early = True
-        else:
-            old_dir = get_traj_dir(self.xbhat_m, self.nUSV)
-            new_dir = get_traj_dir(xbhat_m_new, self.nUSV)
-            cos_angle = get_cos_angle_between(old_dir, new_dir)
-            # direction of previously used trajectory was 0
-            if np.isnan(cos_angle):
-                quit_early = True
-
-        # Special case
-        if quit_early:
-            self.ignore_changes = False
-            self.its_since_started_ignoring = 0
-            self.num_rapid_changes = 0
-            self.its_since_rapid_change = 0
-            self.xbhat_m = \
-                shift_trajectory(xbhat_m_new, self.nUSV, self.delay_len)
-            return self.xbhat_m
-
-        if cos_angle < 0:
-            self.num_rapid_changes += 1
-            self.its_since_rapid_change = 0
-
-        if self.ignore_changes:
-            self.its_since_started_ignoring += 1
-            if self.its_since_started_ignoring > self.delay_len + 1:
-                self.ignore_changes = False
-                self.its_since_started_ignoring = 0
-                self.num_rapid_changes = 0
-                self.its_since_rapid_change = 0
-        else:
-            if self.num_rapid_changes >= 2:
-                self.ignore_changes = True
-
-        if self.ignore_changes and cos_angle < 0:
-            # Use old trajectory
-            self.xbhat_m = shift_trajectory(self.xbhat_m, self.nUSV, 1)
-            return self.xbhat_m
-        else:
-            # Use new trajectory
-            self.xbhat_m = \
-                shift_trajectory(xbhat_m_new, self.nUSV, self.delay_len)
-            return self.xbhat_m
-
-    def solve(self, x_m, xb_m, USV_should_stop = False):
-        # xbhat_m = self.xbhat_queue.get()          OLD, DELETE THIS
-        # xbhat_m = shift_trajectory(xbhat_m, self.nUSV, self.delay_len) OLD, DELETE THIS
-        xbhat_m = self.get_xbhat_m()
-        # xbhat_m = self.xb_traj_0            # DEBUG
-        self.problemUAV.solve(x_m, xbhat_m)
-        self.xhat_queue.put(self.problemUAV.x.value)
-        self.x = self.problemUAV.x
-        self.u = self.problemUAV.u
-
-        xhat_m = self.xhat_queue.get()
-        xhat_m = shift_trajectory(xhat_m, self.nUAV, self.delay_len)
-        if not USV_should_stop:
-            self.problemUSV.solve(xb_m, xhat_m)
-            self.xbhat_queue.put(self.problemUSV.xb.value)
-            self.xb = self.problemUSV.xb
-            self.ub = self.problemUSV.ub
-        else:
-            self.ub.value = np.zeros((self.mUSV*self.T, 1))
-            self.xb.value = self.problemUSV.predict_trajectory(xb_m, self.ub.value)
-            self.xbhat_queue.put(self.xb.value)
-
-        self.t_since_update = 0
-
-    def solve_threaded(self, x_m, xb_m):
-        thread.start_new_thread(self.solve, (x_m, xb_m))
 
 # Problem where only constraints are dynamics and input saturation (maybe)
 # (no safety constraints).
