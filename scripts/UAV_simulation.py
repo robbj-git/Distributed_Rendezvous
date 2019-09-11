@@ -257,7 +257,7 @@ class UAV_simulator():
             , np.nan)
         self.USV_traj_log = np.full((self.nUSV*(self.T+1), sim_len), np.nan)
         self.wdes_traj_log = np.full((self.mv*self.T, sim_len), np.nan)
-        self.s_log = np.full((1, sim_len), np.nan)
+        self.s_vert_log = np.full((1, sim_len), np.nan)
         self.obj_val_log = np.full((1, sim_len), np.nan)
         # Associate one time value with each iteration of the simulation
         self.UAV_times = np.full((1, sim_len), np.nan)
@@ -282,6 +282,7 @@ class UAV_simulator():
             # Stores both positive and negative distances, for nicer plotting
             self.dist_traj_signed = None
         else: # if self.CENTRALISED
+            self.s_cent_log = np.full((1, sim_len), np.nan)
             self.uUSV_log = np.full((self.mUSV, sim_len), np.nan)
 
         self.USVApprox = StampedTrajQueue(self.delay_len)
@@ -411,7 +412,7 @@ class UAV_simulator():
         self.vert_traj_log[:, i:i+1] = self.xv_traj
         self.wdes_traj_log[:, i:i+1] = self.wdes_traj
         self.USV_traj_log[:, i:i+1] = self.xb_traj
-        self.s_log[:, i:i+1] = self.problemVert.s.value
+        self.s_vert_log[:, i:i+1] = self.problemVert.s.value
         self.obj_val_log[:, i:i+1] = self.problemVert.obj_val
 
         self.UAV_times[:, i:i+1] = rospy.get_time()
@@ -419,6 +420,7 @@ class UAV_simulator():
         if self.CENTRALISED:
             self.xb_log[:, i:i+1] = self.xb
             self.uUSV_log[:, i:i+1] = self.uUSV
+            self.s_cent_log[:, i:i+1] = self.problemCent.s.value
         else:
             self.xb_log[:, i:i+1] = self.xb_traj[0:self.nUSV, 0:1]
 
@@ -506,10 +508,11 @@ class UAV_simulator():
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_time_stamps.txt', self.UAV_times)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_solution_durations.txt', self.vert_solution_durations)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_horizontal_durations.txt', self.hor_solution_durations)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_log.txt', self.s_log)
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_vert_log.txt', self.s_vert_log)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/obj_val_log.txt', self.obj_val_log)
         if self.CENTRALISED:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_traj_log.txt', self.USV_traj_log)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_cent_log.txt', self.s_cent_log)
         if self.PARALLEL:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_hor_inner_durations.txt', self.hor_inner_solution_durations)
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_inner_durations.txt', self.vert_inner_solution_durations)

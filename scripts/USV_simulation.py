@@ -199,6 +199,7 @@ class USV_simulator():
             self.x_log = np.full((self.nUAV, sim_len+1), np.nan)
             self.UAV_traj_log = np.full( (self.nUAV*(self.T+1), sim_len),\
                 np.nan )
+            self.s_USV_log = np.full((1, sim_len), np.nan)
         if self.PARALLEL:
             self.USV_inner_traj_log = np.full((self.nUSV*(self.T_inner+1),\
                 sim_len), np.nan )
@@ -271,6 +272,7 @@ class USV_simulator():
             self.USV_traj_log[:, i:i+1] = self.xb_traj
             self.UAV_traj_log[:, i:i+1] = self.x_traj
             self.x_log[:, i:i+1] = self.x_traj[0:self.nUAV, 0:1]
+            self.s_USV_log[:, i:i+1] = self.problemUSV.s.value
 
         if self.PARALLEL:
             self.USV_inner_traj_log[:, i:i+1] = self.problemUSVFast.xb.value
@@ -333,6 +335,7 @@ class USV_simulator():
         if not self.CENTRALISED:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_traj_log.txt', self.USV_traj_log)
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_horizontal_durations.txt', self.hor_solution_durations)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_USV_log.txt', self.s_USV_log)
         if self.PARALLEL:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_inner_horizontal_durations.txt', self.hor_inner_solution_durations)
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_inner_traj_log.txt', self.USV_inner_traj_log)

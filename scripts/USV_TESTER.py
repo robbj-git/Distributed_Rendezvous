@@ -108,8 +108,8 @@ took_too_long_horizon = -1
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
 if PARALLEL:
-    hor_max = 100#221#240
-    hor_min = 100#221#150
+    hor_max = 200#221#240
+    hor_min = 200#221#150
 elif CENTRALISED:
     hor_max = 74#90
     hor_min = 74#40
@@ -117,7 +117,7 @@ elif DISTRIBUTED:
     hor_max = 80#100
     hor_min = 80#50
 
-hor_inner = 30#15
+hor_inner = 60#30#15
 
 for N in range(hor_max, hor_min-1, -1):
     took_too_long = False

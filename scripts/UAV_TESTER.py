@@ -94,8 +94,8 @@ my_uav_simulator =  None
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
 NUM_TESTS = 1
 if PARALLEL:
-    hor_max = 100#221#240
-    hor_min = 100#221#150
+    hor_max = 200#221#240
+    hor_min = 200#221#150
 elif CENTRALISED:
     hor_max = 74#90
     hor_min = 74#40
@@ -103,7 +103,7 @@ elif DISTRIBUTED:
     hor_max = 80#100
     hor_min = 80#50
 
-hor_inner = 30#15
+hor_inner = 60#30#15
 cancelled = False
 
 # Need to create a simulator, because simulators call rospy.node_init(), and

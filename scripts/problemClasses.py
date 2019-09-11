@@ -95,13 +95,13 @@ class CentralisedProblem():
         zeros_sqr = np.zeros((mUAV*T, mUAV*T))
         zeros_tall = np.zeros((nUAV*(T+1), 1))
         zeros_short = np.zeros((mUAV*T, 1))
-        C = np.full((1, 1), 10000*(T+1))
+        self.C = np.full((1, 1), 10000*(T+1))
         P_temp = 2*np.bmat([
             [self.Q_big, zeros, -self.Q_big, zeros, zeros_tall],
             [zeros.T, self.R_big, zeros.T, zeros_sqr, zeros_short],
             [-self.Q_big, zeros, self.Q_big, zeros, zeros_tall],
             [zeros.T, zeros_sqr, zeros.T,  self.R_big, zeros_short],
-            [zeros_tall.T, zeros_short.T, zeros_tall.T, zeros_short.T, C]
+            [zeros_tall.T, zeros_short.T, zeros_tall.T, zeros_short.T, self.C]
         ])
         # This matrix should be created straight from the dense counterpart,
         # because 1. the matrix is not diagonal, 2. it has a non-changing spartsity pattern
@@ -154,6 +154,7 @@ class CentralisedProblem():
         self.ub = cp.Variable(( mUSV*T, 1 ))
         self.x_0  = cp.Parameter((nUAV, 1))
         self.xb_0 = cp.Parameter((nUSV, 1))
+        self.s = cp.Variable((1, 1))
 
         objectiveCent = cp.quad_form(self.x-self.xb, self.Q_big) \
             + cp.quad_form(self.u, self.R_big) \
@@ -234,7 +235,7 @@ class CentralisedProblem():
             self.u.value = np.reshape(results.x[nUAV*(T+1):nUAV*(T+1)+mUAV*T], (-1, 1))
             self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T:2*nUAV*(T+1)+mUAV*T], (-1, 1))
             self.ub.value = np.reshape(results.x[2*nUAV*(T+1)+mUAV*T:-1], (-1, 1))
-            self.s = results.x[-1:]
+            self.s.value = np.full((1,1), results.x[-1])
             # print results.info.status, results.info.iter, #DEBUG PRINT
             # if results.info.run_time > 0.01:
             #     print results.info.iter
@@ -514,10 +515,10 @@ class USVProblem():
 
         dim1 = nUSV*(T+1)
         dim2 = mUSV*T
-        C= np.full((1,1), 10000*(T+1))
+        self.C = np.full((1,1), 10000*(T+1))
         P_temp = 2*np.bmat([[self.Q_big, np.zeros((dim1, dim2)), np.zeros((dim1, 1))],
             [np.zeros((dim2, dim1)), self.R_big, np.zeros((dim2, 1))],
-            [np.zeros((1, dim1)), np.zeros((1, dim2)), C]
+            [np.zeros((1, dim1)), np.zeros((1, dim2)), self.C]
         ])
         P_data = np.diagonal(P_temp)
         P_row = range(nUSV*(T+1) + mUSV*T + 1)
@@ -553,6 +554,7 @@ class USVProblem():
         self.ub = cp.Variable(( mUSV*T, 1 ))
         self.xb_0 = cp.Parameter((nUSV, 1))
         self.x_hat  = cp.Parameter((nUAV*(T+1), 1))
+        self.s  = cp.Parameter((1, 1))
 
         objectiveUSV = cp.quad_form(self.x_hat-self.xb, self.Q_big) \
             + cp.quad_form(self.ub, self.R_big)
@@ -617,7 +619,7 @@ class USVProblem():
             results = self.problemOSQP.solve()
             self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
             self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):-1], (-1, 1))
-            self.s = results.x[-1]
+            self.s.value  = np.full((1,1), results.x[-1])
         else:
             self.problemUSV.solve(solver=cp.OSQP, warm_start=True, verbose=False)
             if self.xb.value is None:
