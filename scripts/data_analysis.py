@@ -242,6 +242,7 @@ class DataAnalyser():
                 xb_pred_traj = USV_traj_log[0::p.nUSV, t]
                 yb_pred_traj = USV_traj_log[1::p.nUSV, t]
                 # Actual trajectories
+                print x_log[0, t]
                 ax.plot(x_log[0, 0:t+1], x_log[1, 0:t+1], 'blue')
                 ax.plot(xb_log[0, 0:t+1], xb_log[1, 0:t+1], 'red')
                 # Predicted trajectories
@@ -361,6 +362,91 @@ class DataAnalyser():
 
     def plot_with_vel_constraints(self, real_time = False):
         p = self.p
+        # upper_vel_constraints = Polygon([ (-100,   1000*p.wmax),\
+        #                                   (1000,   1000*p.wmax),\
+        #                                   (1000,   p.wmax),\
+        #                                   (-100,   p.wmax)], True)
+        # lower_vel_constraints = Polygon([ (-100,   1000*p.wmin),\
+        #                                   (1000,   1000*p.wmin),\
+        #                                   (1000,   p.wmin),\
+        #                                   (-100,   p.wmin)], True)
+        upper_vel_constraints = self.get_vel_polygon(p.wmax)
+        lower_vel_constraints = self.get_vel_polygon(p.wmin)
+        self.should_close = False
+
+        for file_index, dir in enumerate(self.files):
+            patch_collection = PatchCollection( [upper_vel_constraints,\
+                lower_vel_constraints], alpha=0.5, color='grey')
+            fig = plt.figure()
+            fig.canvas.mpl_connect('close_event', self.handle_close)
+            ax = plt.axes()
+
+            xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
+            vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
+            s_log = np.loadtxt(dir_path + dir + '/s_log.txt')
+            obj_val_log = np.loadtxt(dir_path + dir + '/obj_val_log.txt')
+            if self.file_types[file_index] == PARALLEL:
+                vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
+                T_inner = vert_inner_traj_log.shape[0]//p.nv
+
+            T_outer = vert_traj_log.shape[0]//p.nv
+            time_len = vert_traj_log.shape[1]
+            if real_time:
+                time = range(time_len)
+            else:
+                time = [time_len-1]
+
+            for t in time:
+                ax.cla()
+                upper_vel_constraints_slack = self.get_vel_polygon(p.wmax, -s_log[t])
+                lower_vel_constraints_slack = self.get_vel_polygon(p.wmin, -s_log[t])
+                patch_collection_slack = PatchCollection( \
+                    [upper_vel_constraints_slack, lower_vel_constraints_slack],\
+                    alpha=0.2, color='grey')
+                vel_pred_log = vert_traj_log[1::p.nv, t]
+                actual_vel_bound = -p.kl*xv_log[0, 0:t+1] + p.wmin_land
+                pred_vel_bound   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land
+                actual_vel_bound_slack = -p.kl*xv_log[0, 0:t+1] + p.wmin_land - s_log[0:t+1]
+                pred_vel_bound_slack   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land - s_log[t]
+                if np.isnan(vel_pred_log).any():
+                    vel_pred_log = np.full((T_outer,), xv_log[1, t])
+                if np.isnan(pred_vel_bound).any():
+                    pred_vel_bound = np.full((T_outer,), -p.kl*xv_log[0, t] + p.wmin_land)
+                    # TODO: Add a velocity bound predicted by inner controller in parallel case?
+
+                ax.plot(range(t+1), xv_log[1, 0:t+1], 'blue')
+                ax.plot(range(t+1, t+T_outer+1), vel_pred_log, 'green', alpha=0.5)
+                ax.plot(range(t+1), actual_vel_bound, 'red')
+                ax.plot(range(t+1, t+T_outer+1), pred_vel_bound, 'orange')
+                ax.plot(range(t+1), actual_vel_bound_slack, 'red', alpha=0.5)
+                ax.plot(range(t+1, t+T_outer+1), pred_vel_bound_slack, 'orange', alpha=0.5)
+                # ax.plot(range(t+1), s_log[0:t+1], 'k')
+                ax.plot(range(t+1), s_log[0:t+1], 'black')
+                if self.file_types[file_index] == PARALLEL:
+                    vel_inner_pred_log = vert_inner_traj_log[1::p.nv, t]
+                    ax.plot(range(t+1, t+T_inner+1), vel_inner_pred_log, 'yellow', alpha=0.5)
+
+                ax.add_collection(patch_collection)
+                ax.add_collection(patch_collection_slack)
+                plt.xlabel('time [iterations]')
+                plt.ylabel('velocity [m/s]')
+                try:
+                    plt.pause(0.05)
+                except:
+                    # Window was probably closed
+                    return
+                if self.should_close:   # Window was closed
+                    return
+            fig.show()
+        # fig = plt.figure()
+        # fig.canvas.mpl_connect('close_event', self.handle_close)
+        # ax = plt.axes()
+        # ax.plot(range(500), obj_val_log, 'red')
+        # ax.plot(range(500), 500*s_log, 'green')
+        plt.show()
+
+    def plot_obj_val(self, real_time = False):
+        p = self.p
         upper_vel_constraints = Polygon([ (-100,   2*p.wmax),\
                                           (1000,   2*p.wmax),\
                                           (1000,   p.wmax),\
@@ -406,17 +492,17 @@ class DataAnalyser():
                     pred_vel_bound = np.full((T_outer,), -p.kl*xv_log[0, t] + p.wmin_land)
                     # TODO: Add a velocity bound predicted by inner controller in parallel case?
 
-                ax.plot(range(t+1), xv_log[1, 0:t+1], 'blue')
-                ax.plot(range(t+1, t+T_outer+1), vel_pred_log, 'green', alpha=0.5)
-                ax.plot(range(t+1), actual_vel_bound, 'red')
-                ax.plot(range(t+1, t+T_outer+1), pred_vel_bound, 'orange')
-                ax.plot(range(t+1), actual_vel_bound_slack, 'red', alpha=0.5)
-                ax.plot(range(t+1, t+T_outer+1), pred_vel_bound_slack, 'orange', alpha=0.5)
-                ax.plot(range(t+1), s_log[0:t+1], 'k')
-                # ax.plot(range(t+1), s_log[0:t+1], 'black')
-                if self.file_types[file_index] == PARALLEL:
-                    vel_inner_pred_log = vert_inner_traj_log[1::p.nv, t]
-                    ax.plot(range(t+1, t+T_inner+1), vel_inner_pred_log, 'yellow', alpha=0.5)
+                # ax.plot(range(t+1), xv_log[1, 0:t+1], 'blue')
+                # ax.plot(range(t+1, t+T_outer+1), vel_pred_log, 'green', alpha=0.5)
+                # ax.plot(range(t+1), actual_vel_bound, 'red')
+                # ax.plot(range(t+1, t+T_outer+1), pred_vel_bound, 'orange')
+                # ax.plot(range(t+1), actual_vel_bound_slack, 'red', alpha=0.5)
+                # ax.plot(range(t+1, t+T_outer+1), pred_vel_bound_slack, 'orange', alpha=0.5)
+                # ax.plot(range(t+1), s_log[0:t+1], 'k')
+                # if self.file_types[file_index] == PARALLEL:
+                #     vel_inner_pred_log = vert_inner_traj_log[1::p.nv, t]
+                #     ax.plot(range(t+1, t+T_inner+1), vel_inner_pred_log, 'yellow', alpha=0.5)
+                ax.plot(range(t+1), obj_val_log[0:t+1], 'k')
 
                 ax.add_collection(patch_collection)
                 plt.xlabel('time [iterations]')
@@ -534,6 +620,12 @@ class DataAnalyser():
 
     def handle_close(self, evt):
         self.should_close = True
+
+    def get_vel_polygon(self, bound, shift=0):
+        return Polygon([ (-100,   1000*bound+shift),\
+                          (1000,   1000*bound+shift),\
+                          (1000,   bound+shift),\
+                          (-100,   bound+shift)], True)
 
 class DataLoader:
 
@@ -1250,8 +1342,9 @@ if __name__ == '__main__':
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
-    data_analyser.plot_with_vel_constraints(real_time = True)
+    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    # data_analyser.plot_with_vel_constraints(real_time = True)
+    # data_analyser.plot_obj_val(real_time = True)
 
     # use_dir = False
     # use_horizon_vs_performance = False

@@ -190,7 +190,6 @@ class UAV_simulator():
                 self.solve_inner_problem(self.x, self.x_traj)
 
             (self.uUAV, self.uUSV) = self.get_horizontal_control()
-
             # ------- Vertical Problem --------
             if self.dist_traj is not None:
                 if not self.PARALLEL or i == 0:

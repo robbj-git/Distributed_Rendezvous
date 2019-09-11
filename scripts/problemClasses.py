@@ -103,10 +103,8 @@ class CentralisedProblem():
             [zeros.T, zeros_sqr, zeros.T,  self.R_big, zeros_short],
             [zeros_tall.T, zeros_short.T, zeros_tall.T, zeros_short.T, C]
         ])
-        # P_data = np.diagonal(P_temp)
-        # P_row = range(2*nUAV*(T+1) + 2*mUAV*T)
-        # P_col = range(2*nUAV*(T+1) + 2*mUAV*T)
-        # self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
+        # This matrix should be created straight from the dense counterpart,
+        # because 1. the matrix is not diagonal, 2. it has a non-changing spartsity pattern
         self.P_OSQP = csc_matrix(P_temp)
         self.l_OSQP = np.bmat([
             [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # UAV Dynamics
@@ -324,10 +322,10 @@ class UAVProblem():
 
         P_temp = 2*np.bmat([[self.Q_big, np.zeros((nUAV*(T+1), mUAV*T))],\
             [np.zeros((mUAV*T, nUAV*(T+1))), self.R_big]])
-        # P_data = np.diagonal(P_temp)
-        # P_row = range(nUAV*(T+1) + mUAV*T)
-        # P_col = range(nUAV*(T+1) + mUAV*T)
-        self.P_OSQP = csc_matrix(P_temp)
+        P_data = np.diagonal(P_temp)
+        P_row = range(nUAV*(T+1) + mUAV*T)
+        P_col = range(nUAV*(T+1) + mUAV*T)
+        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
         self.q_OSQP = -2*np.bmat([
             [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUSV, 1 )) )],
             [np.zeros((T*mUAV, 1))]
@@ -521,11 +519,10 @@ class USVProblem():
             [np.zeros((dim2, dim1)), self.R_big, np.zeros((dim2, 1))],
             [np.zeros((1, dim1)), np.zeros((1, dim2)), C]
         ])
-        # P_data = np.diagonal(P_temp)
-        # P_row = range(nUSV*(T+1) + mUSV*T)
-        # P_col = range(nUSV*(T+1) + mUSV*T)
-        # self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
-        self.P_OSQP = csc_matrix(P_temp)
+        P_data = np.diagonal(P_temp)
+        P_row = range(nUSV*(T+1) + mUSV*T + 1)
+        P_col = range(nUSV*(T+1) + mUSV*T + 1)
+        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
         self.q_OSQP = -2*np.bmat([
             [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUAV, 1 )) )],
             [np.zeros((T*mUSV+1, 1))]
@@ -753,14 +750,14 @@ class VerticalProblem():
         ])
 
         # ------------- OSQP Matrices --------------
-        self.C = 0#10000*(T+1)
+        self.C = 10000*(T+1)
         P_temp = 2*np.bmat([[self.Qv_big, np.zeros((nv*(T+1), mv*T+1))],\
             [np.zeros((mv*T, nv*(T+1))), self.Rv_big, np.zeros((mv*T, 1)) ],\
             [np.zeros(( 1, nv*(T+1)+mv*T )), np.full((1,1), self.C) ]])
-        # P_data = np.diagonal(P_temp)
-        # P_row = range(nv*(T+1) + mv*T + 1)
-        # P_col = range(nv*(T+1) + mv*T + 1)
-        self.P_OSQP = csc_matrix(P_temp)
+        P_data = np.diagonal(P_temp)
+        P_row = range(nv*(T+1) + mv*T + 1)
+        P_col = range(nv*(T+1) + mv*T + 1)
+        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
         self.q_OSQP = 0
         # Honestly, I can't quite remember wth I was doing here, remade it below
         # self.l_OSQP = np.bmat([[np.dot(self.Phi_v,np.zeros((nv, 1)))],\
@@ -795,7 +792,7 @@ class VerticalProblem():
         self.A_temp = np.bmat([
             [np.eye(nv*(T+1)), -self.Lambda_v, np.zeros((nv*(T+1), 1))],        # Dynamics
             [velocity_extractor, np.zeros((T+1, T)), np.ones((T+1, 1))],   # Velocity constraints
-            [np.zeros((T, nv*(T+1))), np.eye(T), np.zeros((T, 1))],      # Input constraints
+            [np.zeros((T, nv*(T+1))), np.eye(T), np.ones((T, 1))],      # Input constraints
             [velocity_extractor + np.dot(params.kl,height_extractor),\
                 np.zeros((T+1, T)), np.ones((T+1, 1))],                    # Touchdown constraints
             [height_extractor, np.zeros((T+1, T)), np.zeros((T+1, 1))],    # Altitude constraints
@@ -948,6 +945,7 @@ class VerticalProblem():
                 self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):-1], (-1, 1))
                 self.s.value  = np.full((1,1), results.x[-1])
                 self.obj_val = results.info.obj_val
+                # print self.s.value[0,0], self.obj_val
                 # print results.info.iter # DEBUG PRINT
                 # print self.xv.value[-2]
                 # #DEBUG
@@ -1039,8 +1037,7 @@ class VerticalProblem():
             [np.dot(self.Phi_v, x0)],             # Dynamics
             [np.dot(params.wmin,np.ones((2*T+1, 1)))],# Velocity and input constraints
             [np.dot(params.wmin_land,np.ones((T+1, 1)))], # Touchdown constraints
-            # Altitude constraints
-            [np.dot( (np.eye(T+1)-b1), np.full((T+1,1), params.hs) ) ],
+            [np.dot( (np.eye(T+1)-b1), np.full((T+1,1), params.hs) ) ], # Altitude constraints
             [-np.full((T+1, 1), np.inf)]            # Safety constraints
         ])
         self.u_OSQP = np.bmat([
@@ -1052,7 +1049,6 @@ class VerticalProblem():
             [-np.dot(params.hs, np.dot(b1, dist_traj)) + \
                 np.dot(params.hs*params.dl,np.ones((T+1, 1)))]# Safety constraints
         ])
-
         P_temp = 2*np.bmat([[np.dot(b2, self.Qv_big),\
                 np.zeros((self.nv*(self.T+1), self.mv*(self.T+1)))],\
             [np.zeros((self.mv*self.T, self.nv*(self.T+1))), self.Rv_big,\
@@ -1060,6 +1056,10 @@ class VerticalProblem():
             [np.zeros(( 1, self.nv*(self.T+1)+self.mv*self.T )),\
                 np.full((1,1), self.C) ]])
         P_data = np.diagonal(P_temp)
+        # print P_data.shape
+        # P is 225x225. Shouldn't there be just as many elements?
+        # Or has setting some to zero during the first definition messed something up?
+
         # P_row = range(self.nv*(self.T+1) + self.mv*self.T)
         # P_col = range(self.nv*(self.T+1) + self.mv*self.T)
         # P_new = csc_matrix((P_data, (P_row, P_col)))
@@ -1280,7 +1280,11 @@ class FastUAVProblem():
         P_temp = 2*np.bmat([[self.Q_big, np.zeros(((T+1)*nUAV, T*mUAV))],
             [np.zeros((T*mUAV, (T+1)*nUAV,)), self.R_big]
         ])
-        self.P_OSQP = csc_matrix(P_temp)
+
+        P_data = np.diagonal(P_temp)
+        P_row = range(nUAV*(T+1) + mUAV*T)
+        P_col = range(nUAV*(T+1) + mUAV*T)
+        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
         self.q_OSQP = -2*np.bmat([
             [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUAV, 1 )) )],
             [np.zeros((T*mUAV, 1))]
@@ -1393,7 +1397,10 @@ class FastUSVProblem():
         P_temp = 2*np.bmat([[self.Q_big, np.zeros(((T+1)*nUSV, T*mUSV))],
             [np.zeros((T*mUSV, (T+1)*nUSV,)), self.R_big]
         ])
-        self.P_OSQP = csc_matrix(P_temp)
+        P_data = np.diagonal(P_temp)
+        P_row = range(nUSV*(T+1) + mUSV*T)
+        P_col = range(nUSV*(T+1) + mUSV*T)
+        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
         self.q_OSQP = -2*np.bmat([
             [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUSV, 1 )) )],
             [np.zeros((T*mUSV, 1))]
@@ -1453,7 +1460,6 @@ class FastUSVProblem():
 
         end = time.time()
         self.last_solution_duration = end - start
-
 
     def predict_trajectory( self, xb_0, ub_traj):
         return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
@@ -1536,26 +1542,31 @@ class FastVerticalProblem():
         # ------------- OSQP Matrices --------------
         P_temp = 2*np.bmat([[self.Qv_big, np.zeros((nv*(T+1), mv*T))],\
             [np.zeros((mv*T, nv*(T+1))), self.Rv_big]])
-        # P_data = np.diagonal(P_temp)
-        # P_row = range(nv*(T+1) + mv*T)
-        # P_col = range(nv*(T+1) + mv*T)
-        self.P_OSQP = csc_matrix(P_temp)
-        self.q_OSQP = 0
-        self.l_OSQP = np.bmat([\
-            [np.dot(self.Phi_v,np.zeros((nv, 1)))],\
-            [np.full((3*(T+1), 1), -np.inf)]] )
-        self.u_OSQP = np.bmat([\
-            [np.dot(self.Phi_v,np.zeros((nv, 1)))],\
-            [self.vert_constraints_vector]] )
+        P_data = np.diagonal(P_temp)
+        P_row = range(nv*(T+1) + mv*T)
+        P_col = range(nv*(T+1) + mv*T)
+        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
+        # self.l_OSQP = np.bmat([\
+        #     [np.dot(self.Phi_v,np.zeros((nv, 1)))],\
+        #     [np.full((3*(T+1), 1), -np.inf)]] )
+        # self.u_OSQP = np.bmat([\
+        #     [np.dot(self.Phi_v,np.zeros((nv, 1)))],\
+        #     [self.vert_constraints_vector]] )
+        # self.q_OSQP = np.bmat([\
+        #     [-2*np.dot(self.Qv_big, np.zeros((nv*(T+1), 1)))],\
+        #     [np.zeros((T*mv, 1))]])
+        # # I have added velocity constraints, but not constraints on wdes. Will this be enough?
+        # A_temp = np.bmat([\
+        #     [np.eye(nv*(T+1)), -self.Lambda_v],\
+        #     [self.vert_constraints_matrix, np.zeros((3*(T+1), mv*T))]] )
+        self.l_OSQP = np.dot(self.Phi_v,np.zeros((nv, 1)))
+        self.u_OSQP = np.dot(self.Phi_v,np.zeros((nv, 1)))
         self.q_OSQP = np.bmat([\
             [-2*np.dot(self.Qv_big, np.zeros((nv*(T+1), 1)))],\
             [np.zeros((T*mv, 1))]])
         # I have added velocity constraints, but not constraints on wdes. Will this be enough?
         A_temp = np.bmat([\
-            [np.eye(nv*(T+1)), -self.Lambda_v],\
-            [self.vert_constraints_matrix, np.zeros((3*(T+1), mv*T))]] )
-        #     [np.zeros((mv*T, nv*(T+1))), np.eye(mv*T)]
-        #     ])
+            [np.eye(nv*(T+1)), -self.Lambda_v]] )
         self.A_OSQP = csc_matrix(A_temp)
 
     def create_optimisation_problem(self):
@@ -1626,12 +1637,16 @@ class FastVerticalProblem():
         self.last_solution_duration = end - start
 
     def update_OSQP(self, x0, x_des):
-        self.l_OSQP = np.bmat([\
-            [np.dot(self.Phi_v, x0)],\
-            [np.full((3*(self.T+1), 1), -np.inf)]] )
-        self.u_OSQP = np.bmat([\
-            [np.dot(self.Phi_v, x0)],\
-            [self.vert_constraints_vector]] )
+        # self.l_OSQP = np.bmat([\
+        #     [np.dot(self.Phi_v, x0)],\
+        #     [np.full((3*(self.T+1), 1), -np.inf)]] )
+        # self.u_OSQP = np.bmat([\
+        #     [np.dot(self.Phi_v, x0)],\
+        #     [self.vert_constraints_vector]] )
+        # self.q_OSQP = np.bmat([[np.dot(-2*self.Qv_big, x_des)],\
+        #     [np.zeros((self.T*self.mv, 1))]])
+        self.l_OSQP = np.dot(self.Phi_v, x0)
+        self.u_OSQP = np.dot(self.Phi_v, x0)
         self.q_OSQP = np.bmat([[np.dot(-2*self.Qv_big, x_des)],\
             [np.zeros((self.T*self.mv, 1))]])
         # P_temp = 2*np.bmat([[np.dot(safe_states_extractor, self.Qv_big),\
