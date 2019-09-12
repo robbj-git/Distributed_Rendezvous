@@ -383,7 +383,7 @@ class DataAnalyser():
 
             xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
             vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
-            s_log = np.loadtxt(dir_path + dir + '/s_log.txt')
+            s_vert_log = np.loadtxt(dir_path + dir + '/s_vert_log.txt')
             obj_val_log = np.loadtxt(dir_path + dir + '/obj_val_log.txt')
             if self.file_types[file_index] == PARALLEL:
                 vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
@@ -398,16 +398,16 @@ class DataAnalyser():
 
             for t in time:
                 ax.cla()
-                upper_vel_constraints_slack = self.get_vel_polygon(p.wmax, -s_log[t])
-                lower_vel_constraints_slack = self.get_vel_polygon(p.wmin, -s_log[t])
+                upper_vel_constraints_slack = self.get_vel_polygon(p.wmax, -s_vert_log[t])
+                lower_vel_constraints_slack = self.get_vel_polygon(p.wmin, -s_vert_log[t])
                 patch_collection_slack = PatchCollection( \
                     [upper_vel_constraints_slack, lower_vel_constraints_slack],\
                     alpha=0.2, color='grey')
                 vel_pred_log = vert_traj_log[1::p.nv, t]
                 actual_vel_bound = -p.kl*xv_log[0, 0:t+1] + p.wmin_land
                 pred_vel_bound   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land
-                actual_vel_bound_slack = -p.kl*xv_log[0, 0:t+1] + p.wmin_land - s_log[0:t+1]
-                pred_vel_bound_slack   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land - s_log[t]
+                actual_vel_bound_slack = -p.kl*xv_log[0, 0:t+1] + p.wmin_land - s_vert_log[0:t+1]
+                pred_vel_bound_slack   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land - s_vert_log[t]
                 if np.isnan(vel_pred_log).any():
                     vel_pred_log = np.full((T_outer,), xv_log[1, t])
                 if np.isnan(pred_vel_bound).any():
@@ -420,8 +420,8 @@ class DataAnalyser():
                 ax.plot(range(t+1, t+T_outer+1), pred_vel_bound, 'orange')
                 ax.plot(range(t+1), actual_vel_bound_slack, 'red', alpha=0.5)
                 ax.plot(range(t+1, t+T_outer+1), pred_vel_bound_slack, 'orange', alpha=0.5)
-                # ax.plot(range(t+1), s_log[0:t+1], 'k')
-                ax.plot(range(t+1), s_log[0:t+1], 'black')
+                # ax.plot(range(t+1), s_vert_log[0:t+1], 'k')
+                ax.plot(range(t+1), s_vert_log[0:t+1], 'black')
                 if self.file_types[file_index] == PARALLEL:
                     vel_inner_pred_log = vert_inner_traj_log[1::p.nv, t]
                     ax.plot(range(t+1, t+T_inner+1), vel_inner_pred_log, 'yellow', alpha=0.5)
@@ -442,7 +442,7 @@ class DataAnalyser():
         # fig.canvas.mpl_connect('close_event', self.handle_close)
         # ax = plt.axes()
         # ax.plot(range(500), obj_val_log, 'red')
-        # ax.plot(range(500), 500*s_log, 'green')
+        # ax.plot(range(500), 500*s_vert_log, 'green')
         plt.show()
 
     def plot_obj_val(self, real_time = False):
@@ -466,7 +466,7 @@ class DataAnalyser():
 
             xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
             vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
-            s_log = np.loadtxt(dir_path + dir + '/s_log.txt')
+            s_vert_log = np.loadtxt(dir_path + dir + '/s_vert_log.txt')
             obj_val_log = np.loadtxt(dir_path + dir + '/obj_val_log.txt')
             if self.file_types[file_index] == PARALLEL:
                 vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
@@ -484,8 +484,8 @@ class DataAnalyser():
                 vel_pred_log = vert_traj_log[1::p.nv, t]
                 actual_vel_bound = -p.kl*xv_log[0, 0:t+1] + p.wmin_land
                 pred_vel_bound   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land
-                actual_vel_bound_slack = -p.kl*xv_log[0, 0:t+1] + p.wmin_land - s_log[0:t+1]
-                pred_vel_bound_slack   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land - s_log[t]
+                actual_vel_bound_slack = -p.kl*xv_log[0, 0:t+1] + p.wmin_land - s_vert_log[0:t+1]
+                pred_vel_bound_slack   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land - s_vert_log[t]
                 if np.isnan(vel_pred_log).any():
                     vel_pred_log = np.full((T_outer,), xv_log[1, t])
                 if np.isnan(pred_vel_bound).any():
@@ -498,7 +498,7 @@ class DataAnalyser():
                 # ax.plot(range(t+1, t+T_outer+1), pred_vel_bound, 'orange')
                 # ax.plot(range(t+1), actual_vel_bound_slack, 'red', alpha=0.5)
                 # ax.plot(range(t+1, t+T_outer+1), pred_vel_bound_slack, 'orange', alpha=0.5)
-                # ax.plot(range(t+1), s_log[0:t+1], 'k')
+                # ax.plot(range(t+1), s_vert_log[0:t+1], 'k')
                 # if self.file_types[file_index] == PARALLEL:
                 #     vel_inner_pred_log = vert_inner_traj_log[1::p.nv, t]
                 #     ax.plot(range(t+1, t+T_inner+1), vel_inner_pred_log, 'yellow', alpha=0.5)
@@ -519,7 +519,7 @@ class DataAnalyser():
         # fig.canvas.mpl_connect('close_event', self.handle_close)
         # ax = plt.axes()
         # ax.plot(range(500), obj_val_log, 'red')
-        # ax.plot(range(500), 500*s_log, 'green')
+        # ax.plot(range(500), 500*s_vert_log, 'green')
         plt.show()
 
     def plot_with_constraints(self, real_time = False, perspective = ACTUAL):
@@ -1342,8 +1342,8 @@ if __name__ == '__main__':
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
-    # data_analyser.plot_with_vel_constraints(real_time = True)
+    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
 
     # use_dir = False

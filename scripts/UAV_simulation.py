@@ -177,9 +177,10 @@ class UAV_simulator():
 
             # ------- Horizontal Problem --------
             if self.CENTRALISED:
-                self.solve_centralised_problem(self.x, self.xb)
+                self.problemCent.solve(self.x, self.xb)
             elif self.DISTRIBUTED or (self.PARALLEL and i == 0):
-                self.solve_distributed_problem(self.x, self.xb_traj)
+                # TODO: Make xb_traj naturally an array instead of a matrix
+                self.problemUAV.solve(self.x, np.asarray(self.xb_traj))
             elif self.PARALLEL and i % self.INTER_ITS == 0:
                 self.problemUAV.solve_threaded(self.x, self.xb_traj)
 
@@ -187,13 +188,15 @@ class UAV_simulator():
             self.update_hor_trajectories()
 
             if self.PARALLEL:
-                self.solve_inner_problem(self.x, self.x_traj)
+                self.problemUAVFast.solve(self.x[0:(self.T_inner+1)*self.nUAV],\
+                    self.x_traj[0:(self.T_inner+1)*self.nUAV])
 
             (self.uUAV, self.uUSV) = self.get_horizontal_control()
             # ------- Vertical Problem --------
             if self.dist_traj is not None:
                 if not self.PARALLEL or i == 0:
-                    self.solve_vertical_problem(self.xv, self.dist_traj)
+                    # TODO: Make dist_traj naturally be an array instead of a matrix
+                    self.problemVert.solve(self.xv, 0.0, np.asarray(self.dist_traj))
                 elif self.PARALLEL and i % self.INTER_ITS == 0:
                     # TODO: Make dist_traj nartually an array instead of matrix
                     self.problemVert.solve_threaded(self.xv, 0.0, \
@@ -203,7 +206,8 @@ class UAV_simulator():
             self.update_vert_trajectories()
 
             if self.PARALLEL:
-                self.solve_inner_vertical_problem(self.xv, self.xv_traj)
+                self.problemVertFast.solve(self.xv[0:(self.T_inner+1)*self.nv],
+                    self.xv_traj[0:(self.T_inner+1)*self.nv, 0:1])
 
             self.wdes = self.get_vertical_control()
 
@@ -288,43 +292,6 @@ class UAV_simulator():
         self.USVApprox = StampedTrajQueue(self.delay_len)
         self.USV_state_queue = StampedMsgQueue(self.delay_len)
 
-    def solve_centralised_problem(self, x, xb):
-        start_time = time.time()
-        self.problemCent.solve(x, xb)
-        end_time = time.time()
-        self.hor_solution_durations.append(end_time-start_time)
-
-    def solve_distributed_problem(self, x, xb_traj):
-        start_time = time.time()
-        # TODO: Make xb_traj naturally an array instead of a matrix
-        self.problemUAV.solve(x, np.asarray(xb_traj))
-        end_time = time.time()
-        self.hor_solution_durations.append(end_time - start_time)
-
-    def solve_inner_problem(self, x, x_traj):
-        start = time.time()
-        self.problemUAVFast.solve(x[0:(self.T_inner+1)*self.nUAV],\
-            x_traj[0:(self.T_inner+1)*self.nUAV])
-        end = time.time()
-        self.hor_inner_solution_durations.append(end-start)
-        # if end-start > 0.03:
-        #     print end-start
-
-    def solve_vertical_problem(self, xv, dist_traj):
-        start_time = time.time()
-        # TODO: Make dist_traj naturally be an array instead of a matrix
-        self.problemVert.solve(xv, 0.0, np.asarray(dist_traj))
-        end_time = time.time()
-        self.xv_traj = self.problemVert.xv.value
-        self.vert_solution_durations.append(end_time - start_time)
-
-    def solve_inner_vertical_problem(self, xv, vert_traj):
-        start = time.time()
-        self.problemVertFast.solve(xv[0:(self.T_inner+1)*self.nv],
-            vert_traj[0:(self.T_inner+1)*self.nv, 0:1])
-        end = time.time()
-        self.vert_inner_solution_durations.append(end-start)
-
     def get_horizontal_control(self):
         if self.CENTRALISED:
             return (self.problemCent.u[ 0:self.mUAV, 0:1].value,\
@@ -356,8 +323,6 @@ class UAV_simulator():
         elif self.PARALLEL:
             if self.problemUAV.t_since_update == 0:
                 self.x_traj = self.problemUAV.x.value
-                self.hor_solution_durations.append(\
-                    self.problemUAV.last_solution_duration)
                 self.problemUAV.last_solution_is_used = True
             else:
                 self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
@@ -416,17 +381,27 @@ class UAV_simulator():
         self.obj_val_log[:, i:i+1] = self.problemVert.obj_val
 
         self.UAV_times[:, i:i+1] = rospy.get_time()
-
         if self.CENTRALISED:
             self.xb_log[:, i:i+1] = self.xb
             self.uUSV_log[:, i:i+1] = self.uUSV
             self.s_cent_log[:, i:i+1] = self.problemCent.s.value
+            self.hor_solution_durations.append(self.problemCent.last_solution_duration)
         else:
             self.xb_log[:, i:i+1] = self.xb_traj[0:self.nUSV, 0:1]
+
+        if self.DISTRIBUTED:
+            self.hor_solution_durations.append(self.problemUAV.last_solution_duration)
 
         if self.PARALLEL:
             self.UAV_inner_traj_log[:, i:i+1] = self.problemUAVFast.x.value
             self.vert_inner_traj_log[:, i:i+1] = self.problemVertFast.xv.value
+            self.hor_inner_solution_durations.append(self.problemUAVFast.last_solution_duration)
+            self.vert_inner_solution_durations.append(self.problemVertFast.last_solution_duration)
+            if self.problemUAV.t_since_update == 0:
+                self.hor_solution_durations.append(self.problemUAV.last_solution_duration)
+                self.vert_solution_durations.append(self.problemVert.last_solution_duration)
+        else:
+            self.vert_solution_durations.append(self.problemVert.last_solution_duration)
 
     def send_control_to_USV(self, uUSV):
         USV_input_msg = AccelStamped()

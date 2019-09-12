@@ -150,7 +150,7 @@ class USV_simulator():
 
             # ------- Solving Problem --------
             if self.DISTRIBUTED or (self.PARALLEL and i == 0):
-                self.solve_distributed_problem(self.xb, self.x_traj)
+                self.problemUSV.solve(self.xb, self.x_traj, self.USV_should_stop)
             elif self.PARALLEL and i % self.INTER_ITS == 0:
                 self.problemUSV.solve_threaded(self.xb, self.x_traj,\
                     self.USV_should_stop)
@@ -160,7 +160,8 @@ class USV_simulator():
                 self.update_trajectories()
 
             if self.PARALLEL:
-                self.solve_inner_problem(self.xb, self.xb_traj)
+                self.problemUSVFast.solve(self.xb[0:(self.T_inner+1)*self.nUSV],\
+                    self.xb_traj[0:(self.T_inner+1)*self.nUAV])
 
             (self.uUSV) = self.get_control()
 
@@ -222,22 +223,6 @@ class USV_simulator():
         self.UAVApprox = StampedTrajQueue(self.delay_len)
         self.input_queue = StampedMsgQueue(self.delay_len)
 
-    def solve_distributed_problem(self, xb, x_traj):
-        T = self.T
-        nUAV = self.nUAV
-        nUSV = self.nUSV
-        start_time = time.time()
-        self.problemUSV.solve(xb, x_traj, self.USV_should_stop)
-        end_time = time.time()
-        self.hor_solution_durations.append(end_time - start_time)
-
-    def solve_inner_problem(self, xb, xb_traj):
-        start = time.time()
-        self.problemUSVFast.solve(xb[0:(self.T_inner+1)*self.nUSV],\
-            xb_traj[0:(self.T_inner+1)*self.nUAV])
-        end = time.time()
-        self.hor_inner_solution_durations.append(end - start)
-
     def get_control(self):
         if self.CENTRALISED:
             # Input was set in beggining of the main loop already
@@ -274,8 +259,14 @@ class USV_simulator():
             self.x_log[:, i:i+1] = self.x_traj[0:self.nUAV, 0:1]
             self.s_USV_log[:, i:i+1] = self.problemUSV.s.value
 
+        if self.DISTRIBUTED:
+            self.hor_solution_durations.append(self.problemUSV.last_solution_duration)
+
         if self.PARALLEL:
             self.USV_inner_traj_log[:, i:i+1] = self.problemUSVFast.xb.value
+            self.hor_inner_solution_durations.append(self.problemUSVFast.last_solution_duration)
+            if self.problemUSV.t_since_update == 0:
+                self.hor_solution_durations.append(self.problemUSV.last_solution_duration)
 
     def send_traj_to_UAV(self, xb_traj):
         traj_msg = mat_to_multiarray_stamped(xb_traj, self.T+1, self.nUSV)
