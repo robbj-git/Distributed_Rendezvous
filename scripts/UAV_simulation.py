@@ -151,7 +151,7 @@ class UAV_simulator():
 
         start = time.time()
         for i in range(sim_len):
-            # print i,    #DEBUG PRINT
+            # print i    #DEBUG PRINT
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -235,7 +235,7 @@ class UAV_simulator():
             end = time.time()
             self.iteration_durations.append(end-start)
             # if end-start > 0.05:  # DEBUG PRINT
-            #     print end-start
+                # print end-start
             self.rate.sleep()
             start = time.time()
 
@@ -456,6 +456,7 @@ class UAV_simulator():
 
         os.mkdir(dir_path + 'Experiment_' + str(i))
         os.mkdir(dir_path + 'Experiment_' + str(i) + '/UAV')
+        os.mkdir(dir_path + 'Experiment_' + str(i) + '/TEST')
         experiment_index_pub.publish(Int8(i))
 
         info_str = str(datetime.datetime.now()) + '\ntype: '

@@ -242,19 +242,18 @@ class DataAnalyser():
                 xb_pred_traj = USV_traj_log[0::p.nUSV, t]
                 yb_pred_traj = USV_traj_log[1::p.nUSV, t]
                 # Actual trajectories
-                print x_log[0, t]
-                ax.plot(x_log[0, 0:t+1], x_log[1, 0:t+1], 'blue')
-                ax.plot(xb_log[0, 0:t+1], xb_log[1, 0:t+1], 'red')
+                ax.plot(x_log[0, t], x_log[1, t], 'bx')
+                ax.plot(xb_log[0, t], xb_log[1, t], 'rx')
                 # Predicted trajectories
-                # ax.plot(x_pred_traj, y_pred_traj, 'green', alpha=0.2)
-                ax.plot(xb_pred_traj, yb_pred_traj, 'green', alpha=0.2)
+                ax.plot(x_pred_traj, y_pred_traj, 'blue', alpha=0.4)
+                ax.plot(xb_pred_traj, yb_pred_traj, 'red', alpha=0.4)
                 if self.file_types[file_index] == PARALLEL:
                     x_inner_pred_traj = UAV_inner_traj_log[0::p.nUAV, t]
                     y_inner_pred_traj = UAV_inner_traj_log[1::p.nUAV, t]
                     xb_inner_pred_traj = USV_inner_traj_log[0::p.nUSV, t]
                     yb_inner_pred_traj = USV_inner_traj_log[1::p.nUSV, t]
-                    # ax.plot(x_inner_pred_traj, y_inner_pred_traj, 'yellow', alpha=0.2)
-                    ax.plot(xb_inner_pred_traj, yb_inner_pred_traj, 'yellow', alpha=0.2)
+                    ax.plot(x_inner_pred_traj, y_inner_pred_traj, 'green', alpha=0.4)
+                    ax.plot(xb_inner_pred_traj, yb_inner_pred_traj, 'yellow', alpha=0.4)
                 plt.xlabel('x-position [m]')
                 plt.ylabel('y-position [m]')
                 plt.legend(['UAV trajectory', 'USV trajectory'])
@@ -1342,8 +1341,8 @@ if __name__ == '__main__':
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
-    data_analyser.plot_with_vel_constraints(real_time = True)
+    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
 
     # use_dir = False

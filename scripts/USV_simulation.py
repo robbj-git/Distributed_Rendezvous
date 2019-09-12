@@ -265,6 +265,8 @@ class USV_simulator():
         if self.PARALLEL:
             self.USV_inner_traj_log[:, i:i+1] = self.problemUSVFast.xb.value
             self.hor_inner_solution_durations.append(self.problemUSVFast.last_solution_duration)
+            # if self.problemUSVFast.last_solution_duration > 0.05:
+            #     print self.problemUSVFast.last_solution_duration
             if self.problemUSV.t_since_update == 0:
                 self.hor_solution_durations.append(self.problemUSV.last_solution_duration)
 

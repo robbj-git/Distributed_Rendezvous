@@ -1279,6 +1279,7 @@ class FastUSVProblem():
         # Cost Matrices
         self.Q_big  = np.kron(np.eye(T+1), self.Q)
         self.Q_big[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = self.P  # Not double-checked
+        self.Q_big_sparse = csc_matrix(self.Q_big)
         self.R_big  = np.kron(np.eye(T),   self.R)
 
         # Dynamics Matrices
@@ -1345,7 +1346,9 @@ class FastUSVProblem():
         elif self.type == 'CVXPy':
             self.problemUSV.solve(solver=cp.OSQP, warm_start=True, verbose=False)
         elif self.type == 'OSQP':
+            # start1 = time.time()
             self.update_OSQP(xb_m, xb_des_m)
+            # start2 = time.time()
             results = self.problemOSQP.solve()
             self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
             self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):], (-1, 1))
@@ -1366,10 +1369,12 @@ class FastUSVProblem():
     def update_OSQP(self, xb0, xb_des):
         self.l_OSQP = np.dot(self.Phi_b, xb0)
         self.u_OSQP = np.dot(self.Phi_b, xb0)
-        self.q_OSQP = -2*np.block([
-            [np.dot( self.Q_big, xb_des )],
-            [np.zeros((self.T*self.mUSV, 1))]
-        ])
+        # temp = -2*np.dot( self.Q_big, xb_des )
+        # print self.xb_des.shape
+        # print self.Q_big_sparse.dot(-2*xb_des.T).toarray().shape
+        self.q_OSQP = np.block([[self.Q_big_sparse.dot(-2*xb_des)],\
+            [np.zeros((self.T*self.mUSV, 1))]])
+        # np.put(self.q_OSQP, range(self.nUSV*(self.T+1)), self.Q_big_sparse.multiply(-2*xb_des).toarray())
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
 
 class FastVerticalProblem():

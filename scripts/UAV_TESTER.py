@@ -94,8 +94,8 @@ my_uav_simulator =  None
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
 NUM_TESTS = 1
 if PARALLEL:
-    hor_max = 200#221#240
-    hor_min = 200#221#150
+    hor_max = 120#221#240
+    hor_min = 120#221#150
 elif CENTRALISED:
     hor_max = 74#90
     hor_min = 74#40
@@ -103,7 +103,7 @@ elif DISTRIBUTED:
     hor_max = 80#100
     hor_min = 80#50
 
-hor_inner = 60#30#15
+hor_inner = 30#15
 cancelled = False
 
 # Need to create a simulator, because simulators call rospy.node_init(), and
@@ -269,19 +269,19 @@ if not cancelled:
 
     # dir_path = '/home/student/robbj_experiment_results/'
     dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/MEAN.txt', mean_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/MEDIAN.txt', median_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_MEAN.txt', hor_mean_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_MEDIAN.txt', hor_median_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/VERT_MEAN.txt', vert_mean_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/VERT_MEDIAN.txt', vert_median_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/LANDING_TIMES.txt', landing_list)
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEAN.txt', mean_list)
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEDIAN.txt', median_list)
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEAN.txt', hor_mean_list)
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEDIAN.txt', hor_median_list)
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_MEAN.txt', vert_mean_list)
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_MEDIAN.txt', vert_median_list)
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/LANDING_TIMES.txt', landing_list)
 
     if PARALLEL:
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_INNER_MEAN.txt', hor_inner_mean_list)
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/HOR_INNER_MEDIAN.txt', hor_inner_median_list)
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/VERT_INNER_MEAN.txt', vert_inner_mean_list)
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/VERT_INNER_MEDIAN.txt', vert_inner_median_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEAN.txt', hor_inner_mean_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEDIAN.txt', hor_inner_median_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_INNER_MEAN.txt', vert_inner_mean_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_INNER_MEDIAN.txt', vert_inner_median_list)
 
     # Wait for USV to finish storing data. If we exit before this, USV will never receive experiment index
     while USV_has_stored_data == 0:
