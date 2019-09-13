@@ -11,6 +11,8 @@ SAMPLING_RATE = 20              # Dynamics change if this changes
 SAMPLING_TIME = 1.0/SAMPLING_RATE
 ADD_DROPOUT = False # Should a communication loss between the vehicles be simulated?
 
+PRED_PARALLEL_TRAJ = False
+
 dropout_lower_bound = 80    # Iteration index at which communication loss should start
 dropout_upper_bound = 130   # Iteration index at which communication loss should end
 

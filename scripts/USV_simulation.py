@@ -53,6 +53,7 @@ class USV_simulator():
         self.INTER_ITS = pp.INTER_ITS
         self.KUSV = pp.KUSV
         self.ADD_DROPOUT = pp.ADD_DROPOUT
+        self.PRED_PARALLEL_TRAJ = pp.PRED_PARALLEL_TRAJ
         self.dropout_lower_bound = pp.dropout_lower_bound
         self.dropout_upper_bound = pp.dropout_upper_bound
         self.USV_stopped_at_iter = np.nan
@@ -78,6 +79,42 @@ class USV_simulator():
             self.USV_input_sub = rospy.Subscriber(\
                 'USV_input', AccelStamped, self.USV_input_callback)
         self.rate = rospy.Rate(self.SAMPLING_RATE)
+
+    def reset(self, sim_len, xb_0):
+        self.xb_log = np.full((self.nUSV, sim_len+1), np.nan)
+        self.uUSV_log = np.full((self.mUSV, sim_len), np.nan)
+
+        if not self.CENTRALISED:
+            self.USV_traj_log = np.full((self.nUSV*(self.T+1), sim_len), np.nan)
+            self.x_log = np.full((self.nUAV, sim_len+1), np.nan)
+            self.UAV_traj_log = np.full( (self.nUAV*(self.T+1), sim_len),\
+                np.nan )
+            self.s_USV_log = np.full((1, sim_len), np.nan)
+        if self.PARALLEL:
+            self.USV_inner_traj_log = np.full((self.nUSV*(self.T_inner+1),\
+                sim_len), np.nan )
+
+        self.USV_times = np.full((1, sim_len), np.nan)
+        self.iteration_durations = []
+        if not self.CENTRALISED:
+            self.hor_solution_durations = []
+        if self.PARALLEL:
+            self.hor_inner_solution_durations = []
+
+        # Initial predicted trajectory assumes no control signal applied
+        self.xb_traj = self.problemUSV.predict_trajectory(xb_0, \
+            np.zeros( (self.mUSV*self.T, 1) ))
+        self.problemUSV.xb.value = self.xb_traj
+
+        if self.PARALLEL:
+            self.xb_traj_inner = self.xb_traj[:, 0:self.T_inner]
+        self.x_traj = None  # Always contains most up-to-date UAV predicted traj
+        # Always contains most up-to-date current distance between vehicles
+        self.dist = None
+
+        self.USV_should_stop = False
+        self.UAVApprox = StampedTrajQueue(self.delay_len)
+        self.input_queue = StampedMsgQueue(self.delay_len)
 
     def simulate_problem(self, sim_len, xb_val):
         self.reset(sim_len, xb_val)
@@ -151,9 +188,18 @@ class USV_simulator():
             # ------- Solving Problem --------
             if self.DISTRIBUTED:
                 self.problemUSV.solve(self.xb, self.x_traj, self.USV_should_stop)
-            elif self.PARALLEL and i % self.INTER_ITS == 0:
+            elif not self.PRED_PARALLEL_TRAJ and self.PARALLEL and i % self.INTER_ITS == 0:
                 self.problemUSV.solve_threaded(self.xb, self.x_traj,\
                     self.USV_should_stop)
+
+            # Initialising parallel solution using a prediction instead
+            if self.PRED_PARALLEL_TRAJ and self.PARALLEL and i % self.INTER_ITS == 0:
+                self.xb_traj = self.problemUSV.xb.value
+                self.problemUSV.last_solution_is_used = True
+                self.problemUSV.solve_threaded(self.xb_traj[self.INTER_ITS*self.nUSV\
+                    :(self.INTER_ITS+1)*self.nUSV], self.x_traj, self.USV_should_stop)
+            elif self.PRED_PARALLEL_TRAJ and self.PARALLEL:
+                self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
 
             if not self.CENTRALISED:
                 # Update values in xb_traj and x_traj
@@ -191,41 +237,6 @@ class USV_simulator():
         if not self.CENTRALISED:
             self.x_log[:, sim_len:sim_len+1] = self.x_traj[0:self.nUAV, 0:1]
 
-    def reset(self, sim_len, xb_0):
-        self.xb_log = np.full((self.nUSV, sim_len+1), np.nan)
-        self.uUSV_log = np.full((self.mUSV, sim_len), np.nan)
-
-        if not self.CENTRALISED:
-            self.USV_traj_log = np.full((self.nUSV*(self.T+1), sim_len), np.nan)
-            self.x_log = np.full((self.nUAV, sim_len+1), np.nan)
-            self.UAV_traj_log = np.full( (self.nUAV*(self.T+1), sim_len),\
-                np.nan )
-            self.s_USV_log = np.full((1, sim_len), np.nan)
-        if self.PARALLEL:
-            self.USV_inner_traj_log = np.full((self.nUSV*(self.T_inner+1),\
-                sim_len), np.nan )
-
-        self.USV_times = np.full((1, sim_len), np.nan)
-        self.iteration_durations = []
-        if not self.CENTRALISED:
-            self.hor_solution_durations = []
-        if self.PARALLEL:
-            self.hor_inner_solution_durations = []
-
-        # Initial predicted trajectory assumes no control signal applied
-        self.xb_traj = self.problemUSV.predict_trajectory(xb_0, \
-            np.zeros( (self.mUSV*self.T, 1) ))
-
-        if self.PARALLEL:
-            self.xb_traj_inner = self.xb_traj[:, 0:self.T_inner]
-        self.x_traj = None  # Always contains most up-to-date UAV predicted traj
-        # Always contains most up-to-date current distance between vehicles
-        self.dist = None
-
-        self.USV_should_stop = False
-        self.UAVApprox = StampedTrajQueue(self.delay_len)
-        self.input_queue = StampedMsgQueue(self.delay_len)
-
     def get_control(self):
         if self.CENTRALISED:
             # Input was set in beggining of the main loop already
@@ -244,11 +255,12 @@ class USV_simulator():
             self.xb_traj = self.problemUSV.xb.value
         elif self.PARALLEL:
             self.xb_traj_inner = self.problemUSVFast.xb.value
-            if self.problemUSV.t_since_update == 0:
-                self.xb_traj = self.problemUSV.xb.value
-                self.problemUSV.last_solution_is_used = True
-            else:
-                self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
+            if not self.PRED_PARALLEL_TRAJ:
+                if self.problemUSV.t_since_update == 0:
+                    self.xb_traj = self.problemUSV.xb.value
+                    self.problemUSV.last_solution_is_used = True
+                else:
+                    self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
 
     def update_logs(self, i):
         self.xb_log[:, i:i+1] = self.xb
