@@ -215,6 +215,7 @@ class USV_simulator():
         # Initial predicted trajectory assumes no control signal applied
         self.xb_traj = self.problemUSV.predict_trajectory(xb_0, \
             np.zeros( (self.mUSV*self.T, 1) ))
+
         if self.PARALLEL:
             self.xb_traj_inner = self.xb_traj[:, 0:self.T_inner]
         self.x_traj = None  # Always contains most up-to-date UAV predicted traj
@@ -280,6 +281,7 @@ class USV_simulator():
             pass
             print "DID DROP!"
         else:
+            # print traj_msg
             self.traj_pub.publish(traj_msg)
 
     def send_state_to_UAV(self, xb):

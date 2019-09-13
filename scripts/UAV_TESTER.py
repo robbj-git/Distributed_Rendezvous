@@ -85,8 +85,8 @@ class ProblemParams():
         self.dropout_upper_bound = dropout_upper_bound
 
 problem_params = ProblemParams()
-x_m = np.matrix([[0.0], [0.0], [0.0], [0.0]])
-xv_m = np.matrix([[7.0], [0.0]])#np.matrix([[12.0], [0.0]])
+x_m = np.array([[0.0], [0.0], [0.0], [0.0]])
+xv_m = np.array([[7.0], [0.0]])#np.matrix([[12.0], [0.0]])
 prev_simulator = None
 my_uav_simulator =  None
 

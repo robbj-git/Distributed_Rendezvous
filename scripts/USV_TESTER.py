@@ -90,7 +90,7 @@ class ProblemParams():
 
 problem_params = ProblemParams()
 
-xb_m = np.matrix([[0.5], [4.0], [0.0], [-1.0]])
+xb_m = np.array([[0.5], [4.0], [0.0], [-1.0]])
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER

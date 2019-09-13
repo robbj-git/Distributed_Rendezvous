@@ -224,6 +224,9 @@ class UAV_simulator():
                         # Use shifted old trajectory if no new trajectory is available
                         self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
 
+            # if self.problemUAV.x.value is not None:
+            #     print i, ":", self.problemUAV.x.value[10, 0]
+
             # ------- Horizontal Problem --------
             if self.CENTRALISED:
                 self.problemCent.solve(self.x, self.xb)
