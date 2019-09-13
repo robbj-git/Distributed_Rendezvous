@@ -181,9 +181,9 @@ class USV_simulator():
             # ------- Sleep --------
             end = time.time()
             self.iteration_durations.append(end-start)
-            # if end-start > 0.05:
-            #     print end-start
             self.rate.sleep()
+            # if end-start < 0.05:
+                # time.sleep(0.05 - end + start)
             start = time.time()
 
         # ------------ END OF LOOP ------------
@@ -242,8 +242,6 @@ class USV_simulator():
         elif self.PARALLEL:
             if self.problemUSV.t_since_update == 0:
                 self.xb_traj = self.problemUSV.xb.value
-                self.hor_solution_durations.append(\
-                    self.problemUSV.last_solution_duration)
                 self.problemUSV.last_solution_is_used = True
             else:
                 self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)

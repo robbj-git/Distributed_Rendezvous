@@ -20,7 +20,7 @@ wmin_land = -0.3
 kl = 0.2
 vmax = 5.0
 vmax_b = 5.0
-vmin_b = 1.0
+vmin_b = 0.8
 
 # ------------------- DYNAMICS -------------------
 

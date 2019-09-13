@@ -90,7 +90,7 @@ class ProblemParams():
 
 problem_params = ProblemParams()
 
-xb_m = np.matrix([[4.0], [5.0], [-4.0], [-5.0]])
+xb_m = np.matrix([[0.5], [4.0], [0.0], [-1.0]])
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
@@ -108,8 +108,8 @@ took_too_long_horizon = -1
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
 if PARALLEL:
-    hor_max = 120#221#240
-    hor_min = 120#221#150
+    hor_max = 200#221#240
+    hor_min = 200#221#150
 elif CENTRALISED:
     hor_max = 74#90
     hor_min = 74#40
@@ -117,7 +117,7 @@ elif DISTRIBUTED:
     hor_max = 80#100
     hor_min = 80#50
 
-hor_inner = 30#15
+hor_inner = 60#30#15
 
 for N in range(hor_max, hor_min-1, -1):
     took_too_long = False
@@ -258,6 +258,9 @@ if quit_horizon >= 0:
         print 'OMG HOW ON EARTH DID IT EVER TAKE TOO LONG????? Horizon:', took_too_long_horizon
 
     dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
+    dir_already_exists = os.path.isdir(dir_path + 'Experiment_' + str(exp_index) + '/TEST')
+    if not dir_already_exists:
+        os.mkdir(dir_path + 'Experiment_' + str(i) + '/TEST')
     # TODO: Why and when is UAV notified about that the USV has finished storing?
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEAN_USV.txt', it_mean_list)
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEDIAN_USV.txt', it_median_list)

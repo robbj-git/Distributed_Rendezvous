@@ -499,6 +499,7 @@ class USVProblem():
         # Cost Matrices
         self.Q_big  = np.kron(np.eye(T+1), self.Q)
         self.Q_big[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = self.P  # Not double-checked
+        self.Q_big_sparse = csc_matrix(self.Q_big)
         self.R_big  = np.kron(np.eye(T),   self.R)
 
         # Dynamics Matrices
@@ -660,6 +661,7 @@ class USVProblem():
             [np.dot( self.Q_big, x_traj )],
             [np.zeros((T*self.mUSV+1, 1))]
         ])
+
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
 
 class VerticalProblem():
