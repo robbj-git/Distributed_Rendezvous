@@ -114,8 +114,57 @@ class UAV_simulator():
                 print "Failed reaching control authority. Sleeping for 3s."
                 time.sleep(3)
 
+    def reset(self, sim_len, x_0, xv_0):
+        self.x_log  = np.full((self.nUAV, sim_len+1), np.nan)
+        self.xv_log = np.full((self.nv,   sim_len+1), np.nan)
+        self.xb_log = np.full((self.nUSV, sim_len+1), np.nan)
+        self.uUAV_log = np.full((self.mUAV, sim_len), np.nan)
+        self.wdes_log = np.full((self.mv,   sim_len), np.nan)
+        self.UAV_traj_log = np.full((self.nUAV*(self.T+1), sim_len), np.nan)
+        self.vert_traj_log = np.full((self.nv *(self.T+1), sim_len), np.nan)
+        self.UAV_inner_traj_log = np.full((self.nUAV*(self.T_inner+1), sim_len)\
+            , np.nan)
+        self.vert_inner_traj_log = np.full((self.nv *(self.T_inner+1), sim_len)\
+            , np.nan)
+        self.USV_traj_log = np.full((self.nUSV*(self.T+1), sim_len), np.nan)
+        self.wdes_traj_log = np.full((self.mv*self.T, sim_len), np.nan)
+        self.s_vert_log = np.full((1, sim_len), np.nan)
+        self.obj_val_log = np.full((1, sim_len), np.nan)
+        # Associate one time value with each iteration of the simulation
+        self.UAV_times = np.full((1, sim_len), np.nan)
+        self.iteration_durations = []
+        self.hor_solution_durations = []
+        self.vert_solution_durations = []
+        if self.PARALLEL:
+            self.hor_inner_solution_durations = []
+            self.vert_inner_solution_durations = []
+
+        # Initial predicted UAV trajectory assumes no control signal applied
+        self.x_traj = self.problemUAV.predict_trajectory(x_0, \
+            np.zeros( (self.mUAV*self.T, 1) ))
+        self.xv_traj = self.problemVert.predict_trajectory(xv_0, \
+            np.zeros( (self.mv*self.T, 1) )) # Always contains most up-to-date predicted vertical traj
+        self.xb_traj = None # Always contains most up-to-date USV predicted traj
+        if self.PARALLEL:
+            self.x_traj_inner = self.x_traj[:, 0:self.T_inner]
+            self.xv_traj_inner = self.xv_traj[:, 0:self.T_inner]
+        # Always contains most up-to-date predicted (by outer problem in
+        # parallel case) vertical input trajectory
+        self.wdes_traj = np.full((self.mv*self.T, 1), np.nan)
+        # Always contains most up-to-date predicted horizontal distance between vehicles
+        self.dist_traj = None
+        if not self.CENTRALISED:
+            # Stores both positive and negative distances, for nicer plotting
+            self.dist_traj_signed = None
+        else: # if self.CENTRALISED
+            self.s_cent_log = np.full((1, sim_len), np.nan)
+            self.uUSV_log = np.full((self.mUSV, sim_len), np.nan)
+
+        self.USVApprox = StampedTrajQueue(self.delay_len)
+        self.USV_state_queue = StampedMsgQueue(self.delay_len)
+
     def simulate_problem(self, sim_len, x_val, xv_val):
-        self.reset(sim_len, x_val)
+        self.reset(sim_len, x_val, xv_val)
 
         self.x = x_val
         self.xv = xv_val
@@ -194,7 +243,7 @@ class UAV_simulator():
             (self.uUAV, self.uUSV) = self.get_horizontal_control()
             # ------- Vertical Problem --------
             if self.dist_traj is not None:
-                if not self.PARALLEL or i == 0:
+                if not self.PARALLEL:
                     # TODO: Make dist_traj naturally be an array instead of a matrix
                     self.problemVert.solve(self.xv, 0.0, np.asarray(self.dist_traj))
                 elif self.PARALLEL and i % self.INTER_ITS == 0:
@@ -247,51 +296,6 @@ class UAV_simulator():
         else:
             self.xb_log[:, sim_len:sim_len+1] = self.xb_traj[0:self.nUSV, 0:1]
 
-    def reset(self, sim_len, x_0):
-        self.x_log  = np.full((self.nUAV, sim_len+1), np.nan)
-        self.xv_log = np.full((self.nv,   sim_len+1), np.nan)
-        self.xb_log = np.full((self.nUSV, sim_len+1), np.nan)
-        self.uUAV_log = np.full((self.mUAV, sim_len), np.nan)
-        self.wdes_log = np.full((self.mv,   sim_len), np.nan)
-        self.UAV_traj_log = np.full((self.nUAV*(self.T+1), sim_len), np.nan)
-        self.vert_traj_log = np.full((self.nv *(self.T+1), sim_len), np.nan)
-        self.UAV_inner_traj_log = np.full((self.nUAV*(self.T_inner+1), sim_len)\
-            , np.nan)
-        self.vert_inner_traj_log = np.full((self.nv *(self.T_inner+1), sim_len)\
-            , np.nan)
-        self.USV_traj_log = np.full((self.nUSV*(self.T+1), sim_len), np.nan)
-        self.wdes_traj_log = np.full((self.mv*self.T, sim_len), np.nan)
-        self.s_vert_log = np.full((1, sim_len), np.nan)
-        self.obj_val_log = np.full((1, sim_len), np.nan)
-        # Associate one time value with each iteration of the simulation
-        self.UAV_times = np.full((1, sim_len), np.nan)
-        self.iteration_durations = []
-        self.hor_solution_durations = []
-        self.vert_solution_durations = []
-        if self.PARALLEL:
-            self.hor_inner_solution_durations = []
-            self.vert_inner_solution_durations = []
-
-        # Initial predicted UAV trajectory assumes no control signal applied
-        self.x_traj = self.problemUAV.predict_trajectory(x_0, \
-            np.zeros( (self.mUAV*self.T, 1) ))
-        self.xb_traj = None # Always contains most up-to-date USV predicted traj
-        self.xv_traj = None # Always contains most up-to-date predicted vertical traj
-        # Always contains most up-to-date predicted (by outer problem in
-        # parallel case) vertical input trajectory
-        self.wdes_traj = np.full((self.mv*self.T, 1), np.nan)
-        # Always contains most up-to-date predicted horizontal distance between vehicles
-        self.dist_traj = None
-        if not self.CENTRALISED:
-            # Stores both positive and negative distances, for nicer plotting
-            self.dist_traj_signed = None
-        else: # if self.CENTRALISED
-            self.s_cent_log = np.full((1, sim_len), np.nan)
-            self.uUSV_log = np.full((self.mUSV, sim_len), np.nan)
-
-        self.USVApprox = StampedTrajQueue(self.delay_len)
-        self.USV_state_queue = StampedMsgQueue(self.delay_len)
-
     def get_horizontal_control(self):
         if self.CENTRALISED:
             return (self.problemCent.u[ 0:self.mUAV, 0:1].value,\
@@ -321,6 +325,7 @@ class UAV_simulator():
         elif self.DISTRIBUTED:
             self.x_traj = self.problemUAV.x.value
         elif self.PARALLEL:
+            self.x_traj_inner = self.problemUAVFast.x.value
             if self.problemUAV.t_since_update == 0:
                 self.x_traj = self.problemUAV.x.value
                 self.problemUAV.last_solution_is_used = True
@@ -362,11 +367,12 @@ class UAV_simulator():
                 # the initial value used in the problem solution
                 if self.problemVert.t_since_update == 0:
                     self.xv_traj = self.problemVert.xv.value
-                    self.vert_solution_durations.append(\
-                        self.problemVert.last_solution_duration)
                     self.problemVert.last_solution_is_used = True
                 else:
                     self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
+        if self.PARALLEL:
+            # TODO: Can it happen that this one becomes None? Does anything even become None anymore?
+            self.xv_traj_inner = self.problemVertFast.xv.value
 
     def update_logs(self, i):
         self.x_log[ :, i:i+1] = self.x
@@ -393,12 +399,13 @@ class UAV_simulator():
             self.hor_solution_durations.append(self.problemUAV.last_solution_duration)
 
         if self.PARALLEL:
-            self.UAV_inner_traj_log[:, i:i+1] = self.problemUAVFast.x.value
-            self.vert_inner_traj_log[:, i:i+1] = self.problemVertFast.xv.value
+            self.UAV_inner_traj_log[:, i:i+1] = self.x_traj_inner
+            self.vert_inner_traj_log[:, i:i+1] = self.xv_traj_inner
             self.hor_inner_solution_durations.append(self.problemUAVFast.last_solution_duration)
             self.vert_inner_solution_durations.append(self.problemVertFast.last_solution_duration)
             if self.problemUAV.t_since_update == 0:
                 self.hor_solution_durations.append(self.problemUAV.last_solution_duration)
+            if self.problemVert.t_since_update == 0:
                 self.vert_solution_durations.append(self.problemVert.last_solution_duration)
         else:
             self.vert_solution_durations.append(self.problemVert.last_solution_duration)

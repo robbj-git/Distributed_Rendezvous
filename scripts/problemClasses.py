@@ -35,7 +35,7 @@ class CentralisedProblem():
         self.R = R
         self.params = params
         self.type = type
-        self.t_since_update = 0
+        self.t_since_update = 100 # Arbitrary number larger than 0
         [self.nUAV, self.mUAV] = B.shape
         [self.nUSV, self.mUSV] = Bb.shape
         self.last_solution_duration = np.nan
@@ -290,7 +290,7 @@ class UAVProblem():
         # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
         [self.nUAV, self.mUAV] = B.shape
-        self.t_since_update = 0
+        self.t_since_update = 100 # Arbitrary number larger than 0
         self.t_since_prev_update = 0
         self.last_solution_is_used = False
         self.create_optimisation_matrices()
@@ -481,7 +481,7 @@ class USVProblem():
         # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
         [self.nUSV, self.mUSV] = Bb.shape
-        self.t_since_update = 0
+        self.t_since_update = 100 # Arbitrary number larger than 0
         self.t_since_prev_update = 0
         self.last_solution_is_used = False
         self.create_optimisation_matrices()
@@ -677,7 +677,7 @@ class VerticalProblem():
         self.params = params
         self.nv = 2
         self.mv = 1
-        self.t_since_update = 0
+        self.t_since_update = 100 # Arbitrary number larger than 0
         self.t_since_prev_update = 0    # TODO: Us this used still?
         self.last_solution_is_used = False
         # When problem is solved in parallel, this variable makes it easier to access solution duration
@@ -1392,7 +1392,7 @@ class FastVerticalProblem():
         self.params = params
         self.nv = 2
         self.mv = 1
-        self.t_since_update = 0
+        self.t_since_update = 100 # Arbitrary number larger than 0
         self.last_solution_duration = np.nan
         self.create_optimisation_matrices()
         self.create_optimisation_problem()

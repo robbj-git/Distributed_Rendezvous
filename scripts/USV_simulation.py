@@ -149,7 +149,7 @@ class USV_simulator():
             #         self.USV_stopped_at_iter = self.i
 
             # ------- Solving Problem --------
-            if self.DISTRIBUTED or (self.PARALLEL and i == 0):
+            if self.DISTRIBUTED:
                 self.problemUSV.solve(self.xb, self.x_traj, self.USV_should_stop)
             elif self.PARALLEL and i % self.INTER_ITS == 0:
                 self.problemUSV.solve_threaded(self.xb, self.x_traj,\
@@ -215,6 +215,8 @@ class USV_simulator():
         # Initial predicted trajectory assumes no control signal applied
         self.xb_traj = self.problemUSV.predict_trajectory(xb_0, \
             np.zeros( (self.mUSV*self.T, 1) ))
+        if self.PARALLEL:
+            self.xb_traj_inner = self.xb_traj[:, 0:self.T_inner]
         self.x_traj = None  # Always contains most up-to-date UAV predicted traj
         # Always contains most up-to-date current distance between vehicles
         self.dist = None
@@ -240,6 +242,7 @@ class USV_simulator():
         elif self.DISTRIBUTED:
             self.xb_traj = self.problemUSV.xb.value
         elif self.PARALLEL:
+            self.xb_traj_inner = self.problemUSVFast.xb.value
             if self.problemUSV.t_since_update == 0:
                 self.xb_traj = self.problemUSV.xb.value
                 self.problemUSV.last_solution_is_used = True
@@ -261,7 +264,7 @@ class USV_simulator():
             self.hor_solution_durations.append(self.problemUSV.last_solution_duration)
 
         if self.PARALLEL:
-            self.USV_inner_traj_log[:, i:i+1] = self.problemUSVFast.xb.value
+            self.USV_inner_traj_log[:, i:i+1] = self.xb_traj_inner
             self.hor_inner_solution_durations.append(self.problemUSVFast.last_solution_duration)
             # if self.problemUSVFast.last_solution_duration > 0.05:
             #     print self.problemUSVFast.last_solution_duration
