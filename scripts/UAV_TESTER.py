@@ -95,8 +95,8 @@ my_uav_simulator =  None
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
 NUM_TESTS = 1
 if PARALLEL:
-    hor_max = 250#120#221#240
-    hor_min = 250#120#221#150
+    hor_max = 200#120#221#240
+    hor_min = 200#120#221#150
 elif CENTRALISED:
     hor_max = 74#90
     hor_min = 74#40

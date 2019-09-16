@@ -559,7 +559,7 @@ class USVProblem():
         self.ub = cp.Variable(( mUSV*T, 1 ))
         self.xb_0 = cp.Parameter((nUSV, 1))
         self.x_hat  = cp.Parameter((nUAV*(T+1), 1))
-        self.s  = cp.Parameter((1, 1))
+        self.s  = cp.Variable((1, 1))
 
         objectiveUSV = cp.quad_form(self.x_hat-self.xb, self.Q_big) \
             + cp.quad_form(self.ub, self.R_big)
