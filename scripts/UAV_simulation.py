@@ -203,7 +203,7 @@ class UAV_simulator():
 
         start = time.time()
         for i in range(sim_len):
-            # print i    #DEBUG PRINT
+            print i    #DEBUG PRINT
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -500,7 +500,8 @@ class UAV_simulator():
         info_str += 'sampling rate: ' + str(SAMPLING_RATE) + '\n'
         info_str += 'UAV used horizontal solver: ' + used_solver + '\n'
         info_str += 'and vertical solver: ' + self.vert_used_solver + '\n'
-        info_str += 'Delay length [iterations]: ' + str(self.delay_len)
+        info_str += 'Delay length [iterations]: ' + str(self.delay_len) + '\n'
+        info_str += ("HIL setup" if self.USE_HIL else "Local setup") + " was used" 
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/info.txt', [info_str], fmt="%s")
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/x_log.txt', self.x_log)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/xv_log.txt', self.xv_log)

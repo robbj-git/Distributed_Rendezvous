@@ -109,8 +109,8 @@ took_too_long_horizon = -1
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
 if PARALLEL:
-    hor_max = 120#221#240
-    hor_min = 120#221#150
+    hor_max = 250#221#240
+    hor_min = 250#221#150
 elif CENTRALISED:
     hor_max = 74#90
     hor_min = 74#40
@@ -261,7 +261,7 @@ if quit_horizon >= 0:
     dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
     dir_already_exists = os.path.isdir(dir_path + 'Experiment_' + str(exp_index) + '/TEST')
     if not dir_already_exists:
-        os.mkdir(dir_path + 'Experiment_' + str(i) + '/TEST')
+        os.mkdir(dir_path + 'Experiment_' + str(exp_index) + '/TEST')
     # TODO: Why and when is UAV notified about that the USV has finished storing?
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEAN_USV.txt', it_mean_list)
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEDIAN_USV.txt', it_median_list)

@@ -30,7 +30,6 @@ light_blue = (0.498, 0.804, 0.733, 0.7)
 # red = '#ff0000'
 red = (1.0, 0.0, 0.0, 0.7)
 
-# TODO: ADD INTERPOLATION IN APPROPRIATE PLACES!!!
 class DataAnalyser():
 
     def __init__(self, files):
@@ -61,24 +60,37 @@ class DataAnalyser():
                 raise TypeError('Problem must only be of type Centralised, Distributed, or Parallel')
         return file_types
 
-    def plot_3d(self, real_time = False):
+    def plot_3d(self, real_time = False, perspective = ACTUAL):
         p = self.p
         self.should_close = False
         for file_index, dir in enumerate(self.files):
             fig = plt.figure()
             fig.canvas.mpl_connect('close_event', self.handle_close)
             ax = plt.axes(projection='3d')
-            x_log  = np.loadtxt(dir_path + dir + '/x_log.txt')
-            xb_log = np.loadtxt(dir_path + dir + '/xb_log.txt')
-            xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
-            UAV_traj_log = np.loadtxt(dir_path + dir + '/UAV_traj_log.txt')
-            USV_traj_log = np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
-            vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
 
-            if self.file_types[file_index] == PARALLEL:
-                UAV_inner_traj_log = np.loadtxt(dir_path + dir + '/UAV_inner_traj_log.txt')
-                USV_inner_traj_log = np.loadtxt(dir_path + dir + '/USV_inner_traj_log.txt')
-                vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
+            dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['horizontal', 'vertical'], self.p)
+            if perspective == ACTUAL:
+                x_log  = dtl.x_log
+                xb_log = dtl.xb_log
+                UAV_traj_log = dtl.UAV_traj_log
+                USV_traj_log = dtl.USV_traj_log
+            if perspective == UAV:
+                x_log  = dtl.x_log
+                UAV_traj_log = dtl.UAV_traj_log
+                USV_traj_log = dtl.USV_traj_log_UAV
+                xb_log = USV_traj_log[0:p.nUSV, :]
+            if perspective == USV:
+                xb_log = dtl.xb_log
+                USV_traj_log = dtl.USV_traj_log
+                UAV_traj_log = dtl.UAV_traj_log_USV
+                x_log = UAV_traj_log[0:p.nUAV, :]
+            xv_log = dtl.xv_log#np.loadtxt(dir_path + dir + '/xv_log.txt')
+            vert_traj_log = dtl.vert_traj_log#np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
+
+            # if self.file_types[file_index] == PARALLEL:
+            #     UAV_inner_traj_log = np.loadtxt(dir_path + dir + '/UAV_inner_traj_log.txt')
+            #     USV_inner_traj_log = np.loadtxt(dir_path + dir + '/USV_inner_traj_log.txt')
+            #     vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
 
             time_len = x_log.shape[1]-1
             if real_time:
@@ -95,8 +107,10 @@ class DataAnalyser():
                 yb_pred_traj = USV_traj_log[1::p.nUSV, t]
 
                 # Actual trajectories
-                ax.plot3D(x_log[0, 0:t+1], x_log[1, 0:t+1], xv_log[0, 0:t+1], 'blue')
-                ax.plot3D(xb_log[0, 0:t+1], xb_log[1, 0:t+1], 0, 'red')
+                ax.plot3D(x_log[0, 0:t+1], x_log[1, 0:t+1], xv_log[0, 0:t+1], 'b')
+                ax.plot3D(xb_log[0, 0:t+1], xb_log[1, 0:t+1], 0, 'r')
+                ax.plot3D(x_log[0, t:t+1], x_log[1, t:t+1], xv_log[0, t:t+1], 'bx')
+                ax.plot3D(xb_log[0, t:t+1], xb_log[1, t:t+1], 0, 'rx')
                 # Predicted trajectories
                 if not np.isnan(z_pred_traj).all():
                     ax.plot3D(x_pred_traj, y_pred_traj, z_pred_traj, 'green', alpha=0.5)
@@ -104,11 +118,11 @@ class DataAnalyser():
                     ax.plot3D(x_pred_traj, y_pred_traj,  xv_log[0, t], 'green', alpha=0.5)
                 ax.plot3D(xb_pred_traj, yb_pred_traj, 0, 'green', alpha=0.5)
                 if self.file_types[file_index] == PARALLEL:
-                    x_inner_pred_traj = UAV_inner_traj_log[0::p.nUAV, t]
-                    y_inner_pred_traj = UAV_inner_traj_log[1::p.nUAV, t]
-                    z_inner_pred_traj = vert_inner_traj_log[0::p.nv,  t]
-                    xb_inner_pred_traj = USV_inner_traj_log[0::p.nUSV, t]
-                    yb_inner_pred_traj = USV_inner_traj_log[1::p.nUSV, t]
+                    x_inner_pred_traj = dtl.UAV_inner_traj_log[0::p.nUAV, t]
+                    y_inner_pred_traj = dtl.UAV_inner_traj_log[1::p.nUAV, t]
+                    z_inner_pred_traj = dtl.vert_inner_traj_log[0::p.nv,  t]
+                    xb_inner_pred_traj = dtl.USV_inner_traj_log[0::p.nUSV, t]
+                    yb_inner_pred_traj = dtl.USV_inner_traj_log[1::p.nUSV, t]
                     ax.plot3D(x_inner_pred_traj, y_inner_pred_traj, z_inner_pred_traj, 'yellow', alpha=0.5)
                     ax.plot3D(xb_inner_pred_traj, yb_inner_pred_traj, 0, 'yellow', alpha=0.5)
 
@@ -127,80 +141,6 @@ class DataAnalyser():
             fig.show()
         plt.show()# raw_input()
 
-    def plot_3d_super_realtime(self):
-        p = self.p
-        self.should_close = False
-
-        for file_index, dir in enumerate(self.files):
-            fig = plt.figure()
-            fig.canvas.mpl_connect('close_event', self.handle_close)
-            ax = plt.axes(projection='3d')
-            x_log  = np.loadtxt(dir_path + dir + '/x_log.txt')
-            xb_log = np.loadtxt(dir_path + dir + '/xb_log.txt')
-            xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
-            UAV_traj_log = np.loadtxt(dir_path + dir + '/UAV_traj_log.txt')
-            USV_traj_log = np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
-            vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
-            self.UAV_time_stamps = np.loadtxt(dir_path + dir + '/UAV_time_stamps.txt')
-            self.USV_time_stamps = np.loadtxt(dir_path + dir + '/USV_time_stamps.txt')
-            t_0 = min(self.UAV_time_stamps.min(), self.USV_time_stamps.min())
-            t_f = max(self.UAV_time_stamps.max(), self.USV_time_stamps.max())
-
-            if self.file_types[file_index] == PARALLEL:
-                UAV_inner_traj_log = np.loadtxt(dir_path + dir + '/UAV_inner_traj_log.txt')
-                USV_inner_traj_log = np.loadtxt(dir_path + dir + '/USV_inner_traj_log.txt')
-                vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
-
-            (sim_len, _) = UAV_traj_log.shape
-            imax = 0
-            imax_b = 0
-            time_points = np.reshape(np.arange(t_0, t_f, 0.01), (1, -1))
-            for (_,_), t in np.ndenumerate(time_points):
-                ax.cla()
-                while imax < sim_len-1 and self.UAV_time_stamps[imax+1] <= t:
-                    imax += 1
-                while imax_b < sim_len-1 and self.USV_time_stamps[imax_b+1] <= t:
-                    imax_b += 1
-                x_pred_traj = UAV_traj_log[0::p.nUAV, imax]
-                y_pred_traj = UAV_traj_log[1::p.nUAV, imax]
-                z_pred_traj = vert_traj_log[0::p.nv,  imax]
-                xb_pred_traj = USV_traj_log[0::p.nUSV, imax_b]
-                yb_pred_traj = USV_traj_log[1::p.nUSV, imax_b]
-
-                # Actual trajectories
-                ax.plot3D(x_log[0, 0:imax+1], x_log[1, 0:imax+1], xv_log[0, 0:imax+1], 'blue')
-                ax.plot3D(xb_log[0, 0:imax_b+1], xb_log[1, 0:imax_b+1], 0, 'red')
-                # Predicted trajectories
-                if not np.isnan(z_pred_traj).all():
-                    ax.plot3D(x_pred_traj, y_pred_traj, z_pred_traj, 'green', alpha=0.5)
-                else:
-                    ax.plot3D(x_pred_traj, y_pred_traj,  xv_log[0, imax], 'green', alpha=0.5)
-                ax.plot3D(xb_pred_traj, yb_pred_traj, 0, 'green', alpha=0.5)
-                if self.file_types[file_index] == PARALLEL:
-                    x_inner_pred_traj = UAV_inner_traj_log[0::p.nUAV, imax]
-                    y_inner_pred_traj = UAV_inner_traj_log[1::p.nUAV, imax]
-                    z_inner_pred_traj = vert_inner_traj_log[0::p.nv,  imax]
-                    xb_inner_pred_traj = USV_inner_traj_log[0::p.nUSV, imax_b]
-                    yb_inner_pred_traj = USV_inner_traj_log[1::p.nUSV, imax_b]
-                    ax.plot3D(x_inner_pred_traj, y_inner_pred_traj, z_inner_pred_traj, 'yellow', alpha=0.5)
-                    ax.plot3D(xb_inner_pred_traj, yb_inner_pred_traj, 0, 'yellow', alpha=0.5)
-
-                ax.set_zlim(0)
-                plt.xlabel('x-position [m]')
-                plt.ylabel('y-position [m]')
-                ax.set_zlabel('Height [m]')
-                plt.legend(['UAV trajectory', 'USV trajectory'])
-                plt.pause(0.01)
-                try:
-                    plt.pause(0.01)
-                except:
-                    # Window was probably closed
-                    return
-                if self.should_close:   # Window was closed
-                    return
-            fig.show()
-        plt.show()# raw_input()
-
     def plot_topview(self, real_time = False, perspective = ACTUAL):
         p = self.p
         self.should_close = False
@@ -208,26 +148,24 @@ class DataAnalyser():
             fig = plt.figure()
             fig.canvas.mpl_connect('close_event', self.handle_close)
             ax = plt.axes()
-            if perspective == ACTUAL:
-                x_log  = np.loadtxt(dir_path + dir + '/x_log.txt')
-                xb_log = np.loadtxt(dir_path + dir + '/xb_log.txt')
-                UAV_traj_log = np.loadtxt(dir_path + dir + '/UAV_traj_log.txt')
-                USV_traj_log = np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
-            if perspective == UAV:
-                x_log  = np.loadtxt(dir_path + dir + '/x_log.txt')
-                UAV_traj_log = np.loadtxt(dir_path + dir + '/UAV_traj_log.txt')
-                USV_traj_log = np.loadtxt(dir_path + dir + '/UAV/USV_traj_log.txt')
-                xb_log = USV_traj_log[0:p.nUSV, :]
-                # print xb_log[0:18]
-            if perspective == USV:
-                xb_log = np.loadtxt(dir_path + dir + '/xb_log.txt')
-                USV_traj_log = np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
-                UAV_traj_log = np.loadtxt(dir_path + dir + '/USV/UAV_traj_log.txt')
-                x_log = UAV_traj_log[0:p.nUAV, :]
 
-            if self.file_types[file_index] == PARALLEL:
-                UAV_inner_traj_log = np.loadtxt(dir_path + dir + '/UAV_inner_traj_log.txt')
-                USV_inner_traj_log = np.loadtxt(dir_path + dir + '/USV_inner_traj_log.txt')
+            dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['horizontal'], self.p)
+
+            if perspective == ACTUAL:
+                x_log  = dtl.x_log
+                xb_log = dtl.xb_log
+                UAV_traj_log = dtl.UAV_traj_log
+                USV_traj_log = dtl.USV_traj_log
+            if perspective == UAV:
+                x_log  = dtl.x_log
+                UAV_traj_log = dtl.UAV_traj_log
+                USV_traj_log = dtl.USV_traj_log_UAV
+                xb_log = USV_traj_log[0:p.nUSV, :]
+            if perspective == USV:
+                xb_log = dtl.xb_log
+                USV_traj_log = dtl.USV_traj_log
+                UAV_traj_log = dtl.UAV_traj_log_USV
+                x_log = UAV_traj_log[0:p.nUAV, :]
 
             time_len = x_log.shape[1]-1
             if real_time:
@@ -248,10 +186,10 @@ class DataAnalyser():
                 ax.plot(x_pred_traj, y_pred_traj, 'blue', alpha=0.4)
                 ax.plot(xb_pred_traj, yb_pred_traj, 'red', alpha=0.4)
                 if self.file_types[file_index] == PARALLEL:
-                    x_inner_pred_traj = UAV_inner_traj_log[0::p.nUAV, t]
-                    y_inner_pred_traj = UAV_inner_traj_log[1::p.nUAV, t]
-                    xb_inner_pred_traj = USV_inner_traj_log[0::p.nUSV, t]
-                    yb_inner_pred_traj = USV_inner_traj_log[1::p.nUSV, t]
+                    x_inner_pred_traj = dtl.UAV_inner_traj_log[0::p.nUAV, t]
+                    y_inner_pred_traj = dtl.UAV_inner_traj_log[1::p.nUAV, t]
+                    xb_inner_pred_traj = dtl.USV_inner_traj_log[0::p.nUSV, t]
+                    yb_inner_pred_traj = dtl.USV_inner_traj_log[1::p.nUSV, t]
                     ax.plot(x_inner_pred_traj, y_inner_pred_traj, 'green', alpha=0.4)
                     ax.plot(xb_inner_pred_traj, yb_inner_pred_traj, 'yellow', alpha=0.4)
                 plt.xlabel('x-position [m]')
@@ -267,6 +205,167 @@ class DataAnalyser():
                     return
             fig.show()
         plt.show()# raw_input()
+
+    def plot_with_vel_constraints(self, real_time = False):
+        p = self.p
+        upper_vel_constraints = self.get_vel_polygon(p.wmax)
+        lower_vel_constraints = self.get_vel_polygon(p.wmin)
+        self.should_close = False
+
+        for file_index, dir in enumerate(self.files):
+            patch_collection = PatchCollection( [upper_vel_constraints,\
+                lower_vel_constraints], alpha=0.5, color='grey')
+            fig = plt.figure()
+            fig.canvas.mpl_connect('close_event', self.handle_close)
+            ax = plt.axes()
+
+            dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['vertical'], self.p)
+
+            if self.file_types[file_index] == PARALLEL:
+                T_inner =dtl.vert_inner_traj_log.shape[0]//p.nv
+
+            T_outer = dtl.vert_traj_log.shape[0]//p.nv
+            time_len = dtl.vert_traj_log.shape[1]
+            if real_time:
+                time = range(time_len)
+            else:
+                time = [time_len-1]
+
+            for t in time:
+                ax.cla()
+                upper_vel_constraints_slack = self.get_vel_polygon(p.wmax, -dtl.s_vert_log[t])
+                lower_vel_constraints_slack = self.get_vel_polygon(p.wmin, -dtl.s_vert_log[t])
+                patch_collection_slack = PatchCollection( \
+                    [upper_vel_constraints_slack, lower_vel_constraints_slack],\
+                    alpha=0.2, color='grey')
+                vel_pred_log = dtl.vert_traj_log[1::p.nv, t]
+                actual_vel_bound = -p.kl*dtl.xv_log[0, 0:t+1] + p.wmin_land
+                pred_vel_bound   = -p.kl*dtl.vert_traj_log[0::p.nv, t] + p.wmin_land
+                actual_vel_bound_slack = -p.kl*dtl.xv_log[0, 0:t+1] + p.wmin_land - dtl.s_vert_log[0:t+1]
+                pred_vel_bound_slack   = -p.kl*dtl.vert_traj_log[0::p.nv, t] + p.wmin_land - dtl.s_vert_log[t]
+                if np.isnan(vel_pred_log).any():
+                    vel_pred_log = np.full((T_outer,), dtl.xv_log[1, t])
+                if np.isnan(pred_vel_bound).any():
+                    pred_vel_bound = np.full((T_outer,), -p.kl*dtl.xv_log[0, t] + p.wmin_land)
+                    # TODO: Add a velocity bound predicted by inner controller in parallel case?
+
+                ax.plot(range(t+1), dtl.xv_log[1, 0:t+1], 'blue')
+                ax.plot(range(t+1, t+T_outer+1), vel_pred_log, 'green', alpha=0.5)
+                ax.plot(range(t+1), actual_vel_bound, 'red')
+                ax.plot(range(t+1, t+T_outer+1), pred_vel_bound, 'orange')
+                ax.plot(range(t+1), actual_vel_bound_slack, 'red', alpha=0.5)
+                ax.plot(range(t+1, t+T_outer+1), pred_vel_bound_slack, 'orange', alpha=0.5)
+                ax.plot(range(t+1), dtl.s_vert_log[0:t+1], 'black')
+                if self.file_types[file_index] == PARALLEL:
+                    vel_inner_pred_log = dtl.vert_inner_traj_log[1::p.nv, t]
+                    ax.plot(range(t+1, t+T_inner+1), vel_inner_pred_log, 'yellow', alpha=0.5)
+
+                ax.add_collection(patch_collection)
+                ax.add_collection(patch_collection_slack)
+                plt.xlabel('time [iterations]')
+                plt.ylabel('velocity [m/s]')
+                try:
+                    plt.pause(0.05)
+                except:
+                    # Window was probably closed
+                    return
+                if self.should_close:   # Window was closed
+                    return
+            fig.show()
+        # fig = plt.figure()
+        # fig.canvas.mpl_connect('close_event', self.handle_close)
+        # ax = plt.axes()
+        # ax.plot(range(500), obj_val_log, 'red')
+        # ax.plot(range(500), 500*s_vert_log, 'green')
+        plt.show()
+
+    def plot_with_constraints(self, real_time = False, perspective = ACTUAL):
+        forbidden_area_1 = Polygon([ (dl, 0),\
+                                     (ds, hs),\
+                                     (35, hs),\
+                                     (35, 0)], True)
+        forbidden_area_2 = Polygon([ (-dl, 0),\
+                                     (-ds, hs),\
+                                     (-35, hs),\
+                                     (-35, 0)], True)
+        p = self.p
+        self.should_close = False
+
+        for file_index, dir in enumerate(self.files):
+            safety_patch_collection = PatchCollection([forbidden_area_1, forbidden_area_2], alpha=0.5, color='grey')
+            fig = plt.figure()
+            fig.canvas.mpl_connect('close_event', self.handle_close)
+            ax = plt.axes()
+
+            dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['horizontal', 'vertical'], self.p)
+            # print dtl.x_log_raw[0, 0:3]
+            # print dtl.x_log[0, 0:3]
+            # return
+
+            if perspective == ACTUAL:
+                xb_log = dtl.xb_log#np.loadtxt(dir_path + dir + '/xb_log.txt')
+                USV_traj_log = dtl.USV_traj_log#np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
+            elif perspective == UAV:
+                if self.file_types[file_index] == CENTRALISED:
+                    USV_traj_log = dtl.USV_traj_log
+                else:
+                    USV_traj_log = dtl.USV_traj_log_UAV#np.loadtxt(dir_path + dir + '/UAV/USV_traj_log.txt')
+                xb_log = dtl.xb_log_UAV#USV_traj_log[0:p.nUSV, :]
+            elif perspective == USV:
+                print "CANNOT PLOT VERTICAL MOVEMENT FROM USV PERSPECTIVE"
+                return
+
+            time_len = dtl.x_log.shape[1]-1
+            dist_log = np.sqrt( np.square(dtl.x_log[0, 0:time_len] - xb_log[0, 0:time_len]) + \
+                np.square(dtl.x_log[1, 0:time_len] - xb_log[1, 0:time_len]) )
+            if self.file_types[file_index] == PARALLEL:
+                T_inner = dtl.vert_inner_traj_log.shape[0]//p.nv
+
+            if real_time:
+                time = range(time_len)
+            else:
+                time = [time_len-1]
+
+            for t in time:
+                ax.cla()
+                dist_pred_log = np.sqrt( np.square(dtl.UAV_traj_log[0::p.nUAV, t] - USV_traj_log[0::p.nUSV, t])\
+                    + np.square(dtl.UAV_traj_log[1::p.nUAV, t] - USV_traj_log[1::p.nUSV, t]) )
+                vert_pred_log = dtl.vert_traj_log[0::p.nv, t]
+
+                # TODO: When perspective is ACTUAL, you should use true future trajectory
+                # instead of predicted future trajectories, no? Naah, would only work if you did that only
+                # for horizontal, and kept predicted for vertical. There seems to be no point to it really
+                ax.plot(dist_log[0:t+1], dtl.xv_log[0, 0:t+1], 'blue')
+                ax.plot(dist_pred_log, vert_pred_log, 'green', alpha=0.5)
+                if self.file_types[file_index] == PARALLEL:
+                    # IMPORTANT: ACTUAL and UAV doesn't really make sense here, there's no "actual" predicted trajectory
+                    # EDIT: Well, couldn't you have a traj predicted by e.g. the UAV be "actual" if you use the USV's prediction of its own position, instead of the UAV's?
+                    if perspective == ACTUAL:
+                        dist_inner_pred_log = np.sqrt( \
+                            np.square(dtl.UAV_inner_traj_log[0::p.nUAV, t] - dtl.USV_inner_traj_log[0::p.nUSV, t])\
+                            + np.square(dtl.UAV_inner_traj_log[1::p.nUAV, t] - dtl.USV_inner_traj_log[1::p.nUSV, t]) )
+                    elif perspective == UAV:
+                        dist_inner_pred_log = np.sqrt( \
+                            np.square(dtl.UAV_inner_traj_log[0:T_inner*p.nUAV:p.nUAV, t]\
+                            - USV_traj_log[0:T_inner*p.nUSV:p.nUSV, t])\
+                            + np.square(dtl.UAV_inner_traj_log[1:T_inner*p.nUAV:p.nUAV, t]\
+                            - USV_traj_log[1:T_inner*p.nUSV:p.nUSV, t])\
+                        )
+
+                    vert_inner_pred_log = dtl.vert_inner_traj_log[0::p.nv, t]
+                    ax.plot(dist_inner_pred_log, vert_inner_pred_log, 'yellow', alpha=0.5)
+                ax.add_collection(safety_patch_collection)
+                plt.xlabel('horizontal distance [m]')
+                plt.ylabel('height [m]')
+                try:
+                    plt.pause(0.05)
+                except:
+                    # Window was probably closed
+                    return
+                if self.should_close:   # Window was closed
+                    return
+            fig.show()
+        plt.show()
 
     def compare_topviews(self, real_time = False):
         p = self.p
@@ -359,263 +458,156 @@ class DataAnalyser():
             fig.show()
         plt.show()# raw_input()
 
-    def plot_with_vel_constraints(self, real_time = False):
-        p = self.p
-        # upper_vel_constraints = Polygon([ (-100,   1000*p.wmax),\
-        #                                   (1000,   1000*p.wmax),\
-        #                                   (1000,   p.wmax),\
-        #                                   (-100,   p.wmax)], True)
-        # lower_vel_constraints = Polygon([ (-100,   1000*p.wmin),\
-        #                                   (1000,   1000*p.wmin),\
-        #                                   (1000,   p.wmin),\
-        #                                   (-100,   p.wmin)], True)
-        upper_vel_constraints = self.get_vel_polygon(p.wmax)
-        lower_vel_constraints = self.get_vel_polygon(p.wmin)
-        self.should_close = False
+    # def plot_obj_val(self, real_time = False):
+    #     p = self.p
+    #     upper_vel_constraints = Polygon([ (-100,   2*p.wmax),\
+    #                                       (1000,   2*p.wmax),\
+    #                                       (1000,   p.wmax),\
+    #                                       (-100,   p.wmax)], True)
+    #     lower_vel_constraints = Polygon([ (-100,   2*p.wmin),\
+    #                                       (1000,   2*p.wmin),\
+    #                                       (1000,   p.wmin),\
+    #                                       (-100,   p.wmin)], True)
+    #     self.should_close = False
+    #
+    #     for file_index, dir in enumerate(self.files):
+    #         patch_collection = PatchCollection( [upper_vel_constraints,\
+    #             lower_vel_constraints], alpha=0.5, color='grey')
+    #         fig = plt.figure()
+    #         fig.canvas.mpl_connect('close_event', self.handle_close)
+    #         ax = plt.axes()
+    #
+    #         xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
+    #         vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
+    #         s_vert_log = np.loadtxt(dir_path + dir + '/s_vert_log.txt')
+    #         obj_val_log = np.loadtxt(dir_path + dir + '/obj_val_log.txt')
+    #         if self.file_types[file_index] == PARALLEL:
+    #             vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
+    #             T_inner = vert_inner_traj_log.shape[0]//p.nv
+    #
+    #         T_outer = vert_traj_log.shape[0]//p.nv
+    #         time_len = vert_traj_log.shape[1]
+    #         if real_time:
+    #             time = range(time_len)
+    #         else:
+    #             time = [time_len-1]
+    #
+    #         for t in time:
+    #             ax.cla()
+    #             vel_pred_log = vert_traj_log[1::p.nv, t]
+    #             actual_vel_bound = -p.kl*xv_log[0, 0:t+1] + p.wmin_land
+    #             pred_vel_bound   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land
+    #             actual_vel_bound_slack = -p.kl*xv_log[0, 0:t+1] + p.wmin_land - s_vert_log[0:t+1]
+    #             pred_vel_bound_slack   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land - s_vert_log[t]
+    #             if np.isnan(vel_pred_log).any():
+    #                 vel_pred_log = np.full((T_outer,), xv_log[1, t])
+    #             if np.isnan(pred_vel_bound).any():
+    #                 pred_vel_bound = np.full((T_outer,), -p.kl*xv_log[0, t] + p.wmin_land)
+    #                 # TODO: Add a velocity bound predicted by inner controller in parallel case?
+    #
+    #             # ax.plot(range(t+1), xv_log[1, 0:t+1], 'blue')
+    #             # ax.plot(range(t+1, t+T_outer+1), vel_pred_log, 'green', alpha=0.5)
+    #             # ax.plot(range(t+1), actual_vel_bound, 'red')
+    #             # ax.plot(range(t+1, t+T_outer+1), pred_vel_bound, 'orange')
+    #             # ax.plot(range(t+1), actual_vel_bound_slack, 'red', alpha=0.5)
+    #             # ax.plot(range(t+1, t+T_outer+1), pred_vel_bound_slack, 'orange', alpha=0.5)
+    #             # ax.plot(range(t+1), s_vert_log[0:t+1], 'k')
+    #             # if self.file_types[file_index] == PARALLEL:
+    #             #     vel_inner_pred_log = vert_inner_traj_log[1::p.nv, t]
+    #             #     ax.plot(range(t+1, t+T_inner+1), vel_inner_pred_log, 'yellow', alpha=0.5)
+    #             ax.plot(range(t+1), obj_val_log[0:t+1], 'k')
+    #
+    #             ax.add_collection(patch_collection)
+    #             plt.xlabel('time [iterations]')
+    #             plt.ylabel('velocity [m/s]')
+    #             try:
+    #                 plt.pause(0.05)
+    #             except:
+    #                 # Window was probably closed
+    #                 return
+    #             if self.should_close:   # Window was closed
+    #                 return
+    #         fig.show()
+    #     # fig = plt.figure()
+    #     # fig.canvas.mpl_connect('close_event', self.handle_close)
+    #     # ax = plt.axes()
+    #     # ax.plot(range(500), obj_val_log, 'red')
+    #     # ax.plot(range(500), 500*s_vert_log, 'green')
+    #     plt.show()
 
-        for file_index, dir in enumerate(self.files):
-            patch_collection = PatchCollection( [upper_vel_constraints,\
-                lower_vel_constraints], alpha=0.5, color='grey')
-            fig = plt.figure()
-            fig.canvas.mpl_connect('close_event', self.handle_close)
-            ax = plt.axes()
-
-            xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
-            vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
-            s_vert_log = np.loadtxt(dir_path + dir + '/s_vert_log.txt')
-            obj_val_log = np.loadtxt(dir_path + dir + '/obj_val_log.txt')
-            if self.file_types[file_index] == PARALLEL:
-                vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
-                T_inner = vert_inner_traj_log.shape[0]//p.nv
-
-            T_outer = vert_traj_log.shape[0]//p.nv
-            time_len = vert_traj_log.shape[1]
-            if real_time:
-                time = range(time_len)
-            else:
-                time = [time_len-1]
-
-            for t in time:
-                ax.cla()
-                upper_vel_constraints_slack = self.get_vel_polygon(p.wmax, -s_vert_log[t])
-                lower_vel_constraints_slack = self.get_vel_polygon(p.wmin, -s_vert_log[t])
-                patch_collection_slack = PatchCollection( \
-                    [upper_vel_constraints_slack, lower_vel_constraints_slack],\
-                    alpha=0.2, color='grey')
-                vel_pred_log = vert_traj_log[1::p.nv, t]
-                actual_vel_bound = -p.kl*xv_log[0, 0:t+1] + p.wmin_land
-                pred_vel_bound   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land
-                actual_vel_bound_slack = -p.kl*xv_log[0, 0:t+1] + p.wmin_land - s_vert_log[0:t+1]
-                pred_vel_bound_slack   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land - s_vert_log[t]
-                if np.isnan(vel_pred_log).any():
-                    vel_pred_log = np.full((T_outer,), xv_log[1, t])
-                if np.isnan(pred_vel_bound).any():
-                    pred_vel_bound = np.full((T_outer,), -p.kl*xv_log[0, t] + p.wmin_land)
-                    # TODO: Add a velocity bound predicted by inner controller in parallel case?
-
-                ax.plot(range(t+1), xv_log[1, 0:t+1], 'blue')
-                ax.plot(range(t+1, t+T_outer+1), vel_pred_log, 'green', alpha=0.5)
-                ax.plot(range(t+1), actual_vel_bound, 'red')
-                ax.plot(range(t+1, t+T_outer+1), pred_vel_bound, 'orange')
-                ax.plot(range(t+1), actual_vel_bound_slack, 'red', alpha=0.5)
-                ax.plot(range(t+1, t+T_outer+1), pred_vel_bound_slack, 'orange', alpha=0.5)
-                # ax.plot(range(t+1), s_vert_log[0:t+1], 'k')
-                ax.plot(range(t+1), s_vert_log[0:t+1], 'black')
-                if self.file_types[file_index] == PARALLEL:
-                    vel_inner_pred_log = vert_inner_traj_log[1::p.nv, t]
-                    ax.plot(range(t+1, t+T_inner+1), vel_inner_pred_log, 'yellow', alpha=0.5)
-
-                ax.add_collection(patch_collection)
-                ax.add_collection(patch_collection_slack)
-                plt.xlabel('time [iterations]')
-                plt.ylabel('velocity [m/s]')
-                try:
-                    plt.pause(0.05)
-                except:
-                    # Window was probably closed
-                    return
-                if self.should_close:   # Window was closed
-                    return
-            fig.show()
-        # fig = plt.figure()
-        # fig.canvas.mpl_connect('close_event', self.handle_close)
-        # ax = plt.axes()
-        # ax.plot(range(500), obj_val_log, 'red')
-        # ax.plot(range(500), 500*s_vert_log, 'green')
-        plt.show()
-
-    def plot_obj_val(self, real_time = False):
-        p = self.p
-        upper_vel_constraints = Polygon([ (-100,   2*p.wmax),\
-                                          (1000,   2*p.wmax),\
-                                          (1000,   p.wmax),\
-                                          (-100,   p.wmax)], True)
-        lower_vel_constraints = Polygon([ (-100,   2*p.wmin),\
-                                          (1000,   2*p.wmin),\
-                                          (1000,   p.wmin),\
-                                          (-100,   p.wmin)], True)
-        self.should_close = False
-
-        for file_index, dir in enumerate(self.files):
-            patch_collection = PatchCollection( [upper_vel_constraints,\
-                lower_vel_constraints], alpha=0.5, color='grey')
-            fig = plt.figure()
-            fig.canvas.mpl_connect('close_event', self.handle_close)
-            ax = plt.axes()
-
-            xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
-            vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
-            s_vert_log = np.loadtxt(dir_path + dir + '/s_vert_log.txt')
-            obj_val_log = np.loadtxt(dir_path + dir + '/obj_val_log.txt')
-            if self.file_types[file_index] == PARALLEL:
-                vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
-                T_inner = vert_inner_traj_log.shape[0]//p.nv
-
-            T_outer = vert_traj_log.shape[0]//p.nv
-            time_len = vert_traj_log.shape[1]
-            if real_time:
-                time = range(time_len)
-            else:
-                time = [time_len-1]
-
-            for t in time:
-                ax.cla()
-                vel_pred_log = vert_traj_log[1::p.nv, t]
-                actual_vel_bound = -p.kl*xv_log[0, 0:t+1] + p.wmin_land
-                pred_vel_bound   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land
-                actual_vel_bound_slack = -p.kl*xv_log[0, 0:t+1] + p.wmin_land - s_vert_log[0:t+1]
-                pred_vel_bound_slack   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land - s_vert_log[t]
-                if np.isnan(vel_pred_log).any():
-                    vel_pred_log = np.full((T_outer,), xv_log[1, t])
-                if np.isnan(pred_vel_bound).any():
-                    pred_vel_bound = np.full((T_outer,), -p.kl*xv_log[0, t] + p.wmin_land)
-                    # TODO: Add a velocity bound predicted by inner controller in parallel case?
-
-                # ax.plot(range(t+1), xv_log[1, 0:t+1], 'blue')
-                # ax.plot(range(t+1, t+T_outer+1), vel_pred_log, 'green', alpha=0.5)
-                # ax.plot(range(t+1), actual_vel_bound, 'red')
-                # ax.plot(range(t+1, t+T_outer+1), pred_vel_bound, 'orange')
-                # ax.plot(range(t+1), actual_vel_bound_slack, 'red', alpha=0.5)
-                # ax.plot(range(t+1, t+T_outer+1), pred_vel_bound_slack, 'orange', alpha=0.5)
-                # ax.plot(range(t+1), s_vert_log[0:t+1], 'k')
-                # if self.file_types[file_index] == PARALLEL:
-                #     vel_inner_pred_log = vert_inner_traj_log[1::p.nv, t]
-                #     ax.plot(range(t+1, t+T_inner+1), vel_inner_pred_log, 'yellow', alpha=0.5)
-                ax.plot(range(t+1), obj_val_log[0:t+1], 'k')
-
-                ax.add_collection(patch_collection)
-                plt.xlabel('time [iterations]')
-                plt.ylabel('velocity [m/s]')
-                try:
-                    plt.pause(0.05)
-                except:
-                    # Window was probably closed
-                    return
-                if self.should_close:   # Window was closed
-                    return
-            fig.show()
-        # fig = plt.figure()
-        # fig.canvas.mpl_connect('close_event', self.handle_close)
-        # ax = plt.axes()
-        # ax.plot(range(500), obj_val_log, 'red')
-        # ax.plot(range(500), 500*s_vert_log, 'green')
-        plt.show()
-
-    def plot_with_constraints(self, real_time = False, perspective = ACTUAL):
-        forbidden_area_1 = Polygon([ (dl, 0),\
-                                     (ds, hs),\
-                                     (35, hs),\
-                                     (35, 0)], True)
-        forbidden_area_2 = Polygon([ (-dl, 0),\
-                                     (-ds, hs),\
-                                     (-35, hs),\
-                                     (-35, 0)], True)
-        p = self.p
-        self.should_close = False
-
-        for file_index, dir in enumerate(self.files):
-            safety_patch_collection = PatchCollection([forbidden_area_1, forbidden_area_2], alpha=0.5, color='grey')
-            fig = plt.figure()
-            fig.canvas.mpl_connect('close_event', self.handle_close)
-            ax = plt.axes()
-
-            dataloader = DataLoader(dir_path+dir, self.file_types[file_index], ['horizontal', 'vertical'], self.p)
-            # print dataloader.x_log_raw[0, 0:3]
-            # print dataloader.x_log[0, 0:3]
-            # return
-
-            if perspective == ACTUAL:
-                xb_log = dataloader.xb_log#np.loadtxt(dir_path + dir + '/xb_log.txt')
-                USV_traj_log = dataloader.USV_traj_log#np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
-            elif perspective == UAV:
-                if self.file_types[file_index] == CENTRALISED:
-                    USV_traj_log = dataloader.USV_traj_log
-                else:
-                    USV_traj_log = dataloader.USV_traj_log_UAV#np.loadtxt(dir_path + dir + '/UAV/USV_traj_log.txt')
-                xb_log = dataloader.xb_log_UAV#USV_traj_log[0:p.nUSV, :]
-            elif perspective == USV:
-                print "CANNOT PLOT VERTICAL MOVEMENT FROM USV PERSPECTIVE"
-                return
-            x_log  = dataloader.x_log#np.loadtxt(dir_path + dir + '/x_log.txt')
-            xv_log = dataloader.xv_log#np.loadtxt(dir_path + dir + '/xv_log.txt')
-            UAV_traj_log = dataloader.UAV_traj_log#np.loadtxt(dir_path + dir + '/UAV_traj_log.txt')
-            vert_traj_log = dataloader.vert_traj_log#np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
-            time_len = x_log.shape[1]-1
-            dist_log = np.sqrt( np.square(x_log[0, 0:time_len] - xb_log[0, 0:time_len]) + \
-                np.square(x_log[1, 0:time_len] - xb_log[1, 0:time_len]) )
-
-            if self.file_types[file_index] == PARALLEL:
-                UAV_inner_traj_log = dataloader.UAV_inner_traj_log#np.loadtxt(dir_path + dir + '/UAV_inner_traj_log.txt')
-                USV_inner_traj_log = dataloader.USV_inner_traj_log#np.loadtxt(dir_path + dir + '/USV_inner_traj_log.txt')
-                vert_inner_traj_log = dataloader.vert_inner_traj_log#np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
-                T_inner = vert_inner_traj_log.shape[0]//p.nv
-
-            if real_time:
-                time = range(time_len)
-            else:
-                time = [time_len-1]
-
-            for t in time:
-                ax.cla()
-                dist_pred_log = np.sqrt( np.square(UAV_traj_log[0::p.nUAV, t] - USV_traj_log[0::p.nUSV, t])\
-                    + np.square(UAV_traj_log[1::p.nUAV, t] - USV_traj_log[1::p.nUSV, t]) )
-                vert_pred_log = vert_traj_log[0::p.nv, t]
-
-                # TODO: When perspective is ACTUAL, you should use true future trajectory
-                # instead of predicted future trajectories, no? Naah, would only work if you did that only
-                # for horizontal, and kept predicted for vertical. There seems to be no point to it really
-                ax.plot(dist_log[0:t+1], xv_log[0, 0:t+1], 'blue')
-                ax.plot(dist_pred_log, vert_pred_log, 'green', alpha=0.5)
-                # print dist_log[t] - dist_pred_log[0]
-                # print x_log[0, t] - UAV_traj_log[0, t]
-                if self.file_types[file_index] == PARALLEL:
-                    # IMPORTANT: ACTUAL and UAV doesn't really make sense here, there's no "actual" predicted trajectory
-                    if perspective == ACTUAL:
-                        dist_inner_pred_log = np.sqrt( \
-                            np.square(UAV_inner_traj_log[0::p.nUAV, t] - USV_inner_traj_log[0::p.nUSV, t])\
-                            + np.square(UAV_inner_traj_log[1::p.nUAV, t] - USV_inner_traj_log[1::p.nUSV, t]) )
-                    elif perspective == UAV:
-                        dist_inner_pred_log = np.sqrt( \
-                            np.square(UAV_inner_traj_log[0:T_inner*p.nUAV:p.nUAV, t]\
-                            - USV_traj_log[0:T_inner*p.nUSV:p.nUSV, t])\
-                            + np.square(UAV_inner_traj_log[1:T_inner*p.nUAV:p.nUAV, t]\
-                            - USV_traj_log[1:T_inner*p.nUSV:p.nUSV, t])\
-                        )
-
-                    vert_inner_pred_log = vert_inner_traj_log[0::p.nv, t]
-                    ax.plot(dist_inner_pred_log, vert_inner_pred_log, 'yellow', alpha=0.5)
-                ax.add_collection(safety_patch_collection)
-                plt.xlabel('horizontal distance [m]')
-                plt.ylabel('height [m]')
-                try:
-                    plt.pause(0.05)
-                except:
-                    # Window was probably closed
-                    return
-                if self.should_close:   # Window was closed
-                    return
-            fig.show()
-        plt.show()
+    # def plot_3d_super_realtime(self):
+    #     p = self.p
+    #     self.should_close = False
+    #
+    #     for file_index, dir in enumerate(self.files):
+    #         fig = plt.figure()
+    #         fig.canvas.mpl_connect('close_event', self.handle_close)
+    #         ax = plt.axes(projection='3d')
+    #         x_log  = np.loadtxt(dir_path + dir + '/x_log.txt')
+    #         xb_log = np.loadtxt(dir_path + dir + '/xb_log.txt')
+    #         xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
+    #         UAV_traj_log = np.loadtxt(dir_path + dir + '/UAV_traj_log.txt')
+    #         USV_traj_log = np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
+    #         vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
+    #         self.UAV_time_stamps = np.loadtxt(dir_path + dir + '/UAV_time_stamps.txt')
+    #         self.USV_time_stamps = np.loadtxt(dir_path + dir + '/USV_time_stamps.txt')
+    #         t_0 = min(self.UAV_time_stamps.min(), self.USV_time_stamps.min())
+    #         t_f = max(self.UAV_time_stamps.max(), self.USV_time_stamps.max())
+    #
+    #         if self.file_types[file_index] == PARALLEL:
+    #             UAV_inner_traj_log = np.loadtxt(dir_path + dir + '/UAV_inner_traj_log.txt')
+    #             USV_inner_traj_log = np.loadtxt(dir_path + dir + '/USV_inner_traj_log.txt')
+    #             vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
+    #
+    #         (sim_len, _) = UAV_traj_log.shape
+    #         imax = 0
+    #         imax_b = 0
+    #         time_points = np.reshape(np.arange(t_0, t_f, 0.01), (1, -1))
+    #         for (_,_), t in np.ndenumerate(time_points):
+    #             ax.cla()
+    #             while imax < sim_len-1 and self.UAV_time_stamps[imax+1] <= t:
+    #                 imax += 1
+    #             while imax_b < sim_len-1 and self.USV_time_stamps[imax_b+1] <= t:
+    #                 imax_b += 1
+    #             x_pred_traj = UAV_traj_log[0::p.nUAV, imax]
+    #             y_pred_traj = UAV_traj_log[1::p.nUAV, imax]
+    #             z_pred_traj = vert_traj_log[0::p.nv,  imax]
+    #             xb_pred_traj = USV_traj_log[0::p.nUSV, imax_b]
+    #             yb_pred_traj = USV_traj_log[1::p.nUSV, imax_b]
+    #
+    #             # Actual trajectories
+    #             ax.plot3D(x_log[0, 0:imax+1], x_log[1, 0:imax+1], xv_log[0, 0:imax+1], 'blue')
+    #             ax.plot3D(xb_log[0, 0:imax_b+1], xb_log[1, 0:imax_b+1], 0, 'red')
+    #             # Predicted trajectories
+    #             if not np.isnan(z_pred_traj).all():
+    #                 ax.plot3D(x_pred_traj, y_pred_traj, z_pred_traj, 'green', alpha=0.5)
+    #             else:
+    #                 ax.plot3D(x_pred_traj, y_pred_traj,  xv_log[0, imax], 'green', alpha=0.5)
+    #             ax.plot3D(xb_pred_traj, yb_pred_traj, 0, 'green', alpha=0.5)
+    #             if self.file_types[file_index] == PARALLEL:
+    #                 x_inner_pred_traj = UAV_inner_traj_log[0::p.nUAV, imax]
+    #                 y_inner_pred_traj = UAV_inner_traj_log[1::p.nUAV, imax]
+    #                 z_inner_pred_traj = vert_inner_traj_log[0::p.nv,  imax]
+    #                 xb_inner_pred_traj = USV_inner_traj_log[0::p.nUSV, imax_b]
+    #                 yb_inner_pred_traj = USV_inner_traj_log[1::p.nUSV, imax_b]
+    #                 ax.plot3D(x_inner_pred_traj, y_inner_pred_traj, z_inner_pred_traj, 'yellow', alpha=0.5)
+    #                 ax.plot3D(xb_inner_pred_traj, yb_inner_pred_traj, 0, 'yellow', alpha=0.5)
+    #
+    #             ax.set_zlim(0)
+    #             plt.xlabel('x-position [m]')
+    #             plt.ylabel('y-position [m]')
+    #             ax.set_zlabel('Height [m]')
+    #             plt.legend(['UAV trajectory', 'USV trajectory'])
+    #             plt.pause(0.01)
+    #             try:
+    #                 plt.pause(0.01)
+    #             except:
+    #                 # Window was probably closed
+    #                 return
+    #             if self.should_close:   # Window was closed
+    #                 return
+    #         fig.show()
+    #     plt.show()# raw_input()
 
     def handle_close(self, evt):
         self.should_close = True
@@ -639,6 +631,9 @@ class DataLoader:
             UAV_time_stamps = UAV_time_stamps - t_0
             USV_time_stamps = USV_time_stamps - t_0
             new_time_stamps = np.arange(0, t_f, 0.05)
+            print "Time span:", len(new_time_stamps), len(UAV_time_stamps), len(USV_time_stamps)    # DEBUG PRINT
+            print UAV_time_stamps[-1] - UAV_time_stamps[0]
+            print USV_time_stamps[-1] - USV_time_stamps[0]
 
             if data_type == 'horizontal':
                 self.UAV_traj_log_raw = np.loadtxt(dir_path + '/UAV_traj_log.txt')
@@ -676,9 +671,11 @@ class DataLoader:
             elif data_type == 'vertical':
                 self.xv_log_raw = np.loadtxt(dir_path + '/xv_log.txt')
                 self.vert_traj_log_raw = np.loadtxt(dir_path + '/vert_traj_log.txt')
+                self.s_vert_log_raw = np.loadtxt(dir_path + '/s_vert_log.txt')
 
                 self.xv_log = self.get_interpolated_traj(self.xv_log_raw, UAV_time_stamps, new_time_stamps)
                 self.vert_traj_log = self.get_interpolated_traj(self.vert_traj_log_raw, UAV_time_stamps, new_time_stamps)
+                self.s_vert_log = self.get_adjusted_array(self.s_vert_log_raw, UAV_time_stamps, new_time_stamps)
 
                 if problem_type == PARALLEL:
                     self.vert_inner_traj_log_raw = np.loadtxt(dir_path + '/vert_inner_traj_log.txt')
@@ -740,608 +737,631 @@ class DataLoader:
                         break
         return new_traj
 
-def combine_multiple_results(dirs):
-    time_list = []
-    dist_list = []
-    test_means_list = []
-    test_hor_means_list = []
-    test_vert_means_list = []
-    z_traj_inter_list = []
-    dist_hor_list = []
-    for dir in dirs:
-        test_means = np.loadtxt(dir_path + dir + '/MEAN.txt')
-        test_medians = np.loadtxt(dir_path + dir + '/MEDIAN.txt')
-        test_means_hor = np.loadtxt(dir_path + dir + '/HOR_MEAN.txt')
-        test_medians_hor = np.loadtxt(dir_path + dir + '/HOR_MEDIAN.txt')
-        test_means_vert = np.loadtxt(dir_path + dir + '/VERT_MEAN.txt')
-        test_medians_vert = np.loadtxt(dir_path + dir + '/VERT_MEDIAN.txt')
-        UAV_time_stamps = np.loadtxt(dir_path + dir + '/UAV_time_stamps.txt')
-        USV_time_stamps = np.loadtxt(dir_path + dir + '/USV_time_stamps.txt')
-        t_0 = np.maximum(UAV_time_stamps[0], USV_time_stamps[0])
-
-        #DEBUG, UAV_time_stamps just happened to have last element equal to nan
-        UAV_time_stamps[-1] = UAV_time_stamps[-2] + 0.05
-
-        UAV_time_stamps = UAV_time_stamps - t_0
-        USV_time_stamps = USV_time_stamps - t_0
-
-        x_log  = np.loadtxt(dir_path + dir + '/x_log.txt')
-        xb_log = np.loadtxt(dir_path + dir + '/xb_log.txt')
-        xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
-        x_traj = x_log[0,:]
-        y_traj = x_log[1,:]
-        z_traj = xv_log[0,:]
-        xb_traj = xb_log[0,:]
-        yb_traj = xb_log[1,:]
-        # distance_hor = np.sqrt( np.square(x_traj-xb_traj) + np.square(y_traj-yb_traj) )
-        # distance = np.sqrt( np.square(x_traj-xb_traj) + np.square(y_traj-yb_traj) + np.square(z_traj))
-
-        new_UAV_times = np.arange(0, UAV_time_stamps[-1], 0.05)
-        new_USV_times = np.arange(0, USV_time_stamps[-1], 0.05)
-        if len(new_UAV_times) > len(new_USV_times):
-            common_times = new_USV_times
-        else:
-            common_times = new_UAV_times
-
-        x_traj_inter = get_interpolated_traj(x_traj, UAV_time_stamps, common_times)
-        y_traj_inter = get_interpolated_traj(y_traj, UAV_time_stamps, common_times)
-        z_traj_inter = get_interpolated_traj(z_traj, UAV_time_stamps, common_times)
-        xb_traj_inter = get_interpolated_traj(xb_traj, USV_time_stamps, common_times)
-        yb_traj_inter = get_interpolated_traj(yb_traj, USV_time_stamps, common_times)
-
-        distance_hor = np.sqrt( np.square(x_traj_inter - xb_traj_inter) \
-            + np.square(y_traj_inter - yb_traj_inter) )
-        distance = np.sqrt( np.square(x_traj_inter - xb_traj_inter) \
-            + np.square(y_traj_inter - yb_traj_inter) + np.square(z_traj_inter) )
-
-        time_list.append(common_times)
-        dist_list.append(distance)
-        test_means_list.append(test_means)
-        test_hor_means_list.append(test_means_hor)
-        test_vert_means_list.append(test_means_vert)
-        z_traj_inter_list.append(z_traj_inter)
-        dist_hor_list.append(distance_hor)
-
-        # Calculate landing time
-        land_time = 0
-        for i in range(len(z_traj)):
-            if z_traj[i] > 0.1:
-                land_time = UAV_time_stamps[i]
-            else:
-                break
-
-        print "Landed at time:", land_time
-
-    colors = [(1.0, 0.0, 0.0, 0.5), (0.0, 0.0, 1.0, 0.5)]
-    legends = ['Centralised', 'Distributed']
-    xlabel = 'Mean Vertical Problem Solution Time [s]'
-    # xlabel = 'Mean Iteration Durations [s]'
-    ylabel = 'Number of Trials'
-    # plot_all_histograms(test_vert_means_list, [red, light_blue], legends, xlabel, ylabel)
-    # plot_all_dists(time_list, dist_list, ['Centralised', 'Distributed', 'Cascading'])
-    plot_all_with_constraints(dist_hor_list, z_traj_inter_list,\
-        ['Centralised', 'Distributed'], 'horizontal distance [m]', 'height [m]')    #['Centralised', 'Distributed', 'Cascading']
-    # save_all_with_constraints(dist_hor_list, z_traj_inter_list,\
-    #     ['Centralised', 'Distributed'], 'horizontal distance [m]', 'height [m]')
-
-def print_data(dir):
-    UAV_iteration_durations = \
-        np.loadtxt(dir_path + dir + '/UAV_iteration_durations.txt')
-
-    # Figure out problem type based on which files exist
-    is_centralised = False
-    is_distributed = False
-    is_parallel = False
-    try:
-        np.loadtxt(dir_path + dir +'/UAV_horizontal_durations.txt')
-    except:
-        print "Failed getting UAV solution durations, assuming that problem type is PARALLEL"
-        is_parallel = True
-    try:
-        np.loadtxt(dir_path + dir +'/USV_iteration_durations.txt')
-    except:
-        print "Failed loading USV iteration durations, assuming that problem type is CENTRALISED"
-        is_centralised = True
-    is_distributed = not is_centralised and not is_parallel
+    def get_adjusted_array(self, traj, old_times, new_times):
+        if new_times[0] < old_times[0] or new_times[0] > old_times[-1]:
+            raise LookupError('New time stamps are non-overlapping with old time stamps')
+        # Assumes interpolation along 0th dimension (x-direction)
+        height = new_times.shape[0]
+        new_traj = np.full((height, ), np.nan)
+        i_0 = 0
+        i_2 = 1
+        for i in range(len(new_times)):
+            # if  np.isnan(traj[row, i]):
+            #     print "WAS NAN"
+            while True:
+                if (old_times[i_2] < new_times[i]):
+                    # haven't passed interpolation point yet, move forward
+                    i_0 = i_2
+                    i_2 = i_2 + 1
+                else:
+                    # We have just passed interpolation point
+                    new_traj[i] = traj[i_0]
+                    break
+        return new_traj
 
 
-    test_means = np.loadtxt(dir_path + dir + '/MEAN.txt')
-    test_medians = np.loadtxt(dir_path + dir + '/MEDIAN.txt')
-    test_means_hor = np.loadtxt(dir_path + dir + '/HOR_MEAN.txt')
-    test_medians_hor = np.loadtxt(dir_path + dir + '/HOR_MEDIAN.txt')
-    test_means_vert = np.loadtxt(dir_path + dir + '/VERT_MEAN.txt')
-    test_medians_vert = np.loadtxt(dir_path + dir + '/VERT_MEDIAN.txt')
-    UAV_time_stamps = np.loadtxt(dir_path + dir + '/UAV_time_stamps.txt')
-    USV_time_stamps = np.loadtxt(dir_path + dir + '/USV_time_stamps.txt')
-    # mean_UAV_iteration_duration = np.mean(np.loadtxt(dir_path + dir + 'UAV_iteration_durations.txt'))
-    # mean_hor_solution_duration = np.mean(np.loadtxt(dir_path + dir + 'UAV_horizontal_durations.txt'))
-    # mean_vert_solution_duration = np.mean(np.loadtxt(dir_path + dir + 'vert_solution_durations.txt'))
-    # mean_USV_iteration_duration = np.mean(np.loadtxt(dir_path + dir + 'USV_iteration_durations.txt'))
-    # mean_USV_solution_duration = np.mean(np.loadtxt(dir_path + dir + 'USV_iteration_durations.txt'))
-    # if is_parallel:
-    #     mean_inner_hor_solution_duration
-    #     mean_inner_vert_solution_duration
-    #     mean_inner_USV_solution_duration
-    try:
-        landing_times = np.loadtxt(dir_path + dir + '/LANDING_TIMES.txt')
-        print "min:", landing_times.min(), ', max:', landing_times.max(), ', mean:', np.mean(landing_times)
-    except:
-        print 'Found no stored landing times'
-    t_0 = np.maximum(UAV_time_stamps[0], USV_time_stamps[0])
-
-    # EDIT: CAN PROBABLY BE DELETED, SHOULDN'T OCCUR ANYMORE
-    # #DEBUG, UAV_time_stamps just happened to have last element equal to nan
-    # UAV_time_stamps[-1] = UAV_time_stamps[-2] + 0.05
-
-    UAV_time_stamps = UAV_time_stamps - t_0
-    USV_time_stamps = USV_time_stamps - t_0
-
-    x_log  = np.loadtxt(dir_path + dir + '/x_log.txt')
-    xb_log = np.loadtxt(dir_path + dir + '/xb_log.txt')
-    xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
-    UAV_traj_log = np.loadtxt(dir_path + dir + '/UAV_traj_log.txt')
-    USV_traj_log = np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
-    vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
-    # TODO: Rename these? Slightly confusing names
-    x_traj = x_log[0,:]
-    y_traj = x_log[1,:]
-    z_traj = xv_log[0,:]
-    w_traj = xv_log[1, :]
-    xb_traj = xb_log[0,:]
-    yb_traj = xb_log[1,:]
-    # distance_hor = np.sqrt( np.square(x_traj-xb_traj) + np.square(y_traj-yb_traj) )
-    # distance = np.sqrt( np.square(x_traj-xb_traj) + np.square(y_traj-yb_traj) + np.square(z_traj))
-
-    new_UAV_times = np.arange(0, UAV_time_stamps[-1], 0.05)
-    new_USV_times = np.arange(0, USV_time_stamps[-1], 0.05)
-    if len(new_UAV_times) > len(new_USV_times):
-        common_times = new_USV_times
-    else:
-        common_times = new_UAV_times
-
-    # print np.count_nonzero( np.isnan(z_traj))
-    # print np.count_nonzero( np.isnan( w_traj))
-    # print '##################################'
-    x_traj_inter = get_interpolated_traj(x_traj, UAV_time_stamps, common_times)
-    y_traj_inter = get_interpolated_traj(y_traj, UAV_time_stamps, common_times)
-    z_traj_inter = get_interpolated_traj(z_traj, UAV_time_stamps, common_times)
-    w_traj_inter = get_interpolated_traj(w_traj, UAV_time_stamps, common_times)
-    xb_traj_inter = get_interpolated_traj(xb_traj, USV_time_stamps, common_times)
-    yb_traj_inter = get_interpolated_traj(yb_traj, USV_time_stamps, common_times)
-    # print np.count_nonzero( np.isnan(z_traj_inter))
-    # print np.count_nonzero( np.isnan( w_traj_inter))
-    # print '!!!!!!'
-
-    distance_hor = np.sqrt( np.square(x_traj_inter - xb_traj_inter) \
-        + np.square(y_traj_inter - yb_traj_inter) )
-    distance = np.sqrt( np.square(x_traj_inter - xb_traj_inter) \
-        + np.square(y_traj_inter - yb_traj_inter) + np.square(z_traj_inter) )
-
-    # Calculate landing time
-    land_time = 0
-    for i in range(len(z_traj)):
-        if z_traj[i] > 0.1:
-            land_time = UAV_time_stamps[i]
-        else:
-            break
-
-    print "Landed at time:", land_time
-
-    # print 'Mean UAV iteration: ' + str(np.mean(UAV_iteration_durations))
-    # print 'Median UAV iteration: ' + str(np.median(UAV_iteration_durations))
-    # print 'Mean UAV horizontal: ' + str(np.mean(UAV_horizontal_durations))
-    # print 'Median UAV horizontal: ' + str(np.median(UAV_horizontal_durations))
-    # print 'Mean UAV vertical: ' + str(np.mean(UAV_vertical_durations))
-    # print 'Median UAV vertical: ' + str(np.median(UAV_vertical_durations))
-    # print '----------------------------------------------'
-
-    xv_log_trimmed = np.reshape( np.array([z_traj_inter, w_traj_inter]), (-1, 1), order='F' )
-    constraints_satisfied(common_times, distance_hor, xv_log_trimmed, land_time)
-
-    # plot_3d(x_traj, y_traj, z_traj, xb_traj, yb_traj)
-    # save_3d_animation(x_traj, y_traj, z_traj, xb_traj, yb_traj)
-    # plot_topview(x_traj, y_traj, xb_traj, yb_traj)
-    # plot_with_constraints(distance_hor, z_traj_inter, 'horizontal distance [m]', 'height [m]')
-    plot_3d_realtime(x_traj, y_traj, z_traj, xb_traj, yb_traj,\
-        UAV_traj_log, USV_traj_log, vert_traj_log)
-    # plot_histogram(test_means_hor, 'Mean Horizontal Problem Solution Time [s]', 'Number of Trials')   #Mean Vertical Problem Solution Time [s]
-    # plot_hor_dist(common_times, distance_hor)
-    # plot_dist(common_times, distance)
-    # plot_height(UAV_time_stamps - t_0, z_traj)
-    return
-
-def constraints_satisfied(common_times, distance_hor, xv_log, landing_time):
-    T_trimmed = len(common_times)
-    height_extractor = np.zeros(( T_trimmed, nv*T_trimmed ))
-    for i in range(T_trimmed):
-        height_extractor[ i, nv*i ] = 1
-
-    distance_hor = np.reshape(distance_hor, (-1, 1))
-    b_vec = distance_hor < ds
-
-    # SAFETY CONSTRAINT
-    # dl - ds < 0 --> Automatically satisfied in b == 0
-    safe1 = (dl - ds)*np.dot(height_extractor,xv_log) <= np.diag(b_vec)*(hs*dl - hs*distance_hor)
-    safe2 = (dl - ds)*np.dot(height_extractor,xv_log) <= np.diag(b_vec)*(hs*dl + hs*distance_hor)   # shouldn't be necessary if distance in positive
-    # SAFE HEIGHT CONSTRAINT
-    # UAV height usually > 0 --> Automatically satisfied if b == 1
-    safe3 = np.dot(height_extractor,xv_log) >= hs*(np.ones((T_trimmed, 1)) - b_vec)
-
-    # np.savetxt('/home/robert/DELTE_ME/safe1.txt', safe1)
-    # np.savetxt('/home/robert/DELTE_ME/safe2.txt', safe2)
-    # np.savetxt('/home/robert/DELTE_ME/safe3.txt', safe3)
-    np.set_printoptions(threshold=sys.maxsize)
-    times_constraints_violated = []
-    for safe_vec in [safe1, safe2, safe3]:
-        if np.count_nonzero(~safe_vec) > 0:
-            nonzero_indices = np.nonzero(~safe_vec)[0]
-            for i in nonzero_indices:
-                if common_times[i] < landing_time:
-                    # Only include constraints that were violated BEFORE landing
-                    times_constraints_violated.append(common_times[i])
-
-    # print np.count_nonzero(~safe1)
-    # print np.count_nonzero(~safe2)
-    # print np.count_nonzero(~safe3)
-    # print np.nonzero(~safe3)[0]
-    print len(times_constraints_violated), 'constraints were violated before landing'
-
-    # # Safety constraints
-    # constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
-    #     <= cp.diag(self.b)*(params.hs*params.dl - params.hs*self.dist)]
-    # constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
-    #     <= cp.diag(self.b)*(params.hs*params.dl + params.hs*self.dist)]
-    # # Safe height constraints
-    # constraintsVert += [self.height_extractor*self.xv \
-    #     >= params.hs*(np.ones(( T+1, 1 )) - self.b)]
-    return
-
-def horizon_vs_performance(dirs):
-    fig = plt.figure()
-    ax = plt.axes()
-    colors = ['blue', 'red']
-    legends = ['Centralised', 'Distributed']
-    j = -1
-    for dir in dirs:
-        j += 1
-        # Find range of horizons
-        min_hor = -1
-        max_hor = -1
-        i = 0
-        while min_hor == -1 or max_hor == -1:
-            file_exists = os.path.isfile(dir_path + dir + '/landing_times_' + str(i) + '.txt')
-            if file_exists and min_hor == -1:
-                min_hor = i
-            elif min_hor != -1 and not file_exists:
-                max_hor = i-1
-            i = i + 1
-
-        all_landing_times = []
-        all_mean_horizontal = []
-        all_median_horizontal = []
-        all_mean_iteration = []
-        all_median_iteration = []
-        all_mean_vertical = []
-        all_median_vertical = []
-        plotable_landing_times = []
-        plotable_mean_horizontal = []
-        plotable_median_horizontal = []
-        plotable_mean_iteration = []
-        plotable_median_iteration = []
-        plotable_mean_vertical = []
-        plotable_median_vertical = []
-
-        print "min:", min_hor, 'max:', max_hor
-        for hor in range(min_hor, max_hor+1):
-            landing_times = np.loadtxt(dir_path + dir + '/landing_times_' + str(hor) + '.txt')
-            mean_horizontal = np.loadtxt(dir_path + dir + '/mean_horizontal_' + str(hor) + '.txt')
-            median_horizontal = np.loadtxt(dir_path + dir + '/median_horizontal_' + str(hor) + '.txt')
-            mean_iteration = np.loadtxt(dir_path + dir + '/mean_iteration_' + str(hor) + '.txt')
-            median_iteration = np.loadtxt(dir_path + dir + '/median_iteration_' + str(hor) + '.txt')
-            mean_vertical = np.loadtxt(dir_path + dir + '/mean_vertical_' + str(hor) + '.txt')
-            median_vertical = np.loadtxt(dir_path + dir + '/median_vertical_' + str(hor) + '.txt')
-
-            # all_landing_times.append(landing_times)
-            # all_mean_horizontal.append(mean_horizontal)
-            # all_median_horizontal.append(median_horizontal)
-            # all_mean_iteration.append(mean_iteration)
-            # all_median_iteration.append(median_iteration)
-            # all_mean_vertical.append(mean_vertical)
-            # all_median_vertical.append(median_vertical)
-            plotable_landing_times.append(np.mean(landing_times))
-            plotable_mean_horizontal.append(np.mean(mean_horizontal))
-            plotable_median_horizontal.append(np.mean(median_horizontal))
-            plotable_mean_iteration.append(np.mean(mean_iteration))
-            plotable_median_iteration.append(np.mean(median_iteration))
-            plotable_mean_vertical.append(np.mean(mean_vertical))
-            plotable_median_vertical.append(np.mean(median_vertical))
-
-        ax.plot(range(min_hor, max_hor+1), plotable_mean_iteration, colors[j])
-        # ax.plot(range(min_hor, max_hor+1), plotable_mean_horizontal)
-        # ax.plot(range(min_hor, max_hor+1), plotable_mean_vertical)
-        # plt.legend(['Iteration Time [s]', 'Horizontal Problem Solution Time [s]', 'Vertical Problem Solution Time [s]'])
-        plt.grid(True)
-        plt.xlabel('Prediction Horizon')
-        plt.ylabel('Iteration Duration [s]')
-    plt.legend(legends)
-    plt.show()
-
-def plot_with_constraints(x_vector, height, xlabel, ylabel):
-    forbidden_area_1 = Polygon([ (dl, 0),\
-                                 (ds, hs),\
-                                 (35, hs),\
-                                 (35, 0)], True)
-    forbidden_area_2 = Polygon([ (-dl, 0),\
-                                 (-ds, hs),\
-                                 (-35, hs),\
-                                 (-35, 0)], True)
-    safety_patch_collection = PatchCollection([forbidden_area_1, forbidden_area_2], alpha=0.4)
-
-    fig = plt.figure()
-    ax = plt.axes()
-    ax.plot(x_vector, height, 'b')
-    ax.add_collection(safety_patch_collection)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.grid(True)
-    plt.show()
-
-def plot_height(time, z_traj):
-    fig = plt.figure()
-    ax = plt.axes()
-    ax.plot(time, z_traj, 'b')
-    plt.grid(True)
-    plt.show()
-
-def plot_hor_dist(time, distance):
-    fig = plt.figure()
-    ax = plt.axes()
-    ax.plot(time, distance, 'b')
-    plt.grid(True)
-    plt.show()
-
-def plot_dist(time, distance):
-    fig = plt.figure()
-    ax = plt.axes()
-    ax.plot(time, distance, 'b')
-    plt.xlabel('time [s]')
-    plt.ylabel('distance [m]')
-    plt.grid(True)
-    plt.show()
-
-def plot_all_dists(time_list, distance_list, legend_list):
-    fig = plt.figure()
-    ax = plt.axes()
-    colors = [blue_like, orange_like, green_like]
-    styles = ['-', '--', '-.']
-    for i in range(len(time_list)):
-        ax.plot(time_list[i], distance_list[i],styles[i])
-    plt.xlabel('time [s]')
-    plt.ylabel('distance [m]')
-    plt.grid(True)
-    plt.legend(legend_list)
-    ax.set_xlim(left=0, right=100)
-    plt.show()
-
-def plot_all_with_constraints(x_vector_list, y_vector_list, legend_list, xlabel, ylabel):
-    forbidden_area_1 = Polygon([ (dl, 0),\
-                                 (ds, hs),\
-                                 (35, hs),\
-                                 (35, 0)], True)
-    forbidden_area_2 = Polygon([ (-dl, 0),\
-                                 (-ds, hs),\
-                                 (-35, hs),\
-                                 (-35, 0)], True)
-    safety_patch_collection = PatchCollection([forbidden_area_1, forbidden_area_2], alpha=0.4, edgecolors='red', facecolors='red')
-
-    fig = plt.figure()
-    ax = plt.axes()
-    colors = [blue_like, orange_like, green_like]
-    # styles = ['-', '--', '-.']
-    styles = ['red', 'blue', 'yellow']
-    for i in range(len(y_vector_list)):
-        ax.plot(x_vector_list[i], y_vector_list[i], styles[i])
-    ax.add_collection(safety_patch_collection)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.grid(True)
-    plt.legend(legend_list)
-    plt.show()
-
-def save_all_with_constraints(x_vector_list, y_vector_list, legend_list, xlabel, ylabel):
-    fig = plt.figure()
-    ax = plt.axes()
-    forbidden_area_1 = Polygon([ (dl, 0),\
-                                 (ds, hs),\
-                                 (35, hs),\
-                                 (35, 0)], True)
-    forbidden_area_2 = Polygon([ (-dl, 0),\
-                                 (-ds, hs),\
-                                 (-35, hs),\
-                                 (-35, 0)], True)
-    safety_patch_collection = PatchCollection([forbidden_area_1, forbidden_area_2], alpha=0.4, edgecolors='red', facecolors='red')
-
-    xcdata, ycdata, xddata, yddata = [], [], [], []
-    line1, = plt.plot([], [], 'r')
-    line2, = plt.plot([], [], 'b')
-    # line3 = plt.plot([], [])
-    lines = [line1, line2]
-    def init():
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        plt.grid(True)
-        plt.legend(legend_list)
-        ax.add_collection(safety_patch_collection)
-        ax.set_xlim(left=0, right=35)
-        ax.set_ylim(bottom=0, top=12)
-        return lines
-
-    def update(i):
-        xcdata.append(x_vector_list[0][i])
-        ycdata.append(y_vector_list[0][i])
-        xddata.append(x_vector_list[1][i])
-        yddata.append(y_vector_list[1][i])
-        lines[0].set_data(xcdata, ycdata)
-        lines[1].set_data(xddata, yddata)
-        return lines
-
-    animation = FuncAnimation(fig, update, frames = len(x_vector_list[0]),\
-        init_func = init, blit=True)
-
-    Writer = matplotlib.animation.writers['ffmpeg']
-    writer = Writer(fps=15, metadata=dict(artist='Me'), bitrate=1800)
-    animation.save('my_constraint_anim.mp4', writer=writer)
-    print "Should have saved constraint mp4"
-
-def save_3d_animation(x_traj, y_traj, z_traj, xb_traj, yb_traj):
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
-    xdata, ydata, zdata = [x_traj[0]], [y_traj[0]], [z_traj[2]]
-    xbdata, ybdata, zbdata = [xb_traj[0]], [yb_traj[0]], [0]
-    line1, = ax.plot3D(xdata, ydata, zdata, 'blue')
-    line2, = ax.plot3D(xbdata, ybdata, zbdata, 'red')
-    lines = [line1, line2]
-    def init():
-        ax.set_xlim(left=0, right=30)
-        ax.set_ylim(bottom=0, top=16)
-        ax.set_zlim(0)
-        plt.xlabel('x-position [m]')
-        plt.ylabel('y-position [m]')
-        ax.set_zlabel('Height [m]')
-        plt.legend(['Drone trajectory', 'Boat trajectory'])
-        return lines
-
-    def update(i):
-
-        xdata.append(x_traj[i])
-        ydata.append(y_traj[i])
-        zdata.append(z_traj[max(i,2)])
-        xbdata.append(xb_traj[i])
-        ybdata.append(yb_traj[i])
-        zbdata.append(0)
-        lines[0].set_data(xdata, ydata)
-        lines[0].set_3d_properties(zdata)
-        lines[1].set_data(xbdata, ybdata)
-        lines[1].set_3d_properties(zbdata)
-        return lines
-
-    animation = FuncAnimation(fig, update, frames = len(x_traj),\
-        init_func = init, blit=True)
-
-    Writer = matplotlib.animation.writers['ffmpeg']
-    writer = Writer(fps=15, metadata=dict(artist='Me'), bitrate=1800)
-    animation.save('my_anim.mp4', writer=writer)
-    print "Should have saved mp4"
-
-def plot_3d(x_traj, y_traj, z_traj, xb_traj, yb_traj):
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
-    plt.grid(False)
-    ax.plot3D(x_traj[3:], y_traj[3:], z_traj[3:], 'blue')
-    ax.plot3D(xb_traj, yb_traj, 0, '#FF5555')
-    ax.set_zlim(0)
-    ax.set_yticklabels([])
-    ax.set_xticklabels([])
-    ax.set_zticklabels([])
-    # plt.axis('off')
-    # plt.xlabel('x-position [m]')
-    # plt.ylabel('y-position [m]')
-    # ax.set_zlabel('Height [m]')
-    # plt.legend(['UAV trajectory', 'USV trajectory'])
-    # # plt.legend(['Drone trajectory', 'Boat trajectory'])
-    plt.show()
-
-def plot_3d_realtime(x_traj, y_traj, z_traj, xb_traj, yb_traj,\
-    UAV_traj_log, USV_traj_log, vert_traj_log):
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
-
-    time = range(len(x_traj))
-    for t in time:
-        x_pred_traj = UAV_traj_log[0::nUAV, t:t+1]
-        y_pred_traj = UAV_traj_log[1::nUAV, t:t+1]
-        z_pred_traj = vert_traj_log[0::nv,  t:t+1]
-        xb_pred_traj = UAV_traj_log[0::nUSV, t:t+1]
-        yb_pred_traj = UAV_traj_log[1::nUSV, t:t+1]
-        # Actual trajectories
-        ax.plot3D(x_traj[0:t+1], y_traj[0:t+1], z_traj[0:t+1], 'blue')
-        ax.plot3D(xb_traj[0:t+1], yb_traj[0:t+1], 0, 'red')
-        # Predicted trajectories
-        ax.plot3D(x_pred_traj[0:t+1], y_pred_traj[0:t+1], z_pred_traj[0:t+1], 'green')
-        ax.plot3D(xb_pred_traj[0:t+1], yb_pred_traj[0:t+1], 0, 'green')
-        ax.set_zlim(0)
-        plt.xlabel('x-position [m]')
-        plt.ylabel('y-position [m]')
-        ax.set_zlabel('Height [m]')
-        plt.legend(['UAV trajectory', 'USV trajectory'])
-        plt.pause(0.05)
-        ax.cla()
-
-def plot_topview(x_traj, y_traj, xb_traj, yb_traj):
-    fig = plt.figure()
-    ax = plt.axes()
-    ax.plot(x_traj, y_traj, 'blue')
-    ax.plot(xb_traj, yb_traj, 'red')
-    plt.xlabel('x-position [m]')
-    plt.ylabel('y-position [m]')
-    plt.legend(['UAV trajectory', 'USV trajectory'])
-    plt.show()
-
-def plot_histogram(vector, xlabel, ylabel, bins=10):
-    plt.hist(vector, bins=bins)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.grid(True)
-    plt.show()
-
-def plot_all_histograms(vectors, colors, legend_list, xlabel, ylabel, bins=10):
-    for (vector, color) in zip(vectors, colors):
-        plt.hist(vector, bins=bins, color=color)
-    # plt.hist(vector1, bins=bins, color=(1.0, 0.0, 0.0, 0.5))
-    # plt.hist(vector2, bins=bins, color=(0.0, 0.0, 1.0, 0.5))
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.grid(True)
-    plt.legend(legend_list)
-    plt.show()
-
-def get_interpolated_traj(traj, old_times, new_times):
-    new_traj = np.empty(new_times.shape)
-    new_traj.fill(np.nan)
-    i_0 = 0
-    i_2 = 1
-    for i in range(len(new_times)):
-        while True:
-            if (old_times[i_2] < new_times[i]):
-                # haven't passed interpolation point yet, move forward
-                i_0 = i_2
-                i_2 = i_2 + 1
-            else:
-                # We have passed interpolation point
-                x_0 = old_times[i_0]
-                x_2 = old_times[i_2]
-                y_0 = traj[i_0]
-                y_2 = traj[i_2]
-                x_1 = new_times[i]
-                new_traj[i] = y_0 + (x_1 - x_0)*(y_2 - y_0)/(x_2 - x_0)
-                break
-    return new_traj
-
-def remove_negative_elements(vector):
-    i = 0
-    while vector[i] < 0 and i < len(vector):
-        i += 1
-
-    return vector[i:]
+# def combine_multiple_results(dirs):
+#     time_list = []
+#     dist_list = []
+#     test_means_list = []
+#     test_hor_means_list = []
+#     test_vert_means_list = []
+#     z_traj_inter_list = []
+#     dist_hor_list = []
+#     for dir in dirs:
+#         test_means = np.loadtxt(dir_path + dir + '/MEAN.txt')
+#         test_medians = np.loadtxt(dir_path + dir + '/MEDIAN.txt')
+#         test_means_hor = np.loadtxt(dir_path + dir + '/HOR_MEAN.txt')
+#         test_medians_hor = np.loadtxt(dir_path + dir + '/HOR_MEDIAN.txt')
+#         test_means_vert = np.loadtxt(dir_path + dir + '/VERT_MEAN.txt')
+#         test_medians_vert = np.loadtxt(dir_path + dir + '/VERT_MEDIAN.txt')
+#         UAV_time_stamps = np.loadtxt(dir_path + dir + '/UAV_time_stamps.txt')
+#         USV_time_stamps = np.loadtxt(dir_path + dir + '/USV_time_stamps.txt')
+#         t_0 = np.maximum(UAV_time_stamps[0], USV_time_stamps[0])
+#
+#         #DEBUG, UAV_time_stamps just happened to have last element equal to nan
+#         UAV_time_stamps[-1] = UAV_time_stamps[-2] + 0.05
+#
+#         UAV_time_stamps = UAV_time_stamps - t_0
+#         USV_time_stamps = USV_time_stamps - t_0
+#
+#         x_log  = np.loadtxt(dir_path + dir + '/x_log.txt')
+#         xb_log = np.loadtxt(dir_path + dir + '/xb_log.txt')
+#         xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
+#         x_traj = x_log[0,:]
+#         y_traj = x_log[1,:]
+#         z_traj = xv_log[0,:]
+#         xb_traj = xb_log[0,:]
+#         yb_traj = xb_log[1,:]
+#         # distance_hor = np.sqrt( np.square(x_traj-xb_traj) + np.square(y_traj-yb_traj) )
+#         # distance = np.sqrt( np.square(x_traj-xb_traj) + np.square(y_traj-yb_traj) + np.square(z_traj))
+#
+#         new_UAV_times = np.arange(0, UAV_time_stamps[-1], 0.05)
+#         new_USV_times = np.arange(0, USV_time_stamps[-1], 0.05)
+#         if len(new_UAV_times) > len(new_USV_times):
+#             common_times = new_USV_times
+#         else:
+#             common_times = new_UAV_times
+#
+#         x_traj_inter = get_interpolated_traj(x_traj, UAV_time_stamps, common_times)
+#         y_traj_inter = get_interpolated_traj(y_traj, UAV_time_stamps, common_times)
+#         z_traj_inter = get_interpolated_traj(z_traj, UAV_time_stamps, common_times)
+#         xb_traj_inter = get_interpolated_traj(xb_traj, USV_time_stamps, common_times)
+#         yb_traj_inter = get_interpolated_traj(yb_traj, USV_time_stamps, common_times)
+#
+#         distance_hor = np.sqrt( np.square(x_traj_inter - xb_traj_inter) \
+#             + np.square(y_traj_inter - yb_traj_inter) )
+#         distance = np.sqrt( np.square(x_traj_inter - xb_traj_inter) \
+#             + np.square(y_traj_inter - yb_traj_inter) + np.square(z_traj_inter) )
+#
+#         time_list.append(common_times)
+#         dist_list.append(distance)
+#         test_means_list.append(test_means)
+#         test_hor_means_list.append(test_means_hor)
+#         test_vert_means_list.append(test_means_vert)
+#         z_traj_inter_list.append(z_traj_inter)
+#         dist_hor_list.append(distance_hor)
+#
+#         # Calculate landing time
+#         land_time = 0
+#         for i in range(len(z_traj)):
+#             if z_traj[i] > 0.1:
+#                 land_time = UAV_time_stamps[i]
+#             else:
+#                 break
+#
+#         print "Landed at time:", land_time
+#
+#     colors = [(1.0, 0.0, 0.0, 0.5), (0.0, 0.0, 1.0, 0.5)]
+#     legends = ['Centralised', 'Distributed']
+#     xlabel = 'Mean Vertical Problem Solution Time [s]'
+#     # xlabel = 'Mean Iteration Durations [s]'
+#     ylabel = 'Number of Trials'
+#     # plot_all_histograms(test_vert_means_list, [red, light_blue], legends, xlabel, ylabel)
+#     # plot_all_dists(time_list, dist_list, ['Centralised', 'Distributed', 'Cascading'])
+#     plot_all_with_constraints(dist_hor_list, z_traj_inter_list,\
+#         ['Centralised', 'Distributed'], 'horizontal distance [m]', 'height [m]')    #['Centralised', 'Distributed', 'Cascading']
+#     # save_all_with_constraints(dist_hor_list, z_traj_inter_list,\
+#     #     ['Centralised', 'Distributed'], 'horizontal distance [m]', 'height [m]')
+#
+# def print_data(dir):
+#     UAV_iteration_durations = \
+#         np.loadtxt(dir_path + dir + '/UAV_iteration_durations.txt')
+#
+#     # Figure out problem type based on which files exist
+#     is_centralised = False
+#     is_distributed = False
+#     is_parallel = False
+#     try:
+#         np.loadtxt(dir_path + dir +'/UAV_horizontal_durations.txt')
+#     except:
+#         print "Failed getting UAV solution durations, assuming that problem type is PARALLEL"
+#         is_parallel = True
+#     try:
+#         np.loadtxt(dir_path + dir +'/USV_iteration_durations.txt')
+#     except:
+#         print "Failed loading USV iteration durations, assuming that problem type is CENTRALISED"
+#         is_centralised = True
+#     is_distributed = not is_centralised and not is_parallel
+#
+#
+#     test_means = np.loadtxt(dir_path + dir + '/MEAN.txt')
+#     test_medians = np.loadtxt(dir_path + dir + '/MEDIAN.txt')
+#     test_means_hor = np.loadtxt(dir_path + dir + '/HOR_MEAN.txt')
+#     test_medians_hor = np.loadtxt(dir_path + dir + '/HOR_MEDIAN.txt')
+#     test_means_vert = np.loadtxt(dir_path + dir + '/VERT_MEAN.txt')
+#     test_medians_vert = np.loadtxt(dir_path + dir + '/VERT_MEDIAN.txt')
+#     UAV_time_stamps = np.loadtxt(dir_path + dir + '/UAV_time_stamps.txt')
+#     USV_time_stamps = np.loadtxt(dir_path + dir + '/USV_time_stamps.txt')
+#     # mean_UAV_iteration_duration = np.mean(np.loadtxt(dir_path + dir + 'UAV_iteration_durations.txt'))
+#     # mean_hor_solution_duration = np.mean(np.loadtxt(dir_path + dir + 'UAV_horizontal_durations.txt'))
+#     # mean_vert_solution_duration = np.mean(np.loadtxt(dir_path + dir + 'vert_solution_durations.txt'))
+#     # mean_USV_iteration_duration = np.mean(np.loadtxt(dir_path + dir + 'USV_iteration_durations.txt'))
+#     # mean_USV_solution_duration = np.mean(np.loadtxt(dir_path + dir + 'USV_iteration_durations.txt'))
+#     # if is_parallel:
+#     #     mean_inner_hor_solution_duration
+#     #     mean_inner_vert_solution_duration
+#     #     mean_inner_USV_solution_duration
+#     try:
+#         landing_times = np.loadtxt(dir_path + dir + '/LANDING_TIMES.txt')
+#         print "min:", landing_times.min(), ', max:', landing_times.max(), ', mean:', np.mean(landing_times)
+#     except:
+#         print 'Found no stored landing times'
+#     t_0 = np.maximum(UAV_time_stamps[0], USV_time_stamps[0])
+#
+#     # EDIT: CAN PROBABLY BE DELETED, SHOULDN'T OCCUR ANYMORE
+#     # #DEBUG, UAV_time_stamps just happened to have last element equal to nan
+#     # UAV_time_stamps[-1] = UAV_time_stamps[-2] + 0.05
+#
+#     UAV_time_stamps = UAV_time_stamps - t_0
+#     USV_time_stamps = USV_time_stamps - t_0
+#
+#     x_log  = np.loadtxt(dir_path + dir + '/x_log.txt')
+#     xb_log = np.loadtxt(dir_path + dir + '/xb_log.txt')
+#     xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
+#     UAV_traj_log = np.loadtxt(dir_path + dir + '/UAV_traj_log.txt')
+#     USV_traj_log = np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
+#     vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
+#     # TODO: Rename these? Slightly confusing names
+#     x_traj = x_log[0,:]
+#     y_traj = x_log[1,:]
+#     z_traj = xv_log[0,:]
+#     w_traj = xv_log[1, :]
+#     xb_traj = xb_log[0,:]
+#     yb_traj = xb_log[1,:]
+#     # distance_hor = np.sqrt( np.square(x_traj-xb_traj) + np.square(y_traj-yb_traj) )
+#     # distance = np.sqrt( np.square(x_traj-xb_traj) + np.square(y_traj-yb_traj) + np.square(z_traj))
+#
+#     new_UAV_times = np.arange(0, UAV_time_stamps[-1], 0.05)
+#     new_USV_times = np.arange(0, USV_time_stamps[-1], 0.05)
+#     if len(new_UAV_times) > len(new_USV_times):
+#         common_times = new_USV_times
+#     else:
+#         common_times = new_UAV_times
+#
+#     # print np.count_nonzero( np.isnan(z_traj))
+#     # print np.count_nonzero( np.isnan( w_traj))
+#     # print '##################################'
+#     x_traj_inter = get_interpolated_traj(x_traj, UAV_time_stamps, common_times)
+#     y_traj_inter = get_interpolated_traj(y_traj, UAV_time_stamps, common_times)
+#     z_traj_inter = get_interpolated_traj(z_traj, UAV_time_stamps, common_times)
+#     w_traj_inter = get_interpolated_traj(w_traj, UAV_time_stamps, common_times)
+#     xb_traj_inter = get_interpolated_traj(xb_traj, USV_time_stamps, common_times)
+#     yb_traj_inter = get_interpolated_traj(yb_traj, USV_time_stamps, common_times)
+#     # print np.count_nonzero( np.isnan(z_traj_inter))
+#     # print np.count_nonzero( np.isnan( w_traj_inter))
+#     # print '!!!!!!'
+#
+#     distance_hor = np.sqrt( np.square(x_traj_inter - xb_traj_inter) \
+#         + np.square(y_traj_inter - yb_traj_inter) )
+#     distance = np.sqrt( np.square(x_traj_inter - xb_traj_inter) \
+#         + np.square(y_traj_inter - yb_traj_inter) + np.square(z_traj_inter) )
+#
+#     # Calculate landing time
+#     land_time = 0
+#     for i in range(len(z_traj)):
+#         if z_traj[i] > 0.1:
+#             land_time = UAV_time_stamps[i]
+#         else:
+#             break
+#
+#     print "Landed at time:", land_time
+#
+#     # print 'Mean UAV iteration: ' + str(np.mean(UAV_iteration_durations))
+#     # print 'Median UAV iteration: ' + str(np.median(UAV_iteration_durations))
+#     # print 'Mean UAV horizontal: ' + str(np.mean(UAV_horizontal_durations))
+#     # print 'Median UAV horizontal: ' + str(np.median(UAV_horizontal_durations))
+#     # print 'Mean UAV vertical: ' + str(np.mean(UAV_vertical_durations))
+#     # print 'Median UAV vertical: ' + str(np.median(UAV_vertical_durations))
+#     # print '----------------------------------------------'
+#
+#     xv_log_trimmed = np.reshape( np.array([z_traj_inter, w_traj_inter]), (-1, 1), order='F' )
+#     constraints_satisfied(common_times, distance_hor, xv_log_trimmed, land_time)
+#
+#     # plot_3d(x_traj, y_traj, z_traj, xb_traj, yb_traj)
+#     # save_3d_animation(x_traj, y_traj, z_traj, xb_traj, yb_traj)
+#     # plot_topview(x_traj, y_traj, xb_traj, yb_traj)
+#     # plot_with_constraints(distance_hor, z_traj_inter, 'horizontal distance [m]', 'height [m]')
+#     plot_3d_realtime(x_traj, y_traj, z_traj, xb_traj, yb_traj,\
+#         UAV_traj_log, USV_traj_log, vert_traj_log)
+#     # plot_histogram(test_means_hor, 'Mean Horizontal Problem Solution Time [s]', 'Number of Trials')   #Mean Vertical Problem Solution Time [s]
+#     # plot_hor_dist(common_times, distance_hor)
+#     # plot_dist(common_times, distance)
+#     # plot_height(UAV_time_stamps - t_0, z_traj)
+#     return
+#
+# def constraints_satisfied(common_times, distance_hor, xv_log, landing_time):
+#     T_trimmed = len(common_times)
+#     height_extractor = np.zeros(( T_trimmed, nv*T_trimmed ))
+#     for i in range(T_trimmed):
+#         height_extractor[ i, nv*i ] = 1
+#
+#     distance_hor = np.reshape(distance_hor, (-1, 1))
+#     b_vec = distance_hor < ds
+#
+#     # SAFETY CONSTRAINT
+#     # dl - ds < 0 --> Automatically satisfied in b == 0
+#     safe1 = (dl - ds)*np.dot(height_extractor,xv_log) <= np.diag(b_vec)*(hs*dl - hs*distance_hor)
+#     safe2 = (dl - ds)*np.dot(height_extractor,xv_log) <= np.diag(b_vec)*(hs*dl + hs*distance_hor)   # shouldn't be necessary if distance in positive
+#     # SAFE HEIGHT CONSTRAINT
+#     # UAV height usually > 0 --> Automatically satisfied if b == 1
+#     safe3 = np.dot(height_extractor,xv_log) >= hs*(np.ones((T_trimmed, 1)) - b_vec)
+#
+#     # np.savetxt('/home/robert/DELTE_ME/safe1.txt', safe1)
+#     # np.savetxt('/home/robert/DELTE_ME/safe2.txt', safe2)
+#     # np.savetxt('/home/robert/DELTE_ME/safe3.txt', safe3)
+#     np.set_printoptions(threshold=sys.maxsize)
+#     times_constraints_violated = []
+#     for safe_vec in [safe1, safe2, safe3]:
+#         if np.count_nonzero(~safe_vec) > 0:
+#             nonzero_indices = np.nonzero(~safe_vec)[0]
+#             for i in nonzero_indices:
+#                 if common_times[i] < landing_time:
+#                     # Only include constraints that were violated BEFORE landing
+#                     times_constraints_violated.append(common_times[i])
+#
+#     # print np.count_nonzero(~safe1)
+#     # print np.count_nonzero(~safe2)
+#     # print np.count_nonzero(~safe3)
+#     # print np.nonzero(~safe3)[0]
+#     print len(times_constraints_violated), 'constraints were violated before landing'
+#
+#     # # Safety constraints
+#     # constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
+#     #     <= cp.diag(self.b)*(params.hs*params.dl - params.hs*self.dist)]
+#     # constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
+#     #     <= cp.diag(self.b)*(params.hs*params.dl + params.hs*self.dist)]
+#     # # Safe height constraints
+#     # constraintsVert += [self.height_extractor*self.xv \
+#     #     >= params.hs*(np.ones(( T+1, 1 )) - self.b)]
+#     return
+#
+# def horizon_vs_performance(dirs):
+#     fig = plt.figure()
+#     ax = plt.axes()
+#     colors = ['blue', 'red']
+#     legends = ['Centralised', 'Distributed']
+#     j = -1
+#     for dir in dirs:
+#         j += 1
+#         # Find range of horizons
+#         min_hor = -1
+#         max_hor = -1
+#         i = 0
+#         while min_hor == -1 or max_hor == -1:
+#             file_exists = os.path.isfile(dir_path + dir + '/landing_times_' + str(i) + '.txt')
+#             if file_exists and min_hor == -1:
+#                 min_hor = i
+#             elif min_hor != -1 and not file_exists:
+#                 max_hor = i-1
+#             i = i + 1
+#
+#         all_landing_times = []
+#         all_mean_horizontal = []
+#         all_median_horizontal = []
+#         all_mean_iteration = []
+#         all_median_iteration = []
+#         all_mean_vertical = []
+#         all_median_vertical = []
+#         plotable_landing_times = []
+#         plotable_mean_horizontal = []
+#         plotable_median_horizontal = []
+#         plotable_mean_iteration = []
+#         plotable_median_iteration = []
+#         plotable_mean_vertical = []
+#         plotable_median_vertical = []
+#
+#         print "min:", min_hor, 'max:', max_hor
+#         for hor in range(min_hor, max_hor+1):
+#             landing_times = np.loadtxt(dir_path + dir + '/landing_times_' + str(hor) + '.txt')
+#             mean_horizontal = np.loadtxt(dir_path + dir + '/mean_horizontal_' + str(hor) + '.txt')
+#             median_horizontal = np.loadtxt(dir_path + dir + '/median_horizontal_' + str(hor) + '.txt')
+#             mean_iteration = np.loadtxt(dir_path + dir + '/mean_iteration_' + str(hor) + '.txt')
+#             median_iteration = np.loadtxt(dir_path + dir + '/median_iteration_' + str(hor) + '.txt')
+#             mean_vertical = np.loadtxt(dir_path + dir + '/mean_vertical_' + str(hor) + '.txt')
+#             median_vertical = np.loadtxt(dir_path + dir + '/median_vertical_' + str(hor) + '.txt')
+#
+#             # all_landing_times.append(landing_times)
+#             # all_mean_horizontal.append(mean_horizontal)
+#             # all_median_horizontal.append(median_horizontal)
+#             # all_mean_iteration.append(mean_iteration)
+#             # all_median_iteration.append(median_iteration)
+#             # all_mean_vertical.append(mean_vertical)
+#             # all_median_vertical.append(median_vertical)
+#             plotable_landing_times.append(np.mean(landing_times))
+#             plotable_mean_horizontal.append(np.mean(mean_horizontal))
+#             plotable_median_horizontal.append(np.mean(median_horizontal))
+#             plotable_mean_iteration.append(np.mean(mean_iteration))
+#             plotable_median_iteration.append(np.mean(median_iteration))
+#             plotable_mean_vertical.append(np.mean(mean_vertical))
+#             plotable_median_vertical.append(np.mean(median_vertical))
+#
+#         ax.plot(range(min_hor, max_hor+1), plotable_mean_iteration, colors[j])
+#         # ax.plot(range(min_hor, max_hor+1), plotable_mean_horizontal)
+#         # ax.plot(range(min_hor, max_hor+1), plotable_mean_vertical)
+#         # plt.legend(['Iteration Time [s]', 'Horizontal Problem Solution Time [s]', 'Vertical Problem Solution Time [s]'])
+#         plt.grid(True)
+#         plt.xlabel('Prediction Horizon')
+#         plt.ylabel('Iteration Duration [s]')
+#     plt.legend(legends)
+#     plt.show()
+#
+# def plot_with_constraints(x_vector, height, xlabel, ylabel):
+#     forbidden_area_1 = Polygon([ (dl, 0),\
+#                                  (ds, hs),\
+#                                  (35, hs),\
+#                                  (35, 0)], True)
+#     forbidden_area_2 = Polygon([ (-dl, 0),\
+#                                  (-ds, hs),\
+#                                  (-35, hs),\
+#                                  (-35, 0)], True)
+#     safety_patch_collection = PatchCollection([forbidden_area_1, forbidden_area_2], alpha=0.4)
+#
+#     fig = plt.figure()
+#     ax = plt.axes()
+#     ax.plot(x_vector, height, 'b')
+#     ax.add_collection(safety_patch_collection)
+#     plt.xlabel(xlabel)
+#     plt.ylabel(ylabel)
+#     plt.grid(True)
+#     plt.show()
+#
+# def plot_height(time, z_traj):
+#     fig = plt.figure()
+#     ax = plt.axes()
+#     ax.plot(time, z_traj, 'b')
+#     plt.grid(True)
+#     plt.show()
+#
+# def plot_hor_dist(time, distance):
+#     fig = plt.figure()
+#     ax = plt.axes()
+#     ax.plot(time, distance, 'b')
+#     plt.grid(True)
+#     plt.show()
+#
+# def plot_dist(time, distance):
+#     fig = plt.figure()
+#     ax = plt.axes()
+#     ax.plot(time, distance, 'b')
+#     plt.xlabel('time [s]')
+#     plt.ylabel('distance [m]')
+#     plt.grid(True)
+#     plt.show()
+#
+# def plot_all_dists(time_list, distance_list, legend_list):
+#     fig = plt.figure()
+#     ax = plt.axes()
+#     colors = [blue_like, orange_like, green_like]
+#     styles = ['-', '--', '-.']
+#     for i in range(len(time_list)):
+#         ax.plot(time_list[i], distance_list[i],styles[i])
+#     plt.xlabel('time [s]')
+#     plt.ylabel('distance [m]')
+#     plt.grid(True)
+#     plt.legend(legend_list)
+#     ax.set_xlim(left=0, right=100)
+#     plt.show()
+#
+# def plot_all_with_constraints(x_vector_list, y_vector_list, legend_list, xlabel, ylabel):
+#     forbidden_area_1 = Polygon([ (dl, 0),\
+#                                  (ds, hs),\
+#                                  (35, hs),\
+#                                  (35, 0)], True)
+#     forbidden_area_2 = Polygon([ (-dl, 0),\
+#                                  (-ds, hs),\
+#                                  (-35, hs),\
+#                                  (-35, 0)], True)
+#     safety_patch_collection = PatchCollection([forbidden_area_1, forbidden_area_2], alpha=0.4, edgecolors='red', facecolors='red')
+#
+#     fig = plt.figure()
+#     ax = plt.axes()
+#     colors = [blue_like, orange_like, green_like]
+#     # styles = ['-', '--', '-.']
+#     styles = ['red', 'blue', 'yellow']
+#     for i in range(len(y_vector_list)):
+#         ax.plot(x_vector_list[i], y_vector_list[i], styles[i])
+#     ax.add_collection(safety_patch_collection)
+#     plt.xlabel(xlabel)
+#     plt.ylabel(ylabel)
+#     plt.grid(True)
+#     plt.legend(legend_list)
+#     plt.show()
+#
+# def save_all_with_constraints(x_vector_list, y_vector_list, legend_list, xlabel, ylabel):
+#     fig = plt.figure()
+#     ax = plt.axes()
+#     forbidden_area_1 = Polygon([ (dl, 0),\
+#                                  (ds, hs),\
+#                                  (35, hs),\
+#                                  (35, 0)], True)
+#     forbidden_area_2 = Polygon([ (-dl, 0),\
+#                                  (-ds, hs),\
+#                                  (-35, hs),\
+#                                  (-35, 0)], True)
+#     safety_patch_collection = PatchCollection([forbidden_area_1, forbidden_area_2], alpha=0.4, edgecolors='red', facecolors='red')
+#
+#     xcdata, ycdata, xddata, yddata = [], [], [], []
+#     line1, = plt.plot([], [], 'r')
+#     line2, = plt.plot([], [], 'b')
+#     # line3 = plt.plot([], [])
+#     lines = [line1, line2]
+#     def init():
+#         plt.xlabel(xlabel)
+#         plt.ylabel(ylabel)
+#         plt.grid(True)
+#         plt.legend(legend_list)
+#         ax.add_collection(safety_patch_collection)
+#         ax.set_xlim(left=0, right=35)
+#         ax.set_ylim(bottom=0, top=12)
+#         return lines
+#
+#     def update(i):
+#         xcdata.append(x_vector_list[0][i])
+#         ycdata.append(y_vector_list[0][i])
+#         xddata.append(x_vector_list[1][i])
+#         yddata.append(y_vector_list[1][i])
+#         lines[0].set_data(xcdata, ycdata)
+#         lines[1].set_data(xddata, yddata)
+#         return lines
+#
+#     animation = FuncAnimation(fig, update, frames = len(x_vector_list[0]),\
+#         init_func = init, blit=True)
+#
+#     Writer = matplotlib.animation.writers['ffmpeg']
+#     writer = Writer(fps=15, metadata=dict(artist='Me'), bitrate=1800)
+#     animation.save('my_constraint_anim.mp4', writer=writer)
+#     print "Should have saved constraint mp4"
+#
+# def save_3d_animation(x_traj, y_traj, z_traj, xb_traj, yb_traj):
+#     fig = plt.figure()
+#     ax = plt.axes(projection='3d')
+#     xdata, ydata, zdata = [x_traj[0]], [y_traj[0]], [z_traj[2]]
+#     xbdata, ybdata, zbdata = [xb_traj[0]], [yb_traj[0]], [0]
+#     line1, = ax.plot3D(xdata, ydata, zdata, 'blue')
+#     line2, = ax.plot3D(xbdata, ybdata, zbdata, 'red')
+#     lines = [line1, line2]
+#     def init():
+#         ax.set_xlim(left=0, right=30)
+#         ax.set_ylim(bottom=0, top=16)
+#         ax.set_zlim(0)
+#         plt.xlabel('x-position [m]')
+#         plt.ylabel('y-position [m]')
+#         ax.set_zlabel('Height [m]')
+#         plt.legend(['Drone trajectory', 'Boat trajectory'])
+#         return lines
+#
+#     def update(i):
+#
+#         xdata.append(x_traj[i])
+#         ydata.append(y_traj[i])
+#         zdata.append(z_traj[max(i,2)])
+#         xbdata.append(xb_traj[i])
+#         ybdata.append(yb_traj[i])
+#         zbdata.append(0)
+#         lines[0].set_data(xdata, ydata)
+#         lines[0].set_3d_properties(zdata)
+#         lines[1].set_data(xbdata, ybdata)
+#         lines[1].set_3d_properties(zbdata)
+#         return lines
+#
+#     animation = FuncAnimation(fig, update, frames = len(x_traj),\
+#         init_func = init, blit=True)
+#
+#     Writer = matplotlib.animation.writers['ffmpeg']
+#     writer = Writer(fps=15, metadata=dict(artist='Me'), bitrate=1800)
+#     animation.save('my_anim.mp4', writer=writer)
+#     print "Should have saved mp4"
+#
+# def plot_3d(x_traj, y_traj, z_traj, xb_traj, yb_traj):
+#     fig = plt.figure()
+#     ax = plt.axes(projection='3d')
+#     plt.grid(False)
+#     ax.plot3D(x_traj[3:], y_traj[3:], z_traj[3:], 'blue')
+#     ax.plot3D(xb_traj, yb_traj, 0, '#FF5555')
+#     ax.set_zlim(0)
+#     ax.set_yticklabels([])
+#     ax.set_xticklabels([])
+#     ax.set_zticklabels([])
+#     # plt.axis('off')
+#     # plt.xlabel('x-position [m]')
+#     # plt.ylabel('y-position [m]')
+#     # ax.set_zlabel('Height [m]')
+#     # plt.legend(['UAV trajectory', 'USV trajectory'])
+#     # # plt.legend(['Drone trajectory', 'Boat trajectory'])
+#     plt.show()
+#
+# def plot_3d_realtime(x_traj, y_traj, z_traj, xb_traj, yb_traj,\
+#     UAV_traj_log, USV_traj_log, vert_traj_log):
+#     fig = plt.figure()
+#     ax = plt.axes(projection='3d')
+#
+#     time = range(len(x_traj))
+#     for t in time:
+#         x_pred_traj = UAV_traj_log[0::nUAV, t:t+1]
+#         y_pred_traj = UAV_traj_log[1::nUAV, t:t+1]
+#         z_pred_traj = vert_traj_log[0::nv,  t:t+1]
+#         xb_pred_traj = UAV_traj_log[0::nUSV, t:t+1]
+#         yb_pred_traj = UAV_traj_log[1::nUSV, t:t+1]
+#         # Actual trajectories
+#         ax.plot3D(x_traj[0:t+1], y_traj[0:t+1], z_traj[0:t+1], 'blue')
+#         ax.plot3D(xb_traj[0:t+1], yb_traj[0:t+1], 0, 'red')
+#         # Predicted trajectories
+#         ax.plot3D(x_pred_traj[0:t+1], y_pred_traj[0:t+1], z_pred_traj[0:t+1], 'green')
+#         ax.plot3D(xb_pred_traj[0:t+1], yb_pred_traj[0:t+1], 0, 'green')
+#         ax.set_zlim(0)
+#         plt.xlabel('x-position [m]')
+#         plt.ylabel('y-position [m]')
+#         ax.set_zlabel('Height [m]')
+#         plt.legend(['UAV trajectory', 'USV trajectory'])
+#         plt.pause(0.05)
+#         ax.cla()
+#
+# def plot_topview(x_traj, y_traj, xb_traj, yb_traj):
+#     fig = plt.figure()
+#     ax = plt.axes()
+#     ax.plot(x_traj, y_traj, 'blue')
+#     ax.plot(xb_traj, yb_traj, 'red')
+#     plt.xlabel('x-position [m]')
+#     plt.ylabel('y-position [m]')
+#     plt.legend(['UAV trajectory', 'USV trajectory'])
+#     plt.show()
+#
+# def plot_histogram(vector, xlabel, ylabel, bins=10):
+#     plt.hist(vector, bins=bins)
+#     plt.xlabel(xlabel)
+#     plt.ylabel(ylabel)
+#     plt.grid(True)
+#     plt.show()
+#
+# def plot_all_histograms(vectors, colors, legend_list, xlabel, ylabel, bins=10):
+#     for (vector, color) in zip(vectors, colors):
+#         plt.hist(vector, bins=bins, color=color)
+#     # plt.hist(vector1, bins=bins, color=(1.0, 0.0, 0.0, 0.5))
+#     # plt.hist(vector2, bins=bins, color=(0.0, 0.0, 1.0, 0.5))
+#     plt.xlabel(xlabel)
+#     plt.ylabel(ylabel)
+#     plt.grid(True)
+#     plt.legend(legend_list)
+#     plt.show()
+#
+# def get_interpolated_traj(traj, old_times, new_times):
+#     new_traj = np.empty(new_times.shape)
+#     new_traj.fill(np.nan)
+#     i_0 = 0
+#     i_2 = 1
+#     for i in range(len(new_times)):
+#         while True:
+#             if (old_times[i_2] < new_times[i]):
+#                 # haven't passed interpolation point yet, move forward
+#                 i_0 = i_2
+#                 i_2 = i_2 + 1
+#             else:
+#                 # We have passed interpolation point
+#                 x_0 = old_times[i_0]
+#                 x_2 = old_times[i_2]
+#                 y_0 = traj[i_0]
+#                 y_2 = traj[i_2]
+#                 x_1 = new_times[i]
+#                 new_traj[i] = y_0 + (x_1 - x_0)*(y_2 - y_0)/(x_2 - x_0)
+#                 break
+#     return new_traj
+#
+# def remove_negative_elements(vector):
+#     i = 0
+#     while vector[i] < 0 and i < len(vector):
+#         i += 1
+#
+#     return vector[i:]
 
 if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
-    # data_analyser.plot_3d(real_time = True)
+    data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
 
