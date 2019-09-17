@@ -434,6 +434,26 @@ class UAVProblem():
         end = time.time()
         self.last_solution_duration = end - start
 
+    def solve_process(self, conn):
+        start = time.time()
+        results = self.problemOSQP.solve()
+        end = time.time()
+        conn.send((results.x, end-start))
+        conn.close()
+
+    def end_process(self):
+        (result_x, duration) = self.parent_conn.recv()
+        self.p.join()
+        self.x.value = np.reshape(result_x[0:self.nUAV*(self.T+1)], (-1, 1))
+        self.u.value = np.reshape(result_x[self.nUAV*(self.T+1):], (-1, 1))
+        self.last_solution_duration = duration
+
+    def solve_in_parallel(self, x_m, xb_m):
+        self.update_OSQP(x_m, xb_m)
+        self.parent_conn, child_conn = Pipe()
+        self.p = Process(target=self.solve_process, args=(child_conn,))
+        self.p.start()
+
     def solve_threaded(self, x_m, xb_m):
         thread.start_new_thread(self.solve, (x_m, xb_m))
 
@@ -523,8 +543,8 @@ class USVProblem():
         self.u_OSQP = np.bmat([
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],      # Dynamics
             [np.full((T*mUSV, 1), params.amax_b)],        # Input constraints
-            # [np.full((2*(T+1),   1), -params.v_min_b)]      # Velocity constraints
-            [np.full((2*(T+1),   1), params.v_max_b)]      # Velocity constraints
+            [np.full((2*(T+1),   1), -params.v_min_b)]      # Velocity constraints
+            # [np.full((2*(T+1),   1), params.v_max_b)]      # Velocity constraints
         ])
         self.A_temp = np.bmat([
             [np.eye(nUSV*(T+1)), -self.Lambda_b, np.zeros((dim1, 1))],              # Dynamics
@@ -621,7 +641,7 @@ class USVProblem():
         end = time.time()
         self.last_solution_duration = end - start
 
-    def solve_process(self, conn, xb_m, xhat_m, USV_should_stop = False):
+    def solve_process(self, conn):
         start = time.time()
         # self.x_hat.value = xhat_m
         # self.xb_0.value = xb_m
@@ -648,9 +668,10 @@ class USVProblem():
         self.last_solution_duration = duration
 
     def solve_in_parallel(self, xb_m, xhat_m, USV_should_stop = False):
+        # TODO: Implement a way to use USV_should_stop?
         self.update_OSQP(xb_m, xhat_m)
         self.parent_conn, child_conn = Pipe()
-        self.p = Process(target=self.solve_process, args=(child_conn, xb_m, xhat_m, USV_should_stop))
+        self.p = Process(target=self.solve_process, args=(child_conn,))
         self.p.start()
 
     def solve_threaded(self, xb_m, x_hat, USV_should_stop = False):
@@ -1033,6 +1054,30 @@ class VerticalProblem():
         # Safe height constraints
         # constraintsVert += [self.height_extractor*self.xv \
         #     >= params.hs*(np.ones(( T+1, 1 )) - self.b)]
+
+    def solve_process(self, conn):
+        start = time.time()
+        results = self.problemOSQP.solve()
+        end = time.time()
+        conn.send((results.x, end-start))
+        conn.close()
+
+    def end_process(self):
+        (result_x, duration) = self.parent_conn.recv()
+        self.p.join()
+        self.xv.value = np.reshape(result_x[0:self.nv*(self.T+1)], (-1, 1))
+        self.wdes.value = np.reshape(result_x[self.nv*(self.T+1):-1], (-1, 1))
+        self.s.value  = np.full((1,1), result_x[-1])
+        self.last_solution_duration = duration
+
+    def solve_in_parallel(self, xv_m, xbv_m, dist):
+        self.xb_v.value = np.ones((self.nv*(self.T+1), 1))*xbv_m
+        self.dist.value = dist
+        self.b.value = (dist <= self.params.ds).astype(int)
+        self.update_OSQP(xv_m, dist, self.b.value)
+        self.parent_conn, child_conn = Pipe()
+        self.p = Process(target=self.solve_process, args=(child_conn,))
+        self.p.start()
 
     def solve_threaded(self, xv_m, xbv_m, dist):
         thread.start_new_thread(self.solve, (xv_m, xbv_m, dist))
