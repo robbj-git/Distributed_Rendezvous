@@ -203,7 +203,10 @@ class UAV_simulator():
 
         start = time.time()
         for i in range(sim_len):
-            # print i    #DEBUG PRINT
+            # if i > 0:
+            #     end0 = time.time()
+            #     print end0 - start0
+            print i    #DEBUG PRINT
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -305,6 +308,7 @@ class UAV_simulator():
             self.iteration_durations.append(end-start)
             # if end-start > 0.05:  # DEBUG PRINT
                 # print end-start
+            # start0 = time.time()
             self.rate.sleep()
             start = time.time()
 

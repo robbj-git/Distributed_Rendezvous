@@ -14,6 +14,7 @@ import scipy as sp
 import osqp
 from scipy.sparse import csc_matrix
 import thread
+from multiprocessing import Process, Pipe
 import Queue
 import time
 
@@ -522,7 +523,8 @@ class USVProblem():
         self.u_OSQP = np.bmat([
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],      # Dynamics
             [np.full((T*mUSV, 1), params.amax_b)],        # Input constraints
-            [np.full((2*(T+1),   1), -params.v_min_b)]      # Velocity constraints
+            # [np.full((2*(T+1),   1), -params.v_min_b)]      # Velocity constraints
+            [np.full((2*(T+1),   1), params.v_max_b)]      # Velocity constraints
         ])
         self.A_temp = np.bmat([
             [np.eye(nUSV*(T+1)), -self.Lambda_b, np.zeros((dim1, 1))],              # Dynamics
@@ -618,6 +620,38 @@ class USVProblem():
         self.last_solution_is_used = False
         end = time.time()
         self.last_solution_duration = end - start
+
+    def solve_process(self, conn, xb_m, xhat_m, USV_should_stop = False):
+        start = time.time()
+        # self.x_hat.value = xhat_m
+        # self.xb_0.value = xb_m
+        # ASSUMES THAT OSQP PROBLEM HAS BEEN UPDATED!
+        results = self.problemOSQP.solve()
+        # self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
+        # self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):-1], (-1, 1))
+        # self.s.value  = np.full((1,1), results.x[-1])
+        #
+        # self.t_since_prev_update = self.t_since_update
+        # self.t_since_update = 0
+        # self.last_solution_is_used = False
+        end = time.time()
+        conn.send((results.x, end-start))
+        conn.close()
+        # self.last_solution_duration = end - start
+
+    def end_process(self):
+        (result_x, duration) = self.parent_conn.recv()
+        self.p.join()
+        self.xb.value = np.reshape(result_x[0:self.nUSV*(self.T+1)], (-1, 1))
+        self.ub.value = np.reshape(result_x[self.nUSV*(self.T+1):-1], (-1, 1))
+        self.s.value  = np.full((1,1), result_x[-1])
+        self.last_solution_duration = duration
+
+    def solve_in_parallel(self, xb_m, xhat_m, USV_should_stop = False):
+        self.update_OSQP(xb_m, xhat_m)
+        self.parent_conn, child_conn = Pipe()
+        self.p = Process(target=self.solve_process, args=(child_conn, xb_m, xhat_m, USV_should_stop))
+        self.p.start()
 
     def solve_threaded(self, xb_m, x_hat, USV_should_stop = False):
         thread.start_new_thread(self.solve, (xb_m, x_hat, USV_should_stop))

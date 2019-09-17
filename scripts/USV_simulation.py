@@ -154,7 +154,10 @@ class USV_simulator():
 
         start = time.time()
         for i in range(sim_len):
-            # print i
+            # if i > 0:
+            #     end0 = time.time()
+            #     print end0 - start0
+            print i
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -189,7 +192,9 @@ class USV_simulator():
             if self.DISTRIBUTED:
                 self.problemUSV.solve(self.xb, self.x_traj, self.USV_should_stop)
             elif not self.PRED_PARALLEL_TRAJ and self.PARALLEL and i % self.INTER_ITS == 0:
-                self.problemUSV.solve_threaded(self.xb, self.x_traj,\
+                # self.problemUSV.solve_threaded(self.xb, self.x_traj,\
+                #     self.USV_should_stop)
+                self.problemUSV.solve_in_parallel(self.xb, self.x_traj,\
                     self.USV_should_stop)
 
             # Initialising parallel solution using a prediction instead
@@ -214,20 +219,31 @@ class USV_simulator():
             self.update_logs(self.i)
 
             # ------- Simulate Dynamics / Apply Control --------
+
             if self.CENTRALISED:
                 self.send_state_to_UAV(self.xb)
-            if self.DISTRIBUTED or \
-                (self.PARALLEL and self.problemUSV.t_since_update == 0):
+            if self.DISTRIBUTED:
                 self.send_traj_to_UAV(self.xb_traj)
+
+            if self.PARALLEL and i%self.INTER_ITS == self.INTER_ITS - 1:
+                self.problemUSV.end_process()
+                self.xb_traj = self.problemUSV.xb.value
+                self.hor_solution_durations.append(self.problemUSV.last_solution_duration)
+                self.send_traj_to_UAV(self.xb_traj)
+                # TODO: What about last_solution_is_used and related varialbes???
 
             if self.PARALLEL and self.problemUSV.last_solution_is_used:
                 self.problemUSV.t_since_update += 1
 
             self.xb = self.Ab*self.xb + self.Bb*self.uUSV
+
             # ------- Sleep --------
             end = time.time()
             self.iteration_durations.append(end-start)
+            # start0 = time.time()
+            # print "sleep start"
             self.rate.sleep()
+            # print "sleep end"
             # if end-start < 0.05:
                 # time.sleep(0.05 - end + start)
             start = time.time()
@@ -255,12 +271,13 @@ class USV_simulator():
             self.xb_traj = self.problemUSV.xb.value
         elif self.PARALLEL:
             self.xb_traj_inner = self.problemUSVFast.xb.value
-            if not self.PRED_PARALLEL_TRAJ:
-                if self.problemUSV.t_since_update == 0:
-                    self.xb_traj = self.problemUSV.xb.value
-                    self.problemUSV.last_solution_is_used = True
-                else:
-                    self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
+            self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
+            # if not self.PRED_PARALLEL_TRAJ:
+            #     if self.problemUSV.t_since_update == 0:
+            #         self.xb_traj = self.problemUSV.xb.value
+            #         self.problemUSV.last_solution_is_used = True
+            #     else:
+            #         self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
 
     def update_logs(self, i):
         self.xb_log[:, i:i+1] = self.xb
@@ -281,8 +298,8 @@ class USV_simulator():
             self.hor_inner_solution_durations.append(self.problemUSVFast.last_solution_duration)
             # if self.problemUSVFast.last_solution_duration > 0.05:
             #     print self.problemUSVFast.last_solution_duration
-            if self.problemUSV.t_since_update == 0:
-                self.hor_solution_durations.append(self.problemUSV.last_solution_duration)
+            # if self.problemUSV.t_since_update == 0:
+            #     self.hor_solution_durations.append(self.problemUSV.last_solution_duration)
 
     def send_traj_to_UAV(self, xb_traj):
         traj_msg = mat_to_multiarray_stamped(xb_traj, self.T+1, self.nUSV)
