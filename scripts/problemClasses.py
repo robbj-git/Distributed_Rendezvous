@@ -248,8 +248,8 @@ class CentralisedProblem():
         end = time.time()
         self.last_solution_duration = end - start
 
-    def solve_threaded(self, x_m, xb_m):
-        thread.start_new_thread(self.solve, (x_m, xb_m))
+    # def solve_threaded(self, x_m, xb_m):
+    #     thread.start_new_thread(self.solve, (x_m, xb_m))
 
     def update_OSQP(self, x0, xb0):
         params = self.params
@@ -445,8 +445,8 @@ class UAVProblem():
         self.p = Process(target=self.solve_process, args=(child_conn,))
         self.p.start()
 
-    def solve_threaded(self, x_m, xb_m):
-        thread.start_new_thread(self.solve, (x_m, xb_m))
+    # def solve_threaded(self, x_m, xb_m):
+        # thread.start_new_thread(self.solve, (x_m, xb_m))
 
     def predict_trajectory(self, x_0, u_traj):
         return np.dot(self.Phi, x_0) + np.dot(self.Lambda, u_traj)
@@ -660,8 +660,8 @@ class USVProblem():
             self.p = Process(target=self.solve_process, args=(child_conn,))
             self.p.start()
 
-    def solve_threaded(self, xb_m, x_hat, USV_should_stop = False):
-        thread.start_new_thread(self.solve, (xb_m, x_hat, USV_should_stop))
+    # def solve_threaded(self, xb_m, x_hat, USV_should_stop = False):
+    #     thread.start_new_thread(self.solve, (xb_m, x_hat, USV_should_stop))
 
     def predict_trajectory( self, xb_0, ub_traj):
         return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
@@ -956,7 +956,7 @@ class VerticalProblem():
             start = time.time()
             self.update_OSQP(xv_m, dist, self.b.value)
             results = self.problemOSQP.solve()
-            if results.x[0] is not None:
+            if results.x[0] is not None and results.info.status != 'maximum iterations reached':
                 self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
                 self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):-1], (-1, 1))
                 self.s.value  = np.full((1,1), results.x[-1])
@@ -1057,8 +1057,8 @@ class VerticalProblem():
         self.p = Process(target=self.solve_process, args=(child_conn,))
         self.p.start()
 
-    def solve_threaded(self, xv_m, xbv_m, dist):
-        thread.start_new_thread(self.solve, (xv_m, xbv_m, dist))
+    # def solve_threaded(self, xv_m, xbv_m, dist):
+    #     thread.start_new_thread(self.solve, (xv_m, xbv_m, dist))
 
     def predict_trajectory(self, xv_0, wdes_traj):
         return np.dot(self.Phi_v, xv_0) + np.dot(self.Lambda_v, wdes_traj)

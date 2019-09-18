@@ -128,7 +128,6 @@ class UAV_simulator():
         self.vert_inner_traj_log = np.full((self.nv *(self.T_inner+1), sim_len)\
             , np.nan)
         self.USV_traj_log = np.full((self.nUSV*(self.T+1), sim_len), np.nan)
-        self.wdes_traj_log = np.full((self.mv*self.T, sim_len), np.nan)
         self.s_vert_log = np.full((1, sim_len), np.nan)
         self.obj_val_log = np.full((1, sim_len), np.nan)
         # Associate one time value with each iteration of the simulation
@@ -151,9 +150,6 @@ class UAV_simulator():
         if self.PARALLEL:
             self.x_traj_inner = self.x_traj[:, 0:self.T_inner]
             self.xv_traj_inner = self.xv_traj[:, 0:self.T_inner]
-        # Always contains most up-to-date predicted (by outer problem in
-        # parallel case) vertical input trajectory
-        self.wdes_traj = np.full((self.mv*self.T, 1), np.nan)
         # Always contains most up-to-date predicted horizontal distance between vehicles
         self.dist_traj = None
         if not self.CENTRALISED:
@@ -335,7 +331,6 @@ class UAV_simulator():
         if np.isnan(wdes).any():
             # If solution of vertical problem failed, make the UAV rise
             wdes = self.params.wmax
-            print "WDES WAS NAN AT ITERATION", self.i
         return wdes
 
     def update_hor_trajectories(self, i):
@@ -356,17 +351,11 @@ class UAV_simulator():
             self.nUSV, True)
 
     def update_vert_trajectories(self):
-        # Sometimes xv.value is None here. I suspect this can occur when,
-        # in problemClasses.py, in VerticalProblem.solve(), xv.value is
-        # filled in nan. I think that when parallel processes are used,
-        # there is a short time at which xv.value in None, and this function
-        # sometimes happens to be called during that time.
         if np.isnan(self.problemVert.xv.value).any():
             # Failed to solve vertical problem, rise up to a safe height
-            self.wdes_traj = np.full((self.T*self.mv, 1), self.params.wmax)
-            self.xv_traj = self.problemVert.predict_trajectory(self.xv, self.wdes_traj)
+            wdes_traj = np.full((self.T*self.mv, 1), self.params.wmax)
+            self.xv_traj = self.problemVert.predict_trajectory(self.xv, wdes_traj)
         else:
-            self.wdes_traj = self.problemVert.wdes.value
             if not self.PARALLEL:
                 self.xv_traj = self.problemVert.xv.value
             elif self.PARALLEL and self.i%self.INTER_ITS != 0:
@@ -390,7 +379,6 @@ class UAV_simulator():
         self.wdes_log[:, i:i+1] = self.wdes
         self.UAV_traj_log[:, i:i+1]  = self.x_traj
         self.vert_traj_log[:, i:i+1] = self.xv_traj
-        self.wdes_traj_log[:, i:i+1] = self.wdes_traj
         self.USV_traj_log[:, i:i+1] = self.xb_traj
         self.s_vert_log[:, i:i+1] = self.problemVert.s.value
         self.obj_val_log[:, i:i+1] = self.problemVert.obj_val
