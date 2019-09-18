@@ -36,7 +36,6 @@ class CentralisedProblem():
         self.R = R
         self.params = params
         self.type = type
-        self.t_since_update = 100 # Arbitrary number larger than 0
         [self.nUAV, self.mUAV] = B.shape
         [self.nUSV, self.mUSV] = Bb.shape
         self.last_solution_duration = np.nan
@@ -246,7 +245,6 @@ class CentralisedProblem():
             #     print ""
         else:
             self.problemCent.solve(solver=cp.OSQP, warm_start=True, verbose=False)
-        self.t_since_update = 0
         end = time.time()
         self.last_solution_duration = end - start
 
@@ -283,9 +281,6 @@ class UAVProblem():
         # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
         [self.nUAV, self.mUAV] = B.shape
-        self.t_since_update = 100 # Arbitrary number larger than 0
-        self.t_since_prev_update = 0
-        self.last_solution_is_used = False
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
         if self.type == 'CVXGEN':
@@ -427,10 +422,6 @@ class UAVProblem():
                 self.x.value = self.predict_trajectory(x_m, self.u.value)
             # print 'Solve exit'  #DEBUG
 
-
-        self.t_since_prev_update = self.t_since_update
-        self.t_since_update = 0
-        self.last_solution_is_used = False
         end = time.time()
         self.last_solution_duration = end - start
 
@@ -483,9 +474,7 @@ class USVProblem():
         # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
         [self.nUSV, self.mUSV] = Bb.shape
-        self.t_since_update = 100 # Arbitrary number larger than 0
-        self.t_since_prev_update = 0
-        self.last_solution_is_used = False
+        self.USV_has_stopped = False
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
         if type == 'CVXGEN':
@@ -635,44 +624,41 @@ class USVProblem():
                 # In that case, apply no control input
                 self.ub.value = np.zeros((self.mUSV*self.T, 1))
                 self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
-        self.t_since_prev_update = self.t_since_update
-        self.t_since_update = 0
-        self.last_solution_is_used = False
         end = time.time()
         self.last_solution_duration = end - start
 
+    # SHOULD NOT BE CALLED FROM OUTSIDE THE CLASS
     def solve_process(self, conn):
         start = time.time()
-        # self.x_hat.value = xhat_m
-        # self.xb_0.value = xb_m
         # ASSUMES THAT OSQP PROBLEM HAS BEEN UPDATED!
         results = self.problemOSQP.solve()
-        # self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
-        # self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):-1], (-1, 1))
-        # self.s.value  = np.full((1,1), results.x[-1])
-        #
-        # self.t_since_prev_update = self.t_since_update
-        # self.t_since_update = 0
-        # self.last_solution_is_used = False
         end = time.time()
         conn.send((results.x, end-start))
         conn.close()
-        # self.last_solution_duration = end - start
 
     def end_process(self):
-        (result_x, duration) = self.parent_conn.recv()
-        self.p.join()
-        self.xb.value = np.reshape(result_x[0:self.nUSV*(self.T+1)], (-1, 1))
-        self.ub.value = np.reshape(result_x[self.nUSV*(self.T+1):-1], (-1, 1))
-        self.s.value  = np.full((1,1), result_x[-1])
-        self.last_solution_duration = duration
+        if self.USV_has_stopped:
+            self.last_solution_duration = None
+        else:
+            (result_x, duration) = self.parent_conn.recv()
+            self.p.join()
+            self.xb.value = np.reshape(result_x[0:self.nUSV*(self.T+1)], (-1, 1))
+            self.ub.value = np.reshape(result_x[self.nUSV*(self.T+1):-1], (-1, 1))
+            self.s.value  = np.full((1,1), result_x[-1])
+            self.last_solution_duration = duration
 
     def solve_in_parallel(self, xb_m, xhat_m, USV_should_stop = False):
-        # TODO: Implement a way to use USV_should_stop?
-        self.update_OSQP(xb_m, xhat_m)
-        self.parent_conn, child_conn = Pipe()
-        self.p = Process(target=self.solve_process, args=(child_conn,))
-        self.p.start()
+        if USV_should_stop:
+            self.ub.value = np.zeros((self.mUSV*self.T, 1))
+            self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
+            self.s.value  = np.full((1,1), 0)
+            self.USV_has_stopped = True
+        else:
+            self.USV_has_stopped = False
+            self.update_OSQP(xb_m, xhat_m)
+            self.parent_conn, child_conn = Pipe()
+            self.p = Process(target=self.solve_process, args=(child_conn,))
+            self.p.start()
 
     def solve_threaded(self, xb_m, x_hat, USV_should_stop = False):
         thread.start_new_thread(self.solve, (xb_m, x_hat, USV_should_stop))
@@ -702,9 +688,6 @@ class VerticalProblem():
         self.params = params
         self.nv = 2
         self.mv = 1
-        self.t_since_update = 100 # Arbitrary number larger than 0
-        self.t_since_prev_update = 0    # TODO: Us this used still?
-        self.last_solution_is_used = False
         # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
         self.create_optimisation_matrices()
@@ -1033,27 +1016,8 @@ class VerticalProblem():
                 self.xv.value = np.zeros( (self.nv*(self.T+1), 1))
                 self.xv.value.fill(np.nan)
 
-        self.t_since_prev_update = self.t_since_update
-        self.t_since_update = 0
-        self.last_solution_is_used = False
         end = time.time()
         self.last_solution_duration = end - start
-        # # DEBUG DEBUG DEBUG DEBUG
-        # params = self.params
-        # SCLHS = (params.dl-params.ds)*np.dot(self.height_extractor,self.xv.value)
-        # SCRHS = np.dot( np.diagflat(self.b.value), (np.reshape(params.hs*params.dl, (1, 1)) - params.hs*dist))
-        # SHLHS = np.dot(self.height_extractor, self.xv.value)
-        # SHRHS = params.hs*(np.ones(( T+1, 1 )) - self.b.value)
-        # # print(SCLHS <= SCRHS)
-        # print('--------')
-        # print(SHLHS-SHRHS)
-        # Safety constraints
-        # constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
-        #     <= cp.diag(self.b)*(params.hs*params.dl - params.hs*self.dist)]
-
-        # Safe height constraints
-        # constraintsVert += [self.height_extractor*self.xv \
-        #     >= params.hs*(np.ones(( T+1, 1 )) - self.b)]
 
     def solve_process(self, conn):
         start = time.time()
@@ -1180,7 +1144,6 @@ class FastUAVProblem():
         self.params = params
         self.last_solution_duration = np.nan
         [self.nUAV, self.mUAV] = B.shape
-        # self.t_since_update = 0
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
 
@@ -1412,7 +1375,6 @@ class FastVerticalProblem():
         self.params = params
         self.nv = 2
         self.mv = 1
-        self.t_since_update = 100 # Arbitrary number larger than 0
         self.last_solution_duration = np.nan
         self.create_optimisation_matrices()
         self.create_optimisation_problem()

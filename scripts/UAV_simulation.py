@@ -230,26 +230,29 @@ class UAV_simulator():
                         # Use shifted old trajectory if no new trajectory is available
                         self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
 
+
+            # The outer parallel problems will be solved anew this iteration
+            # Update using the previous solution
+            if self.PARALLEL and i%self.INTER_ITS == 0 and i > 0:
+                self.update_parallel_trajectories()
+                self.send_traj_to_USV(self.x_traj)
+
             # ------- Horizontal Problem --------
             if self.CENTRALISED:
                 self.problemCent.solve(self.x, self.xb)
             elif self.DISTRIBUTED:
                 # TODO: Make xb_traj naturally an array instead of a matrix
                 self.problemUAV.solve(self.x, np.asarray(self.xb_traj))
-            elif not self.PRED_PARALLEL_TRAJ and self.PARALLEL and i % self.INTER_ITS == 0:
-                # self.problemUAV.solve_threaded(self.x, self.xb_traj)
-                self.problemUAV.solve_in_parallel(self.x, self.xb_traj)
+            elif self.PARALLEL and i % self.INTER_ITS == 0:
+                if self.PRED_PARALLEL_TRAJ:
+                    x0 = self.x_traj[self.INTER_ITS*self.nUAV\
+                        :(self.INTER_ITS+1)*self.nUAV]
+                    traj = shift_trajectory(self.xb_traj, self.nUSV, self.INTER_ITS)
+                else:
+                    x0 = self.x
+                    traj = self.xb_traj
+                self.problemUAV.solve_in_parallel(x0, traj)
 
-            # Initialising parallel solution using a prediction instead
-            # if self.PRED_PARALLEL_TRAJ and self.PARALLEL and i % self.INTER_ITS == 0:
-            #     self.x_traj = self.problemUAV.x.value
-            #     self.problemUAV.last_solution_is_used = True
-            #     self.problemUAV.solve_threaded(self.x_traj[self.INTER_ITS*self.nUAV\
-            #         :(self.INTER_ITS+1)*self.nUAV], self.xb_traj)
-            # elif self.PRED_PARALLEL_TRAJ and self.PARALLEL:
-            #     self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
-
-            # Update values in x_traj and dist_traj (and xb_traj if centralised)
             self.update_hor_trajectories(i)
 
             if self.PARALLEL:
@@ -262,22 +265,19 @@ class UAV_simulator():
                 if not self.PARALLEL:
                     # TODO: Make dist_traj naturally be an array instead of a matrix
                     self.problemVert.solve(self.xv, 0.0, np.asarray(self.dist_traj))
-                elif not self.PRED_PARALLEL_TRAJ and self.PARALLEL and i % self.INTER_ITS == 0:
+                elif self.PARALLEL and i % self.INTER_ITS == 0:
+                    if self.PRED_PARALLEL_TRAJ:
+                        xv0 = self.xv_traj[self.INTER_ITS*self.nv:\
+                            (self.INTER_ITS+1)*self.nv]
+                        dist_traj = shift_trajectory(np.asarray(self.dist_traj),\
+                            1, self.INTER_ITS)
+                    else:
+                        xv0 = self.xv
+                        dist_traj = np.asarray(self.dist_traj)
                     # TODO: Make dist_traj nartually an array instead of matrix
-                    # self.problemVert.solve_threaded(self.xv, 0.0, \
-                    #     np.asarray(self.dist_traj))
-                    self.problemVert.solve_in_parallel(self.xv, 0.0,\
-                        np.asarray(self.dist_traj))
-                # Initialising parallel solution using a prediction instead
-                # if self.PRED_PARALLEL_TRAJ and self.PARALLEL and i % self.INTER_ITS == 0:
-                #     self.xv_traj = self.problemVert.xv.value
-                #     self.problemVert.last_solution_is_used = True
-                #     self.problemVert.solve_threaded(self.xv_traj[\
-                #         self.INTER_ITS*self.nv:(self.INTER_ITS+1)*self.nv], 0.0, \
-                #         np.asarray(self.dist_traj))
-                # elif self.PRED_PARALLEL_TRAJ and self.PARALLEL:
-                #     self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
-            # Updates values in xv_traj
+                    self.problemVert.solve_in_parallel(xv0, 0.0,\
+                        dist_traj)
+
             self.update_vert_trajectories()
 
             if self.PARALLEL:
@@ -285,7 +285,6 @@ class UAV_simulator():
                     self.xv_traj[0:(self.T_inner+1)*self.nv, 0:1])
 
             self.wdes = self.get_vertical_control()
-
             self.update_logs(self.i)
 
             # ------- Simulate Dynamics / Apply Control --------
@@ -294,20 +293,7 @@ class UAV_simulator():
 
             if self.DISTRIBUTED:
                 self.send_traj_to_USV(self.x_traj)
-
-            if self.PARALLEL and i%self.INTER_ITS == self.INTER_ITS - 1:
-                self.problemUAV.end_process()
-                self.problemVert.end_process()
-                self.x_traj = self.problemUAV.x.value
-                self.xv_traj = self.problemVert.xv.value
-                self.hor_solution_durations.append(self.problemUAV.last_solution_duration)
-
-                self.send_traj_to_USV(self.x_traj)
-
-            if self.PARALLEL and self.problemUAV.last_solution_is_used:
-                self.problemUAV.t_since_update += 1
-            if self.PARALLEL and self.problemVert.last_solution_is_used:
-                self.problemVert.t_since_update += 1
+            # In parallel case, trajectory is sent at the beggining of the loop
 
             if not self.USE_HIL:
                 self.x  =  self.A*self.x  +  self.B*self.uUAV
@@ -352,7 +338,6 @@ class UAV_simulator():
             print "WDES WAS NAN AT ITERATION", self.i
         return wdes
 
-    # In parallel case, also stores solution duration of parallel problem
     def update_hor_trajectories(self, i):
         if self.CENTRALISED:
             self.x_traj  = self.problemCent.x.value
@@ -361,12 +346,6 @@ class UAV_simulator():
             self.x_traj = self.problemUAV.x.value
         elif self.PARALLEL:
             self.x_traj_inner = self.problemUAVFast.x.value
-            # if not self.PRED_PARALLEL_TRAJ:
-            #     if self.problemUAV.t_since_update == 0:
-            #         self.x_traj = self.problemUAV.x.value
-            #         self.problemUAV.last_solution_is_used = True
-            #     else:
-            #         self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
             self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
 
         # WARNING: This line is different than in the original, since I now rely on that xb_traj should ALWAYS be up-to-date
@@ -376,7 +355,6 @@ class UAV_simulator():
             get_dist_traj(self.x_traj, self.xb_traj, self.T, self.nUAV,\
             self.nUSV, True)
 
-    # In parallel case, also stores solution duration of parallel problem
     def update_vert_trajectories(self):
         # Sometimes xv.value is None here. I suspect this can occur when,
         # in problemClasses.py, in VerticalProblem.solve(), xv.value is
@@ -402,16 +380,20 @@ class UAV_simulator():
                 # match self.xv in parallel case. Since it takes a few iterations
                 # for the parallel problem to be solved, xv will have changed from
                 # the initial value used in the problem solution
-                # if self.problemVert.t_since_update == 0:
-                #     self.xv_traj = self.problemVert.xv.value
-                #     self.problemVert.last_solution_is_used = True
-                # else:
-                #     self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
                 self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
         if self.PARALLEL:
             # TODO: Can it happen that this one becomes None? Does anything even become None anymore?
             self.xv_traj_inner = self.problemVertFast.xv.value
             self.wdes_traj = self.problemVert.wdes.value    # TODO: This doesn't make sense really, store inner traj in parallel case
+
+    # Also stores solution duration of parallel problem
+    def update_parallel_trajectories(self):
+        self.problemUAV.end_process()
+        self.problemVert.end_process()
+        self.x_traj = self.problemUAV.x.value
+        self.xv_traj = self.problemVert.xv.value
+        self.hor_solution_durations.append(self.problemUAV.last_solution_duration)
+        self.vert_solution_durations.append(self.problemVert.last_solution_duration)
 
     def update_logs(self, i):
         self.x_log[ :, i:i+1] = self.x
@@ -442,10 +424,6 @@ class UAV_simulator():
             self.vert_inner_traj_log[:, i:i+1] = self.xv_traj_inner
             self.hor_inner_solution_durations.append(self.problemUAVFast.last_solution_duration)
             self.vert_inner_solution_durations.append(self.problemVertFast.last_solution_duration)
-            # if self.problemUAV.t_since_update == 0:
-            #     self.hor_solution_durations.append(self.problemUAV.last_solution_duration)
-            # if self.problemVert.t_since_update == 0:
-            #     self.vert_solution_durations.append(self.problemVert.last_solution_duration)
         else:
             self.vert_solution_durations.append(self.problemVert.last_solution_duration)
 
