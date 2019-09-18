@@ -158,7 +158,7 @@ class USV_simulator():
             #     end0 = time.time()
             #     print end0 - start0
 
-            print i
+            # print i
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -262,7 +262,8 @@ class USV_simulator():
             self.xb_traj = self.problemUSV.xb.value
         elif self.PARALLEL:
             self.xb_traj_inner = self.problemUSVFast.xb.value
-            self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
+            if self.i%self.INTER_ITS != 0:
+                self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
 
     def update_parallel_trajectories(self):
         self.problemUSV.end_process()

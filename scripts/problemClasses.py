@@ -1022,6 +1022,8 @@ class VerticalProblem():
     def solve_process(self, conn):
         start = time.time()
         results = self.problemOSQP.solve()
+        if results.info.status == 'maximum iterations reached':
+            results.x.fill(np.nan)
         end = time.time()
         conn.send((results.x, end-start))
         conn.close()
@@ -1029,9 +1031,21 @@ class VerticalProblem():
     def end_process(self):
         (result_x, duration) = self.parent_conn.recv()
         self.p.join()
-        self.xv.value = np.reshape(result_x[0:self.nv*(self.T+1)], (-1, 1))
-        self.wdes.value = np.reshape(result_x[self.nv*(self.T+1):-1], (-1, 1))
-        self.s.value  = np.full((1,1), result_x[-1])
+        if result_x[0] is None or np.isnan(result_x[0]):
+            # OSQP returns a vector filled with None if solution fails
+            # The vector is filled with nan if maximum iterations were exceeded
+            # This seems to mean that the problem was infeasible, but too few
+            # iterations were performed for OSQP to be able to be sure
+            self.xv.value = np.zeros(( (self.T+1)*self.nv, 1 ))
+            self.wdes.value = np.zeros(( self.T*self.mv, 1 ))
+            self.s.value  = np.zeros((1,1))
+            self.xv.value.fill(np.nan)
+            self.wdes.value.fill(np.nan)
+            self.s.value.fill(np.nan)
+        else:
+            self.xv.value = np.reshape(result_x[0:self.nv*(self.T+1)], (-1, 1))
+            self.wdes.value = np.reshape(result_x[self.nv*(self.T+1):-1], (-1, 1))
+            self.s.value  = np.full((1,1), result_x[-1])
         self.last_solution_duration = duration
 
     def solve_in_parallel(self, xv_m, xbv_m, dist):

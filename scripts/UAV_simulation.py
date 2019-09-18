@@ -206,7 +206,7 @@ class UAV_simulator():
             # if i > 0:
             #     end0 = time.time()
             #     print end0 - start0
-            print i    #DEBUG PRINT
+            # print i    #DEBUG PRINT
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -346,9 +346,9 @@ class UAV_simulator():
             self.x_traj = self.problemUAV.x.value
         elif self.PARALLEL:
             self.x_traj_inner = self.problemUAVFast.x.value
-            self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
+            if self.i%self.INTER_ITS != 0:
+                self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
 
-        # WARNING: This line is different than in the original, since I now rely on that xb_traj should ALWAYS be up-to-date
         self.dist_traj = get_dist_traj(self.x_traj, self.xb_traj, self.T, \
             self.nUAV, self.nUSV)
         self.dist_traj_signed = \
@@ -361,30 +361,18 @@ class UAV_simulator():
         # filled in nan. I think that when parallel processes are used,
         # there is a short time at which xv.value in None, and this function
         # sometimes happens to be called during that time.
-        if self.problemVert.xv.value is None or\
-            np.isnan(self.problemVert.xv.value).any():
-            # xv is set to all nan if solving vertical problem fails
-            self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
-            self.wdes_traj.fill(np.nan)
+        if np.isnan(self.problemVert.xv.value).any():
+            # Failed to solve vertical problem, rise up to a safe height
+            self.wdes_traj = np.full((self.T*self.mv, 1), self.params.wmax)
+            self.xv_traj = self.problemVert.predict_trajectory(self.xv, self.wdes_traj)
         else:
-            # In parallel case, wdes_traj will only take on a new value after
-            # each solution of the outer vertical problem. No shifting is done
-            # inbetween those solutions as that wouldn't make sense. wdes won't
-            # follow this trajectory anyway in parallel case, it is just stored
-            # to see the intentions of the outer MPC for debugging purposes
+            self.wdes_traj = self.problemVert.wdes.value
             if not self.PARALLEL:
-                self.wdes_traj = self.problemVert.wdes.value
                 self.xv_traj = self.problemVert.xv.value
-            elif self.PARALLEL and not self.PRED_PARALLEL_TRAJ:
-                # Note that the first element of self.xv_traj won't in general
-                # match self.xv in parallel case. Since it takes a few iterations
-                # for the parallel problem to be solved, xv will have changed from
-                # the initial value used in the problem solution
+            elif self.PARALLEL and self.i%self.INTER_ITS != 0:
                 self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
         if self.PARALLEL:
-            # TODO: Can it happen that this one becomes None? Does anything even become None anymore?
             self.xv_traj_inner = self.problemVertFast.xv.value
-            self.wdes_traj = self.problemVert.wdes.value    # TODO: This doesn't make sense really, store inner traj in parallel case
 
     # Also stores solution duration of parallel problem
     def update_parallel_trajectories(self):
