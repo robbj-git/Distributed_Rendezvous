@@ -66,6 +66,8 @@ class ProblemParams():
         self.Q = Q
         self.P = P
         self.R = R
+        self.Q_vel = Q_vel
+        self.P_vel = P_vel
         self.Av = Av
         self.Bv = Bv
         self.Qv = Qv
@@ -91,6 +93,16 @@ xv_m = np.array([[7.0], [0.0]])#np.matrix([[12.0], [0.0]])
 prev_simulator = None
 my_uav_simulator =  None
 
+# In centralised case, this variable can be set to make the USV travel in the direction
+# of the vector pointint to its starting position. However, you have to manually make
+# sure that the xb below matches the initial state of the USV in USV_TESTER.py
+# xb = None
+xb = np.array([[-3], [-3], [np.nan], [np.nan]])
+if xb is not None and CENTRALISED:
+    reverse_dir = False
+    dir = get_travel_dir(xb, reverse_dir)
+else:
+    dir = None
 # -------------- TESTING LOOP ----------------
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
 NUM_TESTS = 1#50
@@ -154,7 +166,7 @@ for N in range(hor_max, hor_min-1, -1):
         # We deinitialise here because hopefully old messages have stopped arriving by now
         my_uav_simulator.deinitialise()
     prev_simulator = my_uav_simulator
-    my_uav_simulator = UAV_simulator(problem_params)
+    my_uav_simulator = UAV_simulator(problem_params, travel_dir = dir)
 
     # Makes sure that UAV receives info about round being -1 before the round changes to 0
     time.sleep(0.5)

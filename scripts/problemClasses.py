@@ -25,7 +25,8 @@ np.seterr(divide='ignore', invalid='ignore')
 
 class CentralisedProblem():
 
-    def __init__(self, T, A, B, Ab, Bb, Q, P, R, type, params):
+    def __init__(self, T, A, B, Ab, Bb, Q, P, R, Q_vel, P_vel, type, params,\
+        travel_dir = None):
         self.T = T
         self.A = A
         self.B = B
@@ -34,11 +35,14 @@ class CentralisedProblem():
         self.Q = Q
         self.P = P
         self.R = R
+        self.Q_vel = Q_vel
+        self.P_vel = P_vel
         self.params = params
         self.type = type
         [self.nUAV, self.mUAV] = B.shape
         [self.nUSV, self.mUSV] = Bb.shape
         self.last_solution_duration = np.nan
+        self.travel_dir = travel_dir
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
         if self.type == 'CVXGEN':
@@ -57,6 +61,8 @@ class CentralisedProblem():
         self.Q_big  = np.kron(np.eye(T+1), self.Q)
         self.Q_big[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P  # Not double-checked
         self.R_big  = np.kron(np.eye(T),   self.R)
+        self.Q_big_vel  = np.kron(np.eye(T+1), self.Q_vel)
+        self.Q_big_vel[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P_vel
 
         # Dynamics Matrices
         self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
@@ -97,10 +103,14 @@ class CentralisedProblem():
         zeros_tall = np.zeros((nUAV*(T+1), 1))
         zeros_short = np.zeros((mUAV*T, 1))
         self.C = np.full((1, 1), 10000*(T+1))
+        if self.travel_dir is None:
+            Q_temp = self.Q_big
+        else:
+            Q_temp = self.Q_big + self.Q_big_vel
         P_temp = 2*np.bmat([
             [self.Q_big, zeros, -self.Q_big, zeros, zeros_tall],
             [zeros.T, self.R_big, zeros.T, zeros_sqr, zeros_short],
-            [-self.Q_big, zeros, self.Q_big, zeros, zeros_tall],
+            [-self.Q_big, zeros, Q_temp, zeros, zeros_tall],
             [zeros.T, zeros_sqr, zeros.T,  self.R_big, zeros_short],
             [zeros_tall.T, zeros_short.T, zeros_tall.T, zeros_short.T, self.C]
         ])
@@ -121,9 +131,31 @@ class CentralisedProblem():
             [np.full((2*(T+1),   1), params.v_max)],      # UAV Velocity constraints
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],    # USV Dynamics
             [np.full((T*mUSV, 1), params.amax_b)],        # USV Input constraints
-            [np.full((2*(T+1),   1), -params.v_min_b)]  # USV Velocity constraints
+            [np.full((2*(T+1),   1), params.v_max_b)]     # USV Velocity constraints
         ])
-        self.q_OSQP = 0
+        if self.travel_dir is None:
+            self.q_OSQP = 0
+        else:
+            x1 = params.v_max_b*self.travel_dir[0]
+            x2 = params.v_min_b*self.travel_dir[0]
+            y1 = params.v_max_b*self.travel_dir[1]
+            y2 = params.v_min_b*self.travel_dir[1]
+            v_max_x_b = max(x1, x2)
+            v_max_y_b = max(y1, y2)
+            v_min_x_b = min(x1, x2)
+            v_min_y_b = min(y1, y2)
+            # print "X:", v_min_x_b, "to", v_max_x_b
+            # print "Y:", v_min_y_b, "to", v_max_y_b
+            v_x_des = 0.9*v_min_x_b + 0.1*v_max_x_b
+            v_y_des = 0.9*v_min_y_b + 0.1*v_max_y_b
+            vel_state = np.array([[0], [0], [v_x_des], [v_y_des]])
+            vel_vec = np.kron(np.ones((T+1, 1)), vel_state)
+            self.q_OSQP = -2*np.bmat([
+                [np.zeros((nUAV*(T+1)+mUAV*T, 1))],
+                [np.dot( self.Q_big_vel, vel_vec)],
+                [np.zeros((T*mUSV+1, 1))]
+            ])
+
         A_temp_UAV = np.bmat([
             [np.eye(nUAV*(T+1)), -self.Lambda],                # Dynamics
             [np.zeros((T*mUAV, nUAV*(T+1))), np.eye(T*mUAV)],  # Input constraints
@@ -185,7 +217,7 @@ class CentralisedProblem():
         self.problemCent = cp.Problem(cp.Minimize(objectiveCent), constraintsCent)
 
         self.problemOSQP = osqp.OSQP()
-        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 200)
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, q = self.q_OSQP, A=self.A_OSQP, verbose=False, max_iter = 200)
 
     def ROS_init(self):
         print('Waiting for centralised problem solver')

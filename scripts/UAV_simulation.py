@@ -23,7 +23,7 @@ from std_msgs.msg import Int8
 
 class UAV_simulator():
 
-    def __init__(self, problem_params):
+    def __init__(self, problem_params, travel_dir = None):
         pp = problem_params
         self.T = pp.T
         self.T_inner = pp.T_inner
@@ -55,8 +55,8 @@ class UAV_simulator():
         self.long_ref = None
         self.lat_ref = None
 
-        self.problemCent = CentralisedProblem(pp.T, pp.A, pp.B, pp.Ab,\
-            pp.Bb, pp.Q, pp.P, pp.R, pp.used_solver, pp.params)
+        self.problemCent = CentralisedProblem(pp.T, pp.A, pp.B, pp.Ab, pp.Bb,\
+            pp.Q, pp.P, pp.R, pp.Q_vel, pp.P_vel, pp.used_solver, pp.params, travel_dir = travel_dir)
         self.problemUAV = UAVProblem(pp.T, pp.A,  pp.B,  pp.Q, pp.P, pp.R,\
             self.nUSV, pp.used_solver, pp.params)
         self.problemVert = VerticalProblem(pp.T, pp.Av, pp.Bv, pp.Qv, pp.Pv,\
