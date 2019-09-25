@@ -103,10 +103,11 @@ class ProblemParams():
 
 problem_params = ProblemParams()
 
-xb_m = np.array([[5], [-5], [1.0], [-1.0]])
+xb_m = np.array([[-5], [1], [np.nan], [np.nan]])
 
 reverse_dir = True
 dir = get_travel_dir(xb_m, reverse_dir)
+xb_m[2:4] = dir
  # 5 and 0.8
 
 # TODO, REMOVE THIS, DO CALCULATIONS IN USV_SIMULATOR
