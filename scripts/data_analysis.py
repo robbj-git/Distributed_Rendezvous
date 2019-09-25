@@ -197,7 +197,7 @@ class DataAnalyser():
                 plt.legend(['UAV trajectory', 'USV trajectory'])
                 plt.grid(True)
                 try:
-                    plt.pause(0.05)
+                    plt.pause(0.05)  # TODO: DEBUG: Make 0.05 again
                 except:
                     # Window was probably closed
                     return
@@ -1356,12 +1356,12 @@ class DataLoader:
 
 if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
-    data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
+    # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
 

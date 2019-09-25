@@ -3,7 +3,7 @@ import rospy
 from matrices_and_parameters import *              # THESE ARE SUPER NECESSARY
 from IMPORT_ME import *
 from helper_classes import Parameters
-from helper_functions import mat_to_multiarray_stamped, get_dist_traj
+from helper_functions import mat_to_multiarray_stamped, get_dist_traj, get_travel_dir
 import Queue
 import os
 # from callbacks import *
@@ -49,6 +49,16 @@ def UAV_instruction_callback(msg):
         quit_horizon = msg.data
         should_finish = True
 
+def get_USV_travel_dir(xb, reverse_dir = False):
+    len = np.sqrt(np.sum(np.square(xb[0:2])))
+    if len > 0:
+        if reverse_dir:
+            return -xb[0:2]/len
+        else:
+            return xb[0:2]/len
+    else:
+        raise ZeroDivisionError("First two elements of argument must have norm greater than zero")
+
 rospy.init_node('USV_main')
 
 round_pub = rospy.Publisher('USV_test_round', Int32, queue_size = 10, latch = True)
@@ -77,6 +87,8 @@ class ProblemParams():
         self.Qv = Qv
         self.Pv = Pv
         self.Rv = Rv
+        self.Q_vel = Q_vel
+        self.P_vel = P_vel
         self.used_solver = used_hor_solver
         self.lookahead = lookahead
         self.KUAV = KUAV
@@ -91,7 +103,24 @@ class ProblemParams():
 
 problem_params = ProblemParams()
 
-xb_m = np.array([[-2], [3.0], [0.0], [-1.0]])
+xb_m = np.array([[5], [-5], [1.0], [-1.0]])
+
+reverse_dir = True
+dir = get_travel_dir(xb_m, reverse_dir)
+ # 5 and 0.8
+
+# TODO, REMOVE THIS, DO CALCULATIONS IN USV_SIMULATOR
+
+# x1 = 5.0*dir[0]
+# x2 = 0.8*dir[0]
+# y1 = 5.0*dir[1]
+# y2 = 0.8*dir[1]
+# problem_params.params.v_max_x_b = max(x1, x2)
+# problem_params.params.v_max_y_b = max(y1, y2)
+# problem_params.params.v_min_x_b = min(x1, x2)
+# problem_params.params.v_min_y_b = min(y1, y2)
+# print "x:",min(x1, x2), 'to', max(x1, x2)
+# print "y:",min(y1, y2), 'to', max(y1, y2)
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
@@ -115,8 +144,8 @@ elif CENTRALISED:
     hor_max = 120#130#74#90
     hor_min = 120#40#74#40
 elif DISTRIBUTED:
-    hor_max = 150#200#80#100
-    hor_min = 150#50#80#50
+    hor_max = 100#200#80#100
+    hor_min = 100#50#80#50
 
 hor_inner = 60#30#15
 
@@ -155,7 +184,7 @@ for N in range(hor_max, hor_min-1, -1):
         # We deinitialise here because hopefully old messages have stopped arriving by now
         my_usv_simulator.deinitialise()
     prev_simulator = my_usv_simulator
-    my_usv_simulator = USV_simulator(problem_params)
+    my_usv_simulator = USV_simulator(problem_params, travel_dir = dir)
 
     # Makes sure that UAV receives info about round being -1 before the round changes to 0
     time.sleep(0.5)

@@ -21,6 +21,10 @@ kl = 0.2
 vmax = 5.0
 vmax_b = 5.0
 vmin_b = 0.8
+# vmax_x_b = vmax_b
+# vmin_x_b = vmin_b
+# vmax_y_b = vmax_b
+# vmin_y_b = vmin_b
 
 # ------------------- DYNAMICS -------------------
 
@@ -75,6 +79,13 @@ Q = np.matrix([
     [0.,     0.,      0.,      0.]
 ])
 
+Q_vel = np.matrix([
+    [0.,     0.,      0.,      0.],
+    [0.,     0.,      0.,      0.],
+    [0.,     0.,      10,      0.],
+    [0.,     0.,      0.,      10]
+])
+
 R = np.matrix([
     [0.1,         0.],
     [  0.,       0.1]
@@ -86,6 +97,8 @@ P = np.matrix([
     [0.,     0.,     0.,      0.],
     [0.,     0.,     0.,      0.]
 ])
+
+P_vel = Q_vel
 
 Qv = np.matrix([
     [1.0, 0.0],

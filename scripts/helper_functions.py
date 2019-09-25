@@ -34,6 +34,16 @@ def shift_trajectory(traj, n, d):
 def get_traj_dir(traj, n):
     return traj[0:2, 0:1] - traj[-n:-n+2, 0:1]
 
+def get_travel_dir(x, reverse_dir = False):
+    len = np.sqrt(np.sum(np.square(x[0:2])))
+    if len > 0:
+        if reverse_dir:
+            return -x[0:2]/len
+        else:
+            return x[0:2]/len
+    else:
+        raise ZeroDivisionError("First two elements of argument must have norm greater than zero")
+
 def get_cos_angle_between(v1, v2):
     return np.clip(np.asscalar(\
         np.dot(v1.transpose(), v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))),-1,1)

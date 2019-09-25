@@ -16,7 +16,7 @@ import time
 class USV_simulator():
 
 
-    def __init__(self, problem_params):
+    def __init__(self, problem_params, travel_dir = None):
         pp = problem_params
         self.experiment_index = -1  # Used in store_data()
         self.T = pp.T
@@ -59,7 +59,7 @@ class USV_simulator():
         self.USV_stopped_at_iter = np.nan
 
         self.problemUSV = USVProblem(pp.T, pp.Ab, pp.Bb,  pp.Q, pp.P, pp.R,\
-            self.nUAV, self.used_solver, self.params)
+            pp.Q_vel, pp.P_vel, self.nUAV, self.used_solver, self.params, travel_dir = travel_dir)
 
         self.problemUSVFast = FastUSVProblem(pp.T_inner, pp.Ab, pp.Bb,\
             pp.Q, pp.P, pp.R, self.used_solver, pp.params)
@@ -443,8 +443,7 @@ class USV_simulator():
     # Allows for stopping an object from receiving ROS messages.
     # Useful if a new instance is created, but old object is still kept
     # for other purposes. If this function is not called, the old and new
-    # instances will both be subscribed to the same topic. I can't remember
-    # right now why that is a problem, but it did cause me issues previously.
+    # instances will both be subscribed to the same topic.
     def deinitialise(self):
         if not self.CENTRALISED:
             self.UAV_traj_sub.unregister()
