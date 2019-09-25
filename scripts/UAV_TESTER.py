@@ -87,22 +87,22 @@ class ProblemParams():
 
 problem_params = ProblemParams()
 x_m = np.array([[0.0], [0.0], [0.0], [0.0]])
-xv_m = np.array([[0.0], [0.0]])#np.matrix([[12.0], [0.0]])
+xv_m = np.array([[7.0], [0.0]])#np.matrix([[12.0], [0.0]])
 prev_simulator = None
 my_uav_simulator =  None
 
 # -------------- TESTING LOOP ----------------
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 1
+NUM_TESTS = 1#50
 if PARALLEL:
-    hor_max = 220#120#221#240
-    hor_min = 220#120#221#150
+    hor_max = 100#300#220#221#240
+    hor_min = 100#150#220#221#150
 elif CENTRALISED:
-    hor_max = 74#90
-    hor_min = 74#40
+    hor_max = 120#130#74#90
+    hor_min = 120#40#74#40
 elif DISTRIBUTED:
-    hor_max = 80#100
-    hor_min = 80#50
+    hor_max = 150#200#80#100
+    hor_min = 150#50#80#50
 
 hor_inner = 60#30#15
 cancelled = False

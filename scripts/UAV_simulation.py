@@ -343,6 +343,7 @@ class UAV_simulator():
             self.x_traj_inner = self.problemUAVFast.x.value
             if self.i%self.INTER_ITS != 0:
                 self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
+                self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
 
         self.dist_traj = get_dist_traj(self.x_traj, self.xb_traj, self.T, \
             self.nUAV, self.nUSV)

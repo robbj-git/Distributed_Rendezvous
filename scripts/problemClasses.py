@@ -527,12 +527,14 @@ class USVProblem():
         self.l_OSQP = np.bmat([
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],      # Dynamics
             [np.full((T*mUSV, 1), params.amin_b)],          # Input constraints
-            [np.full((2*(T+1),   1), -params.v_max_b)]      # Velocity constraints
+            [np.full(((T+1),   1), -params.v_max_b)],      # Velocity constraints
+            [np.full(((T+1),   1), params.v_min_b)]      # Velocity constraints
         ])
         self.u_OSQP = np.bmat([
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],      # Dynamics
             [np.full((T*mUSV, 1), params.amax_b)],        # Input constraints
-            [np.full((2*(T+1),   1), -params.v_min_b)]      # Velocity constraints
+            [np.full(((T+1),   1), -params.v_min_b)],      # Velocity constraints
+            [np.full(((T+1),   1), params.v_max_b)]      # Velocity constraints
             # [np.full((2*(T+1),   1), params.v_max_b)]      # Velocity constraints
         ])
         self.A_temp = np.bmat([

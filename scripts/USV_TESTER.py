@@ -91,11 +91,11 @@ class ProblemParams():
 
 problem_params = ProblemParams()
 
-xb_m = np.array([[0.5], [4.0], [0.0], [-1.0]])
+xb_m = np.array([[-2], [3.0], [0.0], [-1.0]])
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 1
+NUM_TESTS = 1#50
 prev_simulator = None
 my_usv_simulator = None
 
@@ -109,14 +109,14 @@ took_too_long_horizon = -1
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
 if PARALLEL:
-    hor_max = 220#221#240
-    hor_min = 220#221#150
+    hor_max = 100#300#220#221#240
+    hor_min = 100#150#220#221#150
 elif CENTRALISED:
-    hor_max = 74#90
-    hor_min = 74#40
+    hor_max = 120#130#74#90
+    hor_min = 120#40#74#40
 elif DISTRIBUTED:
-    hor_max = 80#100
-    hor_min = 80#50
+    hor_max = 150#200#80#100
+    hor_min = 150#50#80#50
 
 hor_inner = 60#30#15
 
