@@ -1,7 +1,7 @@
 from math import ceil
 from sys import maxint
 
-USE_HIL = False     # Should the UAV communicate with the HIL setup?
+USE_HIL = True     # Should the UAV communicate with the HIL setup?
 # SET ONE OF THESE TO TRUE
 CENTRALISED = True
 DISTRIBUTED = False
@@ -33,6 +33,8 @@ INTER_ITS = 5  # Number of iteration between each solution of the parallel optim
 # Instructions
 NEXT_HORIZON = 0
 FOUND_HORIZON = 1
+
+SHOULD_SHIFT_MESSAGES = False
 
 # Simulated minimum delay between a sent and received message
 delay_time = 0.75   # Measured in seconds

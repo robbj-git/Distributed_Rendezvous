@@ -305,19 +305,35 @@ class DataAnalyser():
             if perspective == ACTUAL:
                 xb_log = dtl.xb_log#np.loadtxt(dir_path + dir + '/xb_log.txt')
                 USV_traj_log = dtl.USV_traj_log#np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
+                x_log = dtl.x_log
+                UAV_traj_log = dtl.UAV_traj_log
             elif perspective == UAV:
                 if self.file_types[file_index] == CENTRALISED:
                     USV_traj_log = dtl.USV_traj_log
                 else:
                     USV_traj_log = dtl.USV_traj_log_UAV#np.loadtxt(dir_path + dir + '/UAV/USV_traj_log.txt')
                 xb_log = dtl.xb_log_UAV#USV_traj_log[0:p.nUSV, :]
+                x_log = dtl.x_log
+                UAV_traj_log = dtl.UAV_traj_log
             elif perspective == USV:
-                print "CANNOT PLOT VERTICAL MOVEMENT FROM USV PERSPECTIVE"
-                return
+                xb_log = dtl.xb_log
+                USV_traj_log = dtl.USV_traj_log
+                if self.file_types[file_index] == CENTRALISED:
+                    x_log = dtl.x_log
+                    UAV_traj_log = dtl.UAV_traj_log
+                else:
+                    x_log = dtl.x_log_USV
+                    UAV_traj_log = dtl.UAV_traj_log_USV
+
+            # # DEBUG RAW
+            # x_log = dtl.x_log_raw
+            # UAV_traj_log = dtl.UAV_traj_log_raw
+            # xb_log = dtl.xb_log_raw
+            # USV_traj_log = dtl.USV_traj_log_raw
 
             time_len = dtl.x_log.shape[1]-1
-            dist_log = np.sqrt( np.square(dtl.x_log[0, 0:time_len] - xb_log[0, 0:time_len]) + \
-                np.square(dtl.x_log[1, 0:time_len] - xb_log[1, 0:time_len]) )
+            dist_log = np.sqrt( np.square(x_log[0, 0:time_len] - xb_log[0, 0:time_len]) + \
+                np.square(x_log[1, 0:time_len] - xb_log[1, 0:time_len]) )
             if self.file_types[file_index] == PARALLEL:
                 T_inner = dtl.vert_inner_traj_log.shape[0]//p.nv
 
@@ -328,8 +344,8 @@ class DataAnalyser():
 
             for t in time:
                 ax.cla()
-                dist_pred_log = np.sqrt( np.square(dtl.UAV_traj_log[0::p.nUAV, t] - USV_traj_log[0::p.nUSV, t])\
-                    + np.square(dtl.UAV_traj_log[1::p.nUAV, t] - USV_traj_log[1::p.nUSV, t]) )
+                dist_pred_log = np.sqrt( np.square(UAV_traj_log[0::p.nUAV, t] - USV_traj_log[0::p.nUSV, t])\
+                    + np.square(UAV_traj_log[1::p.nUAV, t] - USV_traj_log[1::p.nUSV, t]) )
                 vert_pred_log = dtl.vert_traj_log[0::p.nv, t]
 
                 # TODO: When perspective is ACTUAL, you should use true future trajectory
@@ -421,32 +437,62 @@ class DataAnalyser():
             fig = plt.figure()
             fig.canvas.mpl_connect('close_event', self.handle_close)
             ax = plt.axes()
-            UAV_traj_log_UAV = np.loadtxt(dir_path + dir + '/UAV_traj_log.txt')
-            USV_traj_log_USV = np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
-            USV_traj_log_UAV = np.loadtxt(dir_path + dir + '/UAV/USV_traj_log.txt')
-            UAV_traj_log_USV = np.loadtxt(dir_path + dir + '/USV/UAV_traj_log.txt')
-            x_log_UAV  = np.loadtxt(dir_path + dir + '/x_log.txt')
-            xb_log_UAV = USV_traj_log_UAV[0:p.nUSV, :]
-            xb_log_USV = np.loadtxt(dir_path + dir + '/xb_log.txt')
-            x_log_USV = UAV_traj_log_USV[0:p.nUAV, :]
 
-            T = UAV_traj_log_UAV.shape[0]//p.nUAV
+            dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['horizontal', 'vertical'], self.p)
 
-            time_len = x_log_UAV.shape[1]-1
+            x_log_raw = dtl.x_log_raw
+            UAV_traj_log_raw = dtl.UAV_traj_log_raw
+            xb_log_raw = dtl.xb_log_raw
+            USV_traj_log_raw = dtl.USV_traj_log_raw
+            x_log = dtl.x_log
+            UAV_traj_log = dtl.UAV_traj_log
+            xb_log = dtl.xb_log
+            USV_traj_log = dtl.USV_traj_log
+
+            # UAV_traj_log_UAV = np.loadtxt(dir_path + dir + '/UAV_traj_log.txt')
+            # USV_traj_log_USV = np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
+            # USV_traj_log_UAV = np.loadtxt(dir_path + dir + '/UAV/USV_traj_log.txt')
+            # UAV_traj_log_USV = np.loadtxt(dir_path + dir + '/USV/UAV_traj_log.txt')
+            # x_log_UAV  = np.loadtxt(dir_path + dir + '/x_log.txt')
+            # xb_log_UAV = USV_traj_log_UAV[0:p.nUSV, :]
+            # xb_log_USV = np.loadtxt(dir_path + dir + '/xb_log.txt')
+            # x_log_USV = UAV_traj_log_USV[0:p.nUAV, :]
+
+            T = UAV_traj_log.shape[0]//p.nUAV
+
+            time_len = x_log.shape[1]-1
             if real_time:
                 time = range(time_len)
             else:
                 time = [time_len-1]
 
+            dist_log = np.sqrt( np.square(x_log[0, 0:time_len] - xb_log[0, 0:time_len]) + \
+                np.square(x_log[1, 0:time_len] - xb_log[1, 0:time_len]) )
+
+            dist_log_raw = np.sqrt( np.square(x_log_raw[0, 0:time_len] - xb_log_raw[0, 0:time_len]) + \
+                np.square(x_log_raw[1, 0:time_len] - xb_log_raw[1, 0:time_len]) )
+
             for t in time:
                 ax.cla()
-                ax.plot(range(t+1), x_log_UAV[0, 0:t+1], 'blue')
-                ax.plot(range(t+1), x_log_USV[0, 0:t+1], 'red')
-                ax.plot(range(t, t+T), UAV_traj_log_UAV[0::p.nUAV, t], 'green', alpha=0.5)
-                ax.plot(range(t, t+T), UAV_traj_log_USV[0::p.nUSV, t], 'yellow', alpha=0.5)
+
+                dist_pred_log = np.sqrt( np.square(UAV_traj_log[0::p.nUAV, t] - USV_traj_log[0::p.nUSV, t])\
+                    + np.square(UAV_traj_log[1::p.nUAV, t] - USV_traj_log[1::p.nUSV, t]) )
+                dist_pred_log_raw = np.sqrt( np.square(UAV_traj_log_raw[0::p.nUAV, t] - USV_traj_log_raw[0::p.nUSV, t])\
+                    + np.square(UAV_traj_log_raw[1::p.nUAV, t] - USV_traj_log_raw[1::p.nUSV, t]) )
+
+
+
+                ax.plot(range(t+1), dist_log[0:t+1], 'b')
+                ax.plot(range(t+1), dist_log_raw[0:t+1], 'r')
+                ax.plot(range(t, t+T), dist_pred_log, 'b', alpha=0.4)
+                ax.plot(range(t, t+T), dist_pred_log_raw, 'r', alpha=0.4)
+                # ax.plot(range(t+1), x_log_UAV[0, 0:t+1], 'blue')
+                # ax.plot(range(t+1), x_log_USV[0, 0:t+1], 'red')
+                # ax.plot(range(t, t+T), UAV_traj_log_UAV[0::p.nUAV, t], 'green', alpha=0.5)
+                # ax.plot(range(t, t+T), UAV_traj_log_USV[0::p.nUSV, t], 'yellow', alpha=0.5)
                 plt.xlabel('time [s]')
                 plt.ylabel('value [m]')
-                plt.legend(['UAV x', 'USV x'])
+                plt.legend(['Real-time', 'Raw'])
                 plt.grid(True)
                 try:
                     plt.pause(0.05)
@@ -1358,10 +1404,10 @@ if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
     # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
-    data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
+    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
 

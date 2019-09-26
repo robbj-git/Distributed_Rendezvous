@@ -134,7 +134,7 @@ class CentralisedProblem():
             [np.full((2*(T+1),   1), params.v_max_b)]     # USV Velocity constraints
         ])
         if self.travel_dir is None:
-            self.q_OSQP = 0
+            self.q_OSQP = np.zeros( (2*nUAV*(T+1) + 2*mUAV*T + 1, 1) )
         else:
             x1 = params.v_max_b*self.travel_dir[0]
             x2 = params.v_min_b*self.travel_dir[0]
@@ -245,6 +245,7 @@ class CentralisedProblem():
         start = time.time()
         self.x_0.value = x_m
         self.xb_0.value = xb_m
+        # print "STARTED SOLVING WITH:", xb_m[0,0], ",", xb_m[1,0]  # DEBUG PRINT
         if self.type == 'CVXGEN':
             self.x_0_msg.array.data = np.asarray(x_m).flatten(order='F')   # TODO: Send in ndarray, then flatten will be enough
             self.xb_0_msg.array.data = np.asarray(xb_m).flatten(order='F') # TODO: Send in ndarray, then flatten will be enough
@@ -265,16 +266,20 @@ class CentralisedProblem():
             T = self.T
             nUAV = self.nUAV
             mUAV = self.mUAV
-            self.x.value = np.reshape(results.x[0:nUAV*(T+1)], (-1, 1))
-            self.u.value = np.reshape(results.x[nUAV*(T+1):nUAV*(T+1)+mUAV*T], (-1, 1))
-            self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T:2*nUAV*(T+1)+mUAV*T], (-1, 1))
-            self.ub.value = np.reshape(results.x[2*nUAV*(T+1)+mUAV*T:-1], (-1, 1))
-            self.s.value = np.full((1,1), results.x[-1])
-            # print results.info.status, results.info.iter, #DEBUG PRINT
-            # if results.info.run_time > 0.01:
-            #     print results.info.iter
-            # else:
-            #     print ""
+            # print results.info.status, results.info.iter #DEBUG PRINT
+            if results.x[0] is not None:
+                self.x.value = np.reshape(results.x[0:nUAV*(T+1)], (-1, 1))
+                self.u.value = np.reshape(results.x[nUAV*(T+1):nUAV*(T+1)+mUAV*T], (-1, 1))
+                self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T:2*nUAV*(T+1)+mUAV*T], (-1, 1))
+                self.ub.value = np.reshape(results.x[2*nUAV*(T+1)+mUAV*T:-1], (-1, 1))
+                self.s.value = np.full((1,1), results.x[-1])
+            else:
+                self.u.value =  np.zeros((mUAV*T, 1))
+                self.ub.value = np.zeros((self.mUSV*T, 1))
+                self.x.value  = self.predict_UAV_traj(x_m, self.u.value)
+                self.xb.value = self.predict_USV_traj(xb_m, self.ub.value)
+                self.s.value = np.zeros((1,1))
+                self.s.value.fill(np.nan)
         else:
             self.problemCent.solve(solver=cp.OSQP, warm_start=True, verbose=False)
         end = time.time()
@@ -297,6 +302,12 @@ class CentralisedProblem():
         self.u_OSQP[(T+1)*(nUAV+2)+T*mUAV:(T+1)*(2*nUAV+2)+T*mUSV, 0] = np.dot(self.Phi_b, xb0)
 
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP)
+
+    def predict_UAV_traj(self, x_0, u_traj):
+        return np.dot(self.Phi, x_0) + np.dot(self.Lambda, u_traj)
+
+    def predict_USV_traj(self, xb_0, ub_traj):
+        return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
 
 class UAVProblem():
 
@@ -845,7 +856,7 @@ class VerticalProblem():
         ])
 
         # ------------- OSQP Matrices --------------
-        self.C = 10000*(T+1)
+        self.C = 100*(T+1)
         self.P_temp = 2*np.bmat([[self.Qv_big, np.zeros((nv*(T+1), mv*T+1))],\
             [np.zeros((mv*T, nv*(T+1))), self.Rv_big, np.zeros((mv*T, 1)) ],\
             [np.zeros(( 1, nv*(T+1)+mv*T )), np.full((1,1), self.C) ]])

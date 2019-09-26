@@ -1,5 +1,5 @@
 from rendezvous_problem.msg import Float32MultiArrayStamped
-from helper_functions import shift_traj_msg, get_traj_dir, get_cos_angle_between
+from helper_functions import shift_trajectory, get_traj_dir, get_cos_angle_between
 from IMPORT_ME import SAMPLING_TIME
 from matrices_and_parameters import n_UAV, n_USV, nv, wmax, wmin, wmin_land, kl
 import numpy as np
@@ -94,12 +94,13 @@ class StampedMsgQueue():
 
 class StampedTrajQueue():
 
-    def __init__(self, delay_time):
+    def __init__(self, delay_time, should_shift = False):
         self.delay_duration = rospy.Duration.from_sec(delay_time)
         # self.traj_msg = Float32MultiArrayStamped()
         # self.traj_msg.array.data = None
         self.traj_msg = None
         self.traj_queue = Queue.Queue()
+        self.should_shift = should_shift
 
     def get_traj(self):
         queue_copy = copy.copy(self.traj_queue.queue)
@@ -127,7 +128,13 @@ class StampedTrajQueue():
             raise IndexError('Queue was empty')
         else:
             self.traj_msg = new_traj_msg
-            return np.reshape(self.traj_msg.array.data, (-1, 1))
+            return_array = np.reshape(self.traj_msg.array.data, (-1, 1))
+            if self.should_shift:
+                d = int(np.floor((rospy.Time.now() - msg_candidate.header.stamp).to_sec()/SAMPLING_TIME))
+                print "shifted", d
+                return shift_trajectory(return_array, 4, d)   # TODO: Somehow get hold of variable nUAV so that you don't have to hard-code 4
+            else:
+                return return_array
 
     def put_traj(self, traj_msg):
         if self.traj_queue.full():
@@ -138,6 +145,7 @@ class StampedTrajQueue():
             except Queue.Empty:
                 pass
         self.traj_queue.put_nowait(traj_msg)
+        # print rospy.get_time(), traj_msg.header.stamp.secs + traj_msg.header.stamp.nsecs/1000000000.0
 
     def set_delay_time(self, new_delay_time):
         self.delay_duration = rospy.Duration.from_sec(new_delay_time)

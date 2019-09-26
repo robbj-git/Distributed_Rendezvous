@@ -54,6 +54,7 @@ class USV_simulator():
         self.KUSV = pp.KUSV
         self.ADD_DROPOUT = pp.ADD_DROPOUT
         self.PRED_PARALLEL_TRAJ = pp.PRED_PARALLEL_TRAJ
+        self.SHOULD_SHIFT_MESSAGES = pp.SHOULD_SHIFT_MESSAGES
         self.dropout_lower_bound = pp.dropout_lower_bound
         self.dropout_upper_bound = pp.dropout_upper_bound
         self.USV_stopped_at_iter = np.nan
@@ -70,7 +71,7 @@ class USV_simulator():
         if not self.CENTRALISED:
             # UAVApprox needs to be initialised here, since UAV_traj_callback
             # can start being called, and it contains a reference to UAVApprox
-            self.UAVApprox = StampedTrajQueue(self.delay_len)
+            self.UAVApprox = StampedTrajQueue(self.delay_len, should_shift = self.SHOULD_SHIFT_MESSAGES)
             self.traj_pub = rospy.Publisher('USV_traj', Float32MultiArrayStamped, queue_size = 10)
             self.UAV_traj_sub = rospy.Subscriber(\
                 'UAV_traj', Float32MultiArrayStamped, self.UAV_traj_callback)
@@ -113,7 +114,7 @@ class USV_simulator():
         self.dist = None
 
         self.USV_should_stop = False
-        self.UAVApprox = StampedTrajQueue(self.delay_len)
+        self.UAVApprox = StampedTrajQueue(self.delay_len, should_shift = self.SHOULD_SHIFT_MESSAGES)
         self.input_queue = StampedMsgQueue(self.delay_len)
 
     def simulate_problem(self, sim_len, xb_val):
@@ -158,7 +159,7 @@ class USV_simulator():
             #     end0 = time.time()
             #     print end0 - start0
 
-            # print i
+            # print i, rospy.get_time()
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -314,6 +315,7 @@ class USV_simulator():
             state_msg.twist.linear.y = xb[3]
             state_msg.header.stamp = rospy.Time.now()
             self.state_pub.publish(state_msg)
+            # print "SENT (x,y)", xb[0], ",",xb[1]
 
     # ------------------------------------------
 

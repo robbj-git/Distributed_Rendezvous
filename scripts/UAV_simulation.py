@@ -50,6 +50,7 @@ class UAV_simulator():
         self.INTER_ITS = pp.INTER_ITS
         self.ADD_DROPOUT = problem_params.ADD_DROPOUT
         self.PRED_PARALLEL_TRAJ = problem_params.PRED_PARALLEL_TRAJ
+        self.SHOULD_SHIFT_MESSAGES = problem_params.SHOULD_SHIFT_MESSAGES
         self.dropout_lower_bound = pp.dropout_lower_bound
         self.dropout_upper_bound = pp.dropout_upper_bound
         self.long_ref = None
@@ -69,7 +70,7 @@ class UAV_simulator():
 
         self.i = 0
         # These must be created already in the constructor since they are used in ROS callbacks
-        self.USVApprox = StampedTrajQueue(self.delay_len)
+        self.USVApprox = StampedTrajQueue(self.delay_len, should_shift = self.SHOULD_SHIFT_MESSAGES)
         self.USV_state_queue = StampedMsgQueue(self.delay_len)
 
         self.x = np.full((self.nUAV, 1), np.nan)
@@ -159,7 +160,7 @@ class UAV_simulator():
             self.s_cent_log = np.full((1, sim_len), np.nan)
             self.uUSV_log = np.full((self.mUSV, sim_len), np.nan)
 
-        self.USVApprox = StampedTrajQueue(self.delay_len)
+        self.USVApprox = StampedTrajQueue(self.delay_len, should_shift = self.SHOULD_SHIFT_MESSAGES)
         self.USV_state_queue = StampedMsgQueue(self.delay_len)
 
     def simulate_problem(self, sim_len, x_val, xv_val):
@@ -202,7 +203,7 @@ class UAV_simulator():
             # if i > 0:
             #     end0 = time.time()
             #     print end0 - start0
-            # print i    #DEBUG PRINT
+            # print i, rospy.get_time()    #DEBUG PRINT
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -215,6 +216,7 @@ class UAV_simulator():
                         self.xb = np.array(\
                             [[xb_msg.pose.position.x], [xb_msg.pose.position.y],\
                             [xb_msg.twist.linear.x], [xb_msg.twist.linear.y]])
+                        # print "UPDATED (x, y):", xb_msg.pose.position.x, ",", xb_msg.pose.position.y  # DEBUG PRINT
                     except IndexError:
                         # Leave self.xb unchanged
                         pass
@@ -381,6 +383,7 @@ class UAV_simulator():
         self.UAV_traj_log[:, i:i+1]  = self.x_traj
         self.vert_traj_log[:, i:i+1] = self.xv_traj
         self.USV_traj_log[:, i:i+1] = self.xb_traj
+        # print "LOGGED:", self.xb_traj[0, 0], ",", self.xb_traj[1, 0] #DEBUG PRINT
         self.s_vert_log[:, i:i+1] = self.problemVert.s.value
         self.obj_val_log[:, i:i+1] = self.problemVert.obj_val
 
