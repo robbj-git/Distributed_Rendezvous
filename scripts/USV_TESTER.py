@@ -106,7 +106,7 @@ problem_params = ProblemParams()
 
 xb_m = np.array([[-3], [-3], [np.nan], [np.nan]])
 
-reverse_dir = True
+reverse_dir = False
 dir = get_travel_dir(xb_m, reverse_dir)
 xb_m[2:] = dir
  # 5 and 0.8

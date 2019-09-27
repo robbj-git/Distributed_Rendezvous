@@ -185,6 +185,8 @@ class USV_simulator():
                 self.update_parallel_trajectories()
                 self.send_traj_to_UAV(self.xb_traj)
 
+            print "VEL:",self.xb[2, 0], ",", self.xb[3, 0]
+
             # TODO: Make this togglable from IMPORT_ME
             # # Make the USV stop once the vehicles are within safe landing distance
             # if not self.CENTRALISED and not self.USV_should_stop:

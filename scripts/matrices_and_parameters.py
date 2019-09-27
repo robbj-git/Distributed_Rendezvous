@@ -6,8 +6,8 @@ tau_w = 0.4
 g = 9.8
 kw  = 1.0
 
-amin  =  -5.0
-amax  =   5.0
+amin  =  -3.0
+amax  =   3.0
 amin_b = -3.0
 amax_b =  3.0
 hs = 5.0

@@ -1,7 +1,7 @@
 from math import ceil
 from sys import maxint
 
-USE_HIL = True     # Should the UAV communicate with the HIL setup?
+USE_HIL = False     # Should the UAV communicate with the HIL setup?
 # SET ONE OF THESE TO TRUE
 CENTRALISED = True
 DISTRIBUTED = False
@@ -16,8 +16,8 @@ PRED_PARALLEL_TRAJ = False
 dropout_lower_bound = 80    # Iteration index at which communication loss should start
 dropout_upper_bound = 130   # Iteration index at which communication loss should end
 
-if CENTRALISED + DISTRIBUTED + PARALLEL > 1:
-    print "PLEASE ONLY SELECT ONE OUT OF CENTRALISED, DISTRIBUTED, OR PARALLEL"
+if CENTRALISED + DISTRIBUTED + PARALLEL != 1:
+    print "PLEASE SELECT EXACTLY ONE OUT OF CENTRALISED, DISTRIBUTED, OR PARALLEL"
     exit()
 
 CVXGEN = "CVXGEN"

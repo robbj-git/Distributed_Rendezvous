@@ -157,7 +157,8 @@ class UAV_simulator():
             # Stores both positive and negative distances, for nicer plotting
             self.dist_traj_signed = None
         else: # if self.CENTRALISED
-            self.s_cent_log = np.full((1, sim_len), np.nan)
+            self.s_UAV_log = np.full((2, sim_len), np.nan)
+            self.s_USV_log = np.full((2, sim_len), np.nan)
             self.uUSV_log = np.full((self.mUSV, sim_len), np.nan)
 
         self.USVApprox = StampedTrajQueue(self.delay_len, should_shift = self.SHOULD_SHIFT_MESSAGES)
@@ -234,6 +235,9 @@ class UAV_simulator():
             if self.PARALLEL and i%self.INTER_ITS == 0 and i > 0:
                 self.update_parallel_trajectories()
                 self.send_traj_to_USV(self.x_traj)
+
+            # if np.abs(self.x[2,0]) > 5.0 or np.abs(self.x[3,0]) > 5.0:
+            print "VEL:",self.x[2, 0], ",", self.x[3, 0]
 
             # ------- Horizontal Problem --------
             if self.CENTRALISED:
@@ -391,7 +395,8 @@ class UAV_simulator():
         if self.CENTRALISED:
             self.xb_log[:, i:i+1] = self.xb
             self.uUSV_log[:, i:i+1] = self.uUSV
-            self.s_cent_log[:, i:i+1] = self.problemCent.s.value
+            self.s_UAV_log[:, i:i+1] = self.problemCent.s_UAV.value
+            self.s_USV_log[:, i:i+1] = self.problemCent.s_USV.value
             self.hor_solution_durations.append(self.problemCent.last_solution_duration)
         else:
             self.xb_log[:, i:i+1] = self.xb_traj[0:self.nUSV, 0:1]
@@ -493,7 +498,8 @@ class UAV_simulator():
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/obj_val_log.txt', self.obj_val_log)
         if self.CENTRALISED:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_traj_log.txt', self.USV_traj_log)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_cent_log.txt', self.s_cent_log)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_UAV_log.txt', self.s_UAV_log)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_USV_log.txt', self.s_USV_log)
         if self.PARALLEL:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_hor_inner_durations.txt', self.hor_inner_solution_durations)
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_inner_durations.txt', self.vert_inner_solution_durations)
