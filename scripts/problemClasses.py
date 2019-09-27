@@ -102,7 +102,7 @@ class CentralisedProblem():
         zeros_sqr = np.zeros((mUAV*T, mUAV*T))
         zeros_tall = np.zeros((nUAV*(T+1), 2))
         zeros_short = np.zeros((mUAV*T, 2))
-        self.C = 10000*(T+1)*np.eye(2)#np.full((1, 1), 10000*(T+1))
+        self.C = 10*(T+1)*np.eye(2)#np.full((1, 1), 10000*(T+1))
         if self.travel_dir is None:
             Q_temp = self.Q_big
         else:
@@ -167,15 +167,16 @@ class CentralisedProblem():
         #     [np.zeros((T*mUSV, nUSV*(T+1))), np.eye(T*mUSV), np.zeros( (T*mUSV, 1) )],   # Input constraints
         #     [velocity_extractor, np.zeros((2*(T+1), T*mUSV)), np.ones((2*(T+1), 1))],    # Velocity constraints
         # ])
+        J_mat = np.kron(np.ones((T+1,1)), np.eye(2))
         self.A_UAV = np.bmat([
             [np.eye(nUAV*(T+1)),       -self.Lambda,          np.zeros((nUAV*(T+1), 2))],  # UAV Dynamics
             [zeros.T,                  np.eye(T*mUAV),        np.zeros((T*mUAV, 2))],      # UAV Input constraints
-            [velocity_extractor, np.zeros((2*(T+1), T*mUAV)), np.zeros((2*(T+1), 2))],     # UAV Velocity constraints
+            [velocity_extractor, np.zeros((2*(T+1), T*mUAV)), J_mat],     # UAV Velocity constraints
         ])
         self.A_USV = np.bmat([
             [np.eye(nUSV*(T+1)),        -self.Lambda_b,       np.zeros((nUSV*(T+1), 2))],   # USV Dynamics
             [zeros.T,                   np.eye(T*mUSV),       np.zeros((T*mUSV, 2))],       # USV Input constraints
-            [velocity_extractor, np.zeros((2*(T+1), T*mUAV)), np.zeros((2*(T+1), 2))],      # USV Velocity constraints
+            [velocity_extractor, np.zeros((2*(T+1), T*mUAV)), J_mat],      # USV Velocity constraints
         ])
         zeros = np.zeros( (nUAV*(T+1) + mUAV*T + 2*(T+1), nUAV*(T+1) + mUAV*T + 2) )
         self.A_temp = np.bmat([
