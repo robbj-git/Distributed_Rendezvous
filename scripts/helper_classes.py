@@ -1,7 +1,7 @@
 from rendezvous_problem.msg import Float32MultiArrayStamped
 from helper_functions import shift_trajectory, get_traj_dir, get_cos_angle_between
 from IMPORT_ME import SAMPLING_TIME
-from matrices_and_parameters import n_UAV, n_USV, nv, wmax, wmin, wmin_land, kl
+from matrices_and_parameters import n_UAV, n_USV, nv, wmax, wmin, wmin_land, kl, vmax, vmax_b
 import numpy as np
 import Queue
 import rospy
@@ -161,6 +161,8 @@ class DataAnalysisParams():
         self.wmin = wmin
         self.wmin_land = wmin_land
         self.kl = kl
+        self.vmax = vmax
+        self.vmax_b = vmax_b
 
 # class StateApproximator():
 #

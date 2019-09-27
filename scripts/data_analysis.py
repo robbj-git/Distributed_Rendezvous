@@ -279,6 +279,94 @@ class DataAnalyser():
         # ax.plot(range(500), 500*s_vert_log, 'green')
         plt.show()
 
+    def plot_hor_velocities(self, real_time = False):
+        p = self.p
+        upper_vel_constraints_UAV = self.get_vel_polygon(p.vmax)
+        lower_vel_constraints_UAV = self.get_vel_polygon(-p.vmax)
+        upper_vel_constraints_USV = self.get_vel_polygon(p.vmax_b)
+        lower_vel_constraints_USV = self.get_vel_polygon(-p.vmax_b)
+        self.should_close = False
+
+        for file_index, dir in enumerate(self.files):
+            patch_collection_UAV = PatchCollection( [upper_vel_constraints_UAV,\
+                lower_vel_constraints_UAV], alpha=0.5, color='grey')
+            patch_collection_USV = PatchCollection( [upper_vel_constraints_USV,\
+                lower_vel_constraints_USV], alpha=0.5, color='grey')
+            # fig = plt.figure()
+            # ax = plt.axes()
+            fig, axes = plt.subplots(nrows=1, ncols=2)
+            fig.canvas.mpl_connect('close_event', self.handle_close)
+
+            dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['horizontal'], self.p)
+
+            if self.file_types[file_index] == PARALLEL:
+                T_inner =dtl.UAV_inner_traj_log.shape[0]//p.nUAV
+
+            T_outer = dtl.UAV_traj_log.shape[0]//p.nUAV
+            time_len = dtl.UAV_traj_log.shape[1]
+            if real_time:
+                time = range(time_len)
+            else:
+                time = [time_len-1]
+
+            for t in time:
+                axes[0].cla()
+                axes[1].cla()
+                # upper_vel_constraints_slack = self.get_vel_polygon(p.wmax, -dtl.s_vert_log[t])
+                # lower_vel_constraints_slack = self.get_vel_polygon(p.wmin, -dtl.s_vert_log[t])
+                # patch_collection_slack = PatchCollection( \
+                #     [upper_vel_constraints_slack, lower_vel_constraints_slack],\
+                #     alpha=0.2, color='grey')
+                # vel_pred_log = dtl.vert_traj_log[1::p.nv, t]
+                # actual_vel_bound = -p.kl*dtl.xv_log[0, 0:t+1] + p.wmin_land
+                # pred_vel_bound   = -p.kl*dtl.vert_traj_log[0::p.nv, t] + p.wmin_land
+                # actual_vel_bound_slack = -p.kl*dtl.xv_log[0, 0:t+1] + p.wmin_land - dtl.s_vert_log[0:t+1]
+                # pred_vel_bound_slack   = -p.kl*dtl.vert_traj_log[0::p.nv, t] + p.wmin_land - dtl.s_vert_log[t]
+                # if np.isnan(vel_pred_log).any():
+                #     vel_pred_log = np.full((T_outer,), dtl.xv_log[1, t])
+                # if np.isnan(pred_vel_bound).any():
+                #     pred_vel_bound = np.full((T_outer,), -p.kl*dtl.xv_log[0, t] + p.wmin_land)
+                #     # TODO: Add a velocity bound predicted by inner controller in parallel case?
+
+                pred_UAV_vel_x_log = dtl.UAV_traj_log[2::p.nUAV, t]
+                pred_UAV_vel_y_log = dtl.UAV_traj_log[3::p.nUAV, t]
+                pred_USV_vel_x_log = dtl.USV_traj_log[2::p.nUSV, t]
+                pred_USV_vel_y_log = dtl.USV_traj_log[3::p.nUSV, t]
+
+                axes[0].plot(range(t+1), dtl.x_log[2, 0:t+1], 'blue')
+                axes[0].plot(range(t+1, t+T_outer+1), pred_UAV_vel_x_log, 'blue', alpha=0.5)
+                axes[0].plot(range(t+1), dtl.x_log[3, 0:t+1], 'red')
+                axes[0].plot(range(t+1, t+T_outer+1), pred_UAV_vel_y_log, 'red', alpha=0.5)
+                axes[1].plot(range(t+1), dtl.xb_log[2, 0:t+1], 'blue')
+                axes[1].plot(range(t+1, t+T_outer+1), pred_USV_vel_x_log, 'blue', alpha=0.5)
+                axes[1].plot(range(t+1), dtl.xb_log[3, 0:t+1], 'red')
+                axes[1].plot(range(t+1, t+T_outer+1), pred_USV_vel_y_log, 'red', alpha=0.5)
+
+                if self.file_types[file_index] == PARALLEL:
+                    pred_UAV_vel_inner_x_log = dtl.UAV_inner_traj_log[2::p.nUAV, t]
+                    pred_UAV_vel_inner_y_log = dtl.UAV_inner_traj_log[3::p.nUAV, t]
+                    pred_USV_vel_inner_x_log = dtl.USV_inner_traj_log[2::p.nUSV, t]
+                    pred_USV_vel_inner_y_log = dtl.USV_inner_traj_log[3::p.nUSV, t]
+                    axes[0].plot(range(t+1, t+T_inner+1), pred_UAV_vel_inner_x_log, 'green', alpha=0.3)
+                    axes[0].plot(range(t+1, t+T_inner+1), pred_UAV_vel_inner_y_log, 'yellow', alpha=0.3)
+                    axes[1].plot(range(t+1, t+T_inner+1), pred_USV_vel_inner_x_log, 'green', alpha=0.3)
+                    axes[1].plot(range(t+1, t+T_inner+1), pred_USV_vel_inner_y_log, 'yellow', alpha=0.3)
+
+                axes[0].add_collection(patch_collection_UAV)
+                axes[1].add_collection(patch_collection_USV)
+                # ax.add_collection(patch_collection_slack)
+                plt.xlabel('time [iterations]')
+                plt.ylabel('velocity [m/s]')
+                try:
+                    plt.pause(0.05)
+                except:
+                    # Window was probably closed
+                    return
+                if self.should_close:   # Window was closed
+                    return
+            fig.show()
+        plt.show()
+
     def plot_with_constraints(self, real_time = False, perspective = ACTUAL):
         forbidden_area_1 = Polygon([ (dl, 0),\
                                      (ds, hs),\
@@ -1404,12 +1492,13 @@ if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
     # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
-    data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
+    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
     # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
+    data_analyser.plot_hor_velocities(real_time = True)
 
     # use_dir = False
     # use_horizon_vs_performance = False

@@ -98,7 +98,7 @@ my_uav_simulator =  None
 # of the vector pointint to its starting position. However, you have to manually make
 # sure that the xb below matches the initial state of the USV in USV_TESTER.py
 # xb = None
-xb = np.array([[-3], [-3], [np.nan], [np.nan]])
+xb = np.array([[-2], [-3], [np.nan], [np.nan]])
 if xb is not None and CENTRALISED:
     reverse_dir = False
     dir = get_travel_dir(xb, reverse_dir)
