@@ -3,9 +3,9 @@ from sys import maxint
 
 USE_HIL = True     # Should the UAV communicate with the HIL setup?
 # SET ONE OF THESE TO TRUE
-CENTRALISED = True
+CENTRALISED = False
 DISTRIBUTED = False
-PARALLEL = False
+PARALLEL = True
 
 SAMPLING_RATE = 20              # Dynamics change if this changes
 SAMPLING_TIME = 1.0/SAMPLING_RATE

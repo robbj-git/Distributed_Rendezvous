@@ -90,7 +90,7 @@ class USV_simulator():
             self.x_log = np.full((self.nUAV, sim_len+1), np.nan)
             self.UAV_traj_log = np.full( (self.nUAV*(self.T+1), sim_len),\
                 np.nan )
-            self.s_USV_log = np.full((1, sim_len), np.nan)
+            self.s_USV_log = np.full((2, sim_len), np.nan)
         if self.PARALLEL:
             self.USV_inner_traj_log = np.full((self.nUSV*(self.T_inner+1),\
                 sim_len), np.nan )
@@ -184,8 +184,6 @@ class USV_simulator():
             if self.PARALLEL and i%self.INTER_ITS == 0 and i > 0:
                 self.update_parallel_trajectories()
                 self.send_traj_to_UAV(self.xb_traj)
-
-            print "VEL:",self.xb[2, 0], ",", self.xb[3, 0]
 
             # TODO: Make this togglable from IMPORT_ME
             # # Make the USV stop once the vehicles are within safe landing distance

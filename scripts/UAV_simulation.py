@@ -236,14 +236,6 @@ class UAV_simulator():
                 self.update_parallel_trajectories()
                 self.send_traj_to_USV(self.x_traj)
 
-            # if np.abs(self.x[2,0]) > 5.0 or np.abs(self.x[3,0]) > 5.0:
-            print "VEL:",self.x[2, 0], ",", self.x[3, 0],
-            try:
-                print self.problemCent.s_UAV.value[0,0], self.problemCent.s_UAV.value[1,0]
-            except:
-                print ""
-                pass
-
             # ------- Horizontal Problem --------
             if self.CENTRALISED:
                 self.problemCent.solve(self.x, self.xb)
@@ -462,7 +454,7 @@ class UAV_simulator():
         i = 0
         dir_already_exists = True
         dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
-        print "DIR PATH:", dir_path
+        # print "DIR PATH:", dir_path
         # dir_path = '/home/student/robbj_experiment_results/'
         while dir_already_exists:
             i += 1

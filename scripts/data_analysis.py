@@ -312,21 +312,6 @@ class DataAnalyser():
             for t in time:
                 axes[0].cla()
                 axes[1].cla()
-                # upper_vel_constraints_slack = self.get_vel_polygon(p.wmax, -dtl.s_vert_log[t])
-                # lower_vel_constraints_slack = self.get_vel_polygon(p.wmin, -dtl.s_vert_log[t])
-                # patch_collection_slack = PatchCollection( \
-                #     [upper_vel_constraints_slack, lower_vel_constraints_slack],\
-                #     alpha=0.2, color='grey')
-                # vel_pred_log = dtl.vert_traj_log[1::p.nv, t]
-                # actual_vel_bound = -p.kl*dtl.xv_log[0, 0:t+1] + p.wmin_land
-                # pred_vel_bound   = -p.kl*dtl.vert_traj_log[0::p.nv, t] + p.wmin_land
-                # actual_vel_bound_slack = -p.kl*dtl.xv_log[0, 0:t+1] + p.wmin_land - dtl.s_vert_log[0:t+1]
-                # pred_vel_bound_slack   = -p.kl*dtl.vert_traj_log[0::p.nv, t] + p.wmin_land - dtl.s_vert_log[t]
-                # if np.isnan(vel_pred_log).any():
-                #     vel_pred_log = np.full((T_outer,), dtl.xv_log[1, t])
-                # if np.isnan(pred_vel_bound).any():
-                #     pred_vel_bound = np.full((T_outer,), -p.kl*dtl.xv_log[0, t] + p.wmin_land)
-                #     # TODO: Add a velocity bound predicted by inner controller in parallel case?
 
                 pred_UAV_vel_x_log = dtl.UAV_traj_log[2::p.nUAV, t]
                 pred_UAV_vel_y_log = dtl.UAV_traj_log[3::p.nUAV, t]
@@ -1495,10 +1480,10 @@ if __name__ == '__main__':
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
-    data_analyser.plot_hor_velocities(real_time = True)
+    # data_analyser.plot_hor_velocities(real_time = True)
 
     # use_dir = False
     # use_horizon_vs_performance = False
