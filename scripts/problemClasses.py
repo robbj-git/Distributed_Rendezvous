@@ -890,7 +890,7 @@ class VerticalProblem():
             [np.dot(self.Phi_v, np.zeros((nv, 1)))],    # Dynamics
             [np.dot(params.wmin,np.ones((2*T+1, 1)))],  # Velocity and input constraints
             [np.dot(params.wmin_land,np.ones((T+1, 1)))], # Touchdown constraints
-            [np.zeros((T+1, 1))],                        # Altitude constraints
+            [-np.full((T+1,1), np.inf)],                        # Altitude constraints
             [-np.full((T+1,1), np.inf)]                  # Safety constraints
         ])
         self.u_OSQP = np.bmat([
@@ -1168,7 +1168,9 @@ class VerticalProblem():
         T = self.T
         self.l_OSQP[0:(T+1)*self.nv, 0] = np.dot(self.Phi_v, x0)    # Dynamics
         self.l_OSQP[(T+1)*(self.nv+2)+T:(T+1)*(self.nv+3)+T, 0] = \
-            np.dot( (np.eye(T+1)-b1), np.full((T+1,1), params.hs) ) # Altitude constraints
+            np.dot( (np.eye(T+1)-2*b1), np.full((T+1,1), params.hs) ) # Altitude constraints
+        # I subtract 2*b1 since I want the constraint to be softer than h>=0
+        # It doesn't really matter if UAV dips a bit below 0, no reason to fail optimisation because of that
         self.u_OSQP[0:(T+1)*self.nv, 0] = np.dot(self.Phi_v, x0)    # Dynamics
         self.u_OSQP[(T+1)*(self.nv+3)+T:(T+1)*(self.nv+4)+T, 0] = \
             -np.dot(params.hs, np.dot(b1, dist_traj)) + \
