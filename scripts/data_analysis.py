@@ -447,6 +447,7 @@ class DataAnalyser():
                 plt.xlabel('horizontal distance [m]')
                 plt.ylabel('height [m]')
                 try:
+                    plt.grid(True)
                     plt.pause(0.05)
                 except:
                     # Window was probably closed

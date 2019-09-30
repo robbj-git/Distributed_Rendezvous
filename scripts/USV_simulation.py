@@ -197,7 +197,7 @@ class USV_simulator():
             # ------- Solving Problem --------
             if self.DISTRIBUTED:
                 self.problemUSV.solve(self.xb, self.x_traj, self.USV_should_stop)
-            elif not self.PRED_PARALLEL_TRAJ and self.PARALLEL and i % self.INTER_ITS == 0:
+            elif self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
                     xb0 = self.xb_traj[self.INTER_ITS*self.nUSV\
                         :(self.INTER_ITS+1)*self.nUSV]
