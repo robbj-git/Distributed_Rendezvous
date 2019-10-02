@@ -51,7 +51,7 @@ rospy.Subscriber('USV_test_round', Int32, USV_test_round_callback)
 rospy.Subscriber('USV_has_stored_data', Int32, USV_store_callback)
 
 # Altitude of the USV, currently assumed constant, which is why it is set here
-hb = 5
+hb = 0
 
 class ProblemParams():
     def __init__(self):
@@ -69,6 +69,8 @@ class ProblemParams():
         self.Q = Q
         self.P = P
         self.R = R
+        self.Qb_vel = Qb_vel
+        self.Pb_vel = Pb_vel
         self.Q_vel = Q_vel
         self.P_vel = P_vel
         self.Av = Av

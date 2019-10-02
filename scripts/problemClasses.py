@@ -25,7 +25,7 @@ np.seterr(divide='ignore', invalid='ignore')
 
 class CentralisedProblem():
 
-    def __init__(self, T, A, B, Ab, Bb, Q, P, R, Q_vel, P_vel, type, params,\
+    def __init__(self, T, A, B, Ab, Bb, Q, P, R, Q_vel, P_vel, Qb_vel, Pb_vel, type, params,\
         travel_dir = None):
         self.T = T
         self.A = A
@@ -35,6 +35,8 @@ class CentralisedProblem():
         self.Q = Q
         self.P = P
         self.R = R
+        self.Qb_vel = Qb_vel
+        self.Pb_vel = Pb_vel
         self.Q_vel = Q_vel
         self.P_vel = P_vel
         self.params = params
@@ -61,6 +63,8 @@ class CentralisedProblem():
         self.Q_big  = np.kron(np.eye(T+1), self.Q)
         self.Q_big[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P  # Not double-checked
         self.R_big  = np.kron(np.eye(T),   self.R)
+        self.Qb_big_vel  = np.kron(np.eye(T+1), self.Qb_vel)
+        self.Qb_big_vel[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.Pb_vel
         self.Q_big_vel  = np.kron(np.eye(T+1), self.Q_vel)
         self.Q_big_vel[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P_vel
 
@@ -106,14 +110,14 @@ class CentralisedProblem():
         if self.travel_dir is None:
             Q_temp = self.Q_big
         else:
-            Q_temp = self.Q_big + self.Q_big_vel
+            Q_temp = self.Q_big + self.Qb_big_vel
         P_temp = 2*np.bmat([
-            [self.Q_big,       zeros,       zeros_tall,   -self.Q_big,       zeros,          zeros_tall],
-            [zeros.T,       self.R_big,     zeros_short,    zeros.T,       zeros_sqr,       zeros_short],
-            [zeros_tall.T, zeros_short.T,     self.C,      zeros_tall.T, zeros_short.T, np.zeros((2,2))],
-            [-self.Q_big,      zeros,         zeros_tall,    Q_temp,         zeros,          zeros_tall],
-            [zeros.T,        zeros_sqr,     zeros_short,     zeros.T,     self.R_big,       zeros_short],
-            [zeros_tall.T, zeros_short.T, np.zeros((2,2)), zeros_tall.T, zeros_short.T,          self.C]
+            [self.Q_big+self.Q_big_vel,    zeros,       zeros_tall,   -self.Q_big,       zeros,          zeros_tall],
+            [zeros.T,                    self.R_big,     zeros_short,    zeros.T,       zeros_sqr,       zeros_short],
+            [zeros_tall.T,              zeros_short.T,     self.C,      zeros_tall.T, zeros_short.T, np.zeros((2,2))],
+            [-self.Q_big,                 zeros,         zeros_tall,    Q_temp,         zeros,          zeros_tall],
+            [zeros.T,                    zeros_sqr,     zeros_short,     zeros.T,     self.R_big,       zeros_short],
+            [zeros_tall.T,              zeros_short.T, np.zeros((2,2)), zeros_tall.T, zeros_short.T,          self.C]
         ])
         # This matrix should be created straight from the dense counterpart,
         # because 1. the matrix is not diagonal, 2. it has a non-changing spartsity pattern
@@ -153,7 +157,7 @@ class CentralisedProblem():
             vel_vec = np.kron(np.ones((T+1, 1)), vel_state)
             self.q_OSQP = -2*np.bmat([
                 [np.zeros((nUAV*(T+1)+mUAV*T+2, 1))],
-                [np.dot( self.Q_big_vel, vel_vec)],
+                [np.dot( self.Qb_big_vel, vel_vec)],
                 [np.zeros((T*mUSV+2, 1))]
             ])
 
@@ -316,13 +320,15 @@ class CentralisedProblem():
 
 class UAVProblem():
 
-    def __init__(self, T, A, B, Q, P, R, nUSV, type, params):
+    def __init__(self, T, A, B, Q, P, R, Q_vel, P_vel, nUSV, type, params):
         self.T = T
         self.A = A
         self.B = B
         self.Q = Q
         self.P = P
         self.R = R
+        self.Q_vel = Q_vel
+        self.P_vel = P_vel
         self.nUSV = nUSV
         self.type = type
         self.params = params
@@ -344,6 +350,8 @@ class UAVProblem():
         self.Q_big  = np.kron(np.eye(T+1), self.Q)
         self.Q_big[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P  # Not double-checked
         self.R_big  = np.kron(np.eye(T),   self.R)
+        self.Q_big_vel = np.kron(np.eye(T+1), self.Q_vel)
+        self.Q_big_vel[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P_vel
 
         # Dynamics Matrices
         self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
@@ -362,9 +370,9 @@ class UAVProblem():
                 velocity_extractor[ 2*i+j, nUAV*i+2+j ] = 1
 
         self.C = 100*(T+1)*np.eye(2)
-        P_temp = 2*np.bmat([[self.Q_big, np.zeros((nUAV*(T+1), mUAV*T)), np.zeros((nUAV*(T+1), 2))],\
-            [np.zeros((mUAV*T, nUAV*(T+1))), self.R_big,                 np.zeros((mUAV*T, 2))],
-            [np.zeros((2, nUAV*(T+1))),      np.zeros((2, mUAV*T)),      self.C]])
+        P_temp = 2*np.bmat([[self.Q_big+self.Q_big_vel, np.zeros((nUAV*(T+1), mUAV*T)), np.zeros((nUAV*(T+1), 2))],\
+            [np.zeros((mUAV*T, nUAV*(T+1))),                self.R_big,                 np.zeros((mUAV*T, 2))],
+            [np.zeros((2, nUAV*(T+1))),                     np.zeros((2, mUAV*T)),      self.C]])
         P_data = np.diagonal(P_temp)
         P_row = range(nUAV*(T+1) + mUAV*T + 2)
         P_col = range(nUAV*(T+1) + mUAV*T + 2)
@@ -515,15 +523,15 @@ class UAVProblem():
 
 class USVProblem():
 
-    def __init__(self, T, Ab, Bb, Q, P, R, Q_vel, P_vel, nUAV, type, params, travel_dir = None):
+    def __init__(self, T, Ab, Bb, Q, P, R, Qb_vel, Pb_vel, nUAV, type, params, travel_dir = None):
         self.T = T
         self.Ab = Ab
         self.Bb = Bb
         self.Q = Q
         self.P = P
         self.R = R
-        self.Q_vel = Q_vel
-        self.P_vel = P_vel
+        self.Qb_vel = Qb_vel
+        self.Pb_vel = Pb_vel
         self.nUAV = nUAV
         self.type = type
         self.params = params
@@ -549,8 +557,8 @@ class USVProblem():
         self.Q_big[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = self.P  # Not double-checked
         self.Q_big_sparse = csc_matrix(self.Q_big)
         self.R_big  = np.kron(np.eye(T),   self.R)
-        self.Q_big_vel  = np.kron(np.eye(T+1), self.Q_vel)
-        self.Q_big_vel[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = self.P_vel
+        self.Qb_big_vel  = np.kron(np.eye(T+1), self.Qb_vel)
+        self.Qb_big_vel[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = self.Pb_vel
 
         # Dynamics Matrices
         self.Phi_b = np.zeros(( (T+1)*nUSV, nUSV ))
@@ -580,7 +588,7 @@ class USVProblem():
             ])
         else:
             # Allows the USV to also track a reference velocity trajectory
-            P_temp = 2*np.bmat([[self.Q_big+self.Q_big_vel, np.zeros((dim1, dim2)), np.zeros((dim1, 2))],
+            P_temp = 2*np.bmat([[self.Q_big+self.Qb_big_vel, np.zeros((dim1, dim2)), np.zeros((dim1, 2))],
                 [np.zeros((dim2, dim1)), 2*self.R_big, np.zeros((dim2, 2))],
                 [np.zeros((2, dim1)), np.zeros((2, dim2)), self.C]
             ])
@@ -608,7 +616,7 @@ class USVProblem():
             v_y_des = 0.9*v_min_y_b + 0.1*v_max_y_b
             vel_state = np.array([[0], [0], [v_x_des], [v_y_des]])
             vel_vec = np.kron(np.ones((T+1, 1)), vel_state)
-            self.vel_cost_vec = np.dot( self.Q_big_vel, vel_vec)
+            self.vel_cost_vec = np.dot( self.Qb_big_vel, vel_vec)
             self.q_OSQP = -2*np.bmat([
                 [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUAV, 1 )) ) + \
                     self.vel_cost_vec],

@@ -87,6 +87,8 @@ class ProblemParams():
         self.Qv = Qv
         self.Pv = Pv
         self.Rv = Rv
+        self.Qb_vel = Qb_vel
+        self.Pb_vel = Pb_vel
         self.Q_vel = Q_vel
         self.P_vel = P_vel
         self.used_solver = used_hor_solver

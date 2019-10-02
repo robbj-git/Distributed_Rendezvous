@@ -58,9 +58,9 @@ class UAV_simulator():
         self.hb = pp.hb
 
         self.problemCent = CentralisedProblem(pp.T, pp.A, pp.B, pp.Ab, pp.Bb,\
-            pp.Q, pp.P, pp.R, pp.Q_vel, pp.P_vel, pp.used_solver, pp.params, travel_dir = travel_dir)
+            pp.Q, pp.P, pp.R, pp.Q_vel, pp.P_vel, pp.Qb_vel, pp.Pb_vel, pp.used_solver, pp.params, travel_dir = travel_dir)
         self.problemUAV = UAVProblem(pp.T, pp.A,  pp.B,  pp.Q, pp.P, pp.R,\
-            self.nUSV, pp.used_solver, pp.params)
+            pp.Q_vel, pp.P_vel, self.nUSV, pp.used_solver, pp.params)
         self.problemVert = VerticalProblem(pp.T, pp.Av, pp.Bv, pp.Qv, pp.Pv,\
             pp.Rv, pp.vert_used_solver, pp.params, self.hb)
 
@@ -202,10 +202,6 @@ class UAV_simulator():
 
         start = time.time()
         for i in range(sim_len):
-            # if i > 0:
-            #     end0 = time.time()
-            #     print end0 - start0
-            # print i, rospy.get_time()    #DEBUG PRINT
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -218,7 +214,6 @@ class UAV_simulator():
                         self.xb = np.array(\
                             [[xb_msg.pose.position.x], [xb_msg.pose.position.y],\
                             [xb_msg.twist.linear.x], [xb_msg.twist.linear.y]])
-                        # print "UPDATED (x, y):", xb_msg.pose.position.x, ",", xb_msg.pose.position.y  # DEBUG PRINT
                     except IndexError:
                         # Leave self.xb unchanged
                         pass
@@ -303,9 +298,6 @@ class UAV_simulator():
             # ------- Sleep --------
             end = time.time()
             self.iteration_durations.append(end-start)
-            # if end-start > 0.05:  # DEBUG PRINT
-                # print end-start
-            # start0 = time.time()
             self.rate.sleep()
             start = time.time()
 

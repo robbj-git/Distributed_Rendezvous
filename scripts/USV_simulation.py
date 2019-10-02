@@ -60,7 +60,7 @@ class USV_simulator():
         self.USV_stopped_at_iter = np.nan
 
         self.problemUSV = USVProblem(pp.T, pp.Ab, pp.Bb,  pp.Q, pp.P, pp.R,\
-            pp.Q_vel, pp.P_vel, self.nUAV, self.used_solver, self.params, travel_dir = travel_dir)
+            pp.Qb_vel, pp.Pb_vel, self.nUAV, self.used_solver, self.params, travel_dir = travel_dir)
 
         self.problemUSVFast = FastUSVProblem(pp.T_inner, pp.Ab, pp.Bb,\
             pp.Q, pp.P, pp.R, self.used_solver, pp.params)
