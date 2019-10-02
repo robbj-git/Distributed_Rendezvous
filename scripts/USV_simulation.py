@@ -199,7 +199,7 @@ class USV_simulator():
                 self.problemUSV.solve(self.xb, self.x_traj, self.USV_should_stop)
             elif self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
-                    xb0 = self.xb_traj[self.INTER_ITS*self.nUSV\
+                    xb0 = self.xb_traj_inner[self.INTER_ITS*self.nUSV\
                         :(self.INTER_ITS+1)*self.nUSV]
                     traj = shift_trajectory(self.x_traj, self.nUAV, self.INTER_ITS)
                 else:

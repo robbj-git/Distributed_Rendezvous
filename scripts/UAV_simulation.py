@@ -240,7 +240,7 @@ class UAV_simulator():
                 self.problemUAV.solve(self.x, np.asarray(self.xb_traj))
             elif self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
-                    x0 = self.x_traj[self.INTER_ITS*self.nUAV\
+                    x0 = self.x_traj_inner[self.INTER_ITS*self.nUAV\
                         :(self.INTER_ITS+1)*self.nUAV]
                     traj = shift_trajectory(self.xb_traj, self.nUSV, self.INTER_ITS)
                 else:

@@ -583,157 +583,6 @@ class DataAnalyser():
             fig.show()
         plt.show()# raw_input()
 
-    # def plot_obj_val(self, real_time = False):
-    #     p = self.p
-    #     upper_vel_constraints = Polygon([ (-100,   2*p.wmax),\
-    #                                       (1000,   2*p.wmax),\
-    #                                       (1000,   p.wmax),\
-    #                                       (-100,   p.wmax)], True)
-    #     lower_vel_constraints = Polygon([ (-100,   2*p.wmin),\
-    #                                       (1000,   2*p.wmin),\
-    #                                       (1000,   p.wmin),\
-    #                                       (-100,   p.wmin)], True)
-    #     self.should_close = False
-    #
-    #     for file_index, dir in enumerate(self.files):
-    #         patch_collection = PatchCollection( [upper_vel_constraints,\
-    #             lower_vel_constraints], alpha=0.5, color='grey')
-    #         fig = plt.figure()
-    #         fig.canvas.mpl_connect('close_event', self.handle_close)
-    #         ax = plt.axes()
-    #
-    #         xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
-    #         vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
-    #         s_vert_log = np.loadtxt(dir_path + dir + '/s_vert_log.txt')
-    #         obj_val_log = np.loadtxt(dir_path + dir + '/obj_val_log.txt')
-    #         if self.file_types[file_index] == PARALLEL:
-    #             vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
-    #             T_inner = vert_inner_traj_log.shape[0]//p.nv
-    #
-    #         T_outer = vert_traj_log.shape[0]//p.nv
-    #         time_len = vert_traj_log.shape[1]
-    #         if real_time:
-    #             time = range(time_len)
-    #         else:
-    #             time = [time_len-1]
-    #
-    #         for t in time:
-    #             ax.cla()
-    #             vel_pred_log = vert_traj_log[1::p.nv, t]
-    #             actual_vel_bound = -p.kl*xv_log[0, 0:t+1] + p.wmin_land
-    #             pred_vel_bound   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land
-    #             actual_vel_bound_slack = -p.kl*xv_log[0, 0:t+1] + p.wmin_land - s_vert_log[0:t+1]
-    #             pred_vel_bound_slack   = -p.kl*vert_traj_log[0::p.nv, t] + p.wmin_land - s_vert_log[t]
-    #             if np.isnan(vel_pred_log).any():
-    #                 vel_pred_log = np.full((T_outer,), xv_log[1, t])
-    #             if np.isnan(pred_vel_bound).any():
-    #                 pred_vel_bound = np.full((T_outer,), -p.kl*xv_log[0, t] + p.wmin_land)
-    #                 # TODO: Add a velocity bound predicted by inner controller in parallel case?
-    #
-    #             # ax.plot(range(t+1), xv_log[1, 0:t+1], 'blue')
-    #             # ax.plot(range(t+1, t+T_outer+1), vel_pred_log, 'green', alpha=0.5)
-    #             # ax.plot(range(t+1), actual_vel_bound, 'red')
-    #             # ax.plot(range(t+1, t+T_outer+1), pred_vel_bound, 'orange')
-    #             # ax.plot(range(t+1), actual_vel_bound_slack, 'red', alpha=0.5)
-    #             # ax.plot(range(t+1, t+T_outer+1), pred_vel_bound_slack, 'orange', alpha=0.5)
-    #             # ax.plot(range(t+1), s_vert_log[0:t+1], 'k')
-    #             # if self.file_types[file_index] == PARALLEL:
-    #             #     vel_inner_pred_log = vert_inner_traj_log[1::p.nv, t]
-    #             #     ax.plot(range(t+1, t+T_inner+1), vel_inner_pred_log, 'yellow', alpha=0.5)
-    #             ax.plot(range(t+1), obj_val_log[0:t+1], 'k')
-    #
-    #             ax.add_collection(patch_collection)
-    #             plt.xlabel('time [iterations]')
-    #             plt.ylabel('velocity [m/s]')
-    #             try:
-    #                 plt.pause(0.05)
-    #             except:
-    #                 # Window was probably closed
-    #                 return
-    #             if self.should_close:   # Window was closed
-    #                 return
-    #         fig.show()
-    #     # fig = plt.figure()
-    #     # fig.canvas.mpl_connect('close_event', self.handle_close)
-    #     # ax = plt.axes()
-    #     # ax.plot(range(500), obj_val_log, 'red')
-    #     # ax.plot(range(500), 500*s_vert_log, 'green')
-    #     plt.show()
-
-    # def plot_3d_super_realtime(self):
-    #     p = self.p
-    #     self.should_close = False
-    #
-    #     for file_index, dir in enumerate(self.files):
-    #         fig = plt.figure()
-    #         fig.canvas.mpl_connect('close_event', self.handle_close)
-    #         ax = plt.axes(projection='3d')
-    #         x_log  = np.loadtxt(dir_path + dir + '/x_log.txt')
-    #         xb_log = np.loadtxt(dir_path + dir + '/xb_log.txt')
-    #         xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
-    #         UAV_traj_log = np.loadtxt(dir_path + dir + '/UAV_traj_log.txt')
-    #         USV_traj_log = np.loadtxt(dir_path + dir + '/USV_traj_log.txt')
-    #         vert_traj_log = np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
-    #         self.UAV_time_stamps = np.loadtxt(dir_path + dir + '/UAV_time_stamps.txt')
-    #         self.USV_time_stamps = np.loadtxt(dir_path + dir + '/USV_time_stamps.txt')
-    #         t_0 = min(self.UAV_time_stamps.min(), self.USV_time_stamps.min())
-    #         t_f = max(self.UAV_time_stamps.max(), self.USV_time_stamps.max())
-    #
-    #         if self.file_types[file_index] == PARALLEL:
-    #             UAV_inner_traj_log = np.loadtxt(dir_path + dir + '/UAV_inner_traj_log.txt')
-    #             USV_inner_traj_log = np.loadtxt(dir_path + dir + '/USV_inner_traj_log.txt')
-    #             vert_inner_traj_log = np.loadtxt(dir_path + dir + '/vert_inner_traj_log.txt')
-    #
-    #         (sim_len, _) = UAV_traj_log.shape
-    #         imax = 0
-    #         imax_b = 0
-    #         time_points = np.reshape(np.arange(t_0, t_f, 0.01), (1, -1))
-    #         for (_,_), t in np.ndenumerate(time_points):
-    #             ax.cla()
-    #             while imax < sim_len-1 and self.UAV_time_stamps[imax+1] <= t:
-    #                 imax += 1
-    #             while imax_b < sim_len-1 and self.USV_time_stamps[imax_b+1] <= t:
-    #                 imax_b += 1
-    #             x_pred_traj = UAV_traj_log[0::p.nUAV, imax]
-    #             y_pred_traj = UAV_traj_log[1::p.nUAV, imax]
-    #             z_pred_traj = vert_traj_log[0::p.nv,  imax]
-    #             xb_pred_traj = USV_traj_log[0::p.nUSV, imax_b]
-    #             yb_pred_traj = USV_traj_log[1::p.nUSV, imax_b]
-    #
-    #             # Actual trajectories
-    #             ax.plot3D(x_log[0, 0:imax+1], x_log[1, 0:imax+1], xv_log[0, 0:imax+1], 'blue')
-    #             ax.plot3D(xb_log[0, 0:imax_b+1], xb_log[1, 0:imax_b+1], 0, 'red')
-    #             # Predicted trajectories
-    #             if not np.isnan(z_pred_traj).all():
-    #                 ax.plot3D(x_pred_traj, y_pred_traj, z_pred_traj, 'green', alpha=0.5)
-    #             else:
-    #                 ax.plot3D(x_pred_traj, y_pred_traj,  xv_log[0, imax], 'green', alpha=0.5)
-    #             ax.plot3D(xb_pred_traj, yb_pred_traj, 0, 'green', alpha=0.5)
-    #             if self.file_types[file_index] == PARALLEL:
-    #                 x_inner_pred_traj = UAV_inner_traj_log[0::p.nUAV, imax]
-    #                 y_inner_pred_traj = UAV_inner_traj_log[1::p.nUAV, imax]
-    #                 z_inner_pred_traj = vert_inner_traj_log[0::p.nv,  imax]
-    #                 xb_inner_pred_traj = USV_inner_traj_log[0::p.nUSV, imax_b]
-    #                 yb_inner_pred_traj = USV_inner_traj_log[1::p.nUSV, imax_b]
-    #                 ax.plot3D(x_inner_pred_traj, y_inner_pred_traj, z_inner_pred_traj, 'yellow', alpha=0.5)
-    #                 ax.plot3D(xb_inner_pred_traj, yb_inner_pred_traj, 0, 'yellow', alpha=0.5)
-    #
-    #             ax.set_zlim(0)
-    #             plt.xlabel('x-position [m]')
-    #             plt.ylabel('y-position [m]')
-    #             ax.set_zlabel('Height [m]')
-    #             plt.legend(['UAV trajectory', 'USV trajectory'])
-    #             plt.pause(0.01)
-    #             try:
-    #                 plt.pause(0.01)
-    #             except:
-    #                 # Window was probably closed
-    #                 return
-    #             if self.should_close:   # Window was closed
-    #                 return
-    #         fig.show()
-    #     plt.show()# raw_input()
-
     def handle_close(self, evt):
         self.should_close = True
 
@@ -1495,12 +1344,12 @@ class DataLoader:
 
 if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
-    # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
+    data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    data_analyser.plot_with_constraints(real_time = True, perspective = UAV)
+    # data_analyser.plot_with_constraints(real_time = True, perspective = UAV)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)
