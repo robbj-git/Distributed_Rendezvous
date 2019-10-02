@@ -9,11 +9,16 @@ from matplotlib.patches import Polygon, Circle
 from matplotlib.collections import PatchCollection
 from matplotlib.animation import FuncAnimation
 import matplotlib.animation
+import getpass
 
 CENTRALISED = 0
 DISTRIBUTED = 1
 PARALLEL    = 2
-dir_path = '/home/student/robbj_experiment_results/'
+
+# getpass.getuser()
+# print getpass.getuser()
+
+dir_path = '/home/' + getpass.getuser() + '/robbj_experiment_results/'
 
 ACTUAL = 0
 UAV = 1
