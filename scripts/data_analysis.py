@@ -583,6 +583,80 @@ class DataAnalyser():
             fig.show()
         plt.show()# raw_input()
 
+    def plot_altitude(self, real_time = False, perspective = ACTUAL):
+        p = self.p
+        self.should_close = False
+
+        for file_index, dir in enumerate(self.files):
+            fig = plt.figure()
+            fig.canvas.mpl_connect('close_event', self.handle_close)
+            ax = plt.axes()
+
+            dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['horizontal', 'vertical'], self.p)
+
+            if perspective == ACTUAL:
+                xb_log = dtl.xb_log
+                USV_traj_log = dtl.USV_traj_log
+                x_log = dtl.x_log
+                UAV_traj_log = dtl.UAV_traj_log
+            elif perspective == UAV:
+                if self.file_types[file_index] == CENTRALISED:
+                    USV_traj_log = dtl.USV_traj_log
+                else:
+                    USV_traj_log = dtl.USV_traj_log_UAV
+                xb_log = dtl.xb_log_UAV
+                x_log = dtl.x_log
+                UAV_traj_log = dtl.UAV_traj_log
+            elif perspective == USV:
+                xb_log = dtl.xb_log
+                USV_traj_log = dtl.USV_traj_log
+                if self.file_types[file_index] == CENTRALISED:
+                    x_log = dtl.x_log
+                    UAV_traj_log = dtl.UAV_traj_log
+                else:
+                    x_log = dtl.x_log_USV
+                    UAV_traj_log = dtl.UAV_traj_log_USV
+
+            time_len = dtl.x_log.shape[1]-1
+            dist_log = np.sqrt( np.square(x_log[0, 0:time_len] - xb_log[0, 0:time_len]) + \
+                np.square(x_log[1, 0:time_len] - xb_log[1, 0:time_len]) )
+            b_log = (dist_log < ds).astype(int)
+            vert_const_log = np.dot(np.diag(b_log), (hs*dl - hs*dist_log)/(dl - ds)) + np.dot(np.diag(1-b_log), np.full((time_len, ), hs))
+            vert_const_log = np.maximum(vert_const_log, np.zeros(vert_const_log.shape))
+            T = UAV_traj_log.shape[0]//p.nUAV
+            if self.file_types[file_index] == PARALLEL:
+                T_inner = dtl.vert_inner_traj_log.shape[0]//p.nv
+
+            if real_time:
+                time = range(time_len)
+            else:
+                time = [time_len-1]
+
+            for t in time:
+                ax.cla()
+                # dist_pred_log = np.sqrt( np.square(UAV_traj_log[0::p.nUAV, t] - USV_traj_log[0::p.nUSV, t])\
+                #     + np.square(UAV_traj_log[1::p.nUAV, t] - USV_traj_log[1::p.nUSV, t]) )
+                vert_pred_log = dtl.vert_traj_log[0::p.nv, t]
+
+                ax.plot(range(t+1), dtl.xv_log[0, 0:t+1], 'blue')
+                ax.plot(range(t, t+T), vert_pred_log, 'green', alpha=0.5)
+                ax.plot(range(t+1), vert_const_log[0:t+1], 'red')
+                if self.file_types[file_index] == PARALLEL:
+                    vert_inner_pred_log = dtl.vert_inner_traj_log[0::p.nv, t]
+                    ax.plot(range(t, t+T_inner), vert_inner_pred_log, 'yellow', alpha=0.5)
+                plt.xlabel('horizontal distance [m]')
+                plt.ylabel('altitude [m]')
+                try:
+                    plt.grid(True)
+                    plt.pause(0.05)
+                except:
+                    # Window was probably closed
+                    return
+                if self.should_close:   # Window was closed
+                    return
+            fig.show()
+        plt.show()
+
     def handle_close(self, evt):
         self.should_close = True
 
@@ -1344,12 +1418,13 @@ class DataLoader:
 
 if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
-    data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
+    # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
     # data_analyser.plot_with_constraints(real_time = True, perspective = UAV)
+    data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)
