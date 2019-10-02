@@ -353,19 +353,10 @@ class DataAnalyser():
         plt.show()
 
     def plot_with_constraints(self, real_time = False, perspective = ACTUAL):
-        forbidden_area_1 = Polygon([ (dl, 0),\
-                                     (ds, hs),\
-                                     (35, hs),\
-                                     (35, 0)], True)
-        forbidden_area_2 = Polygon([ (-dl, 0),\
-                                     (-ds, hs),\
-                                     (-35, hs),\
-                                     (-35, 0)], True)
         p = self.p
         self.should_close = False
 
         for file_index, dir in enumerate(self.files):
-            safety_patch_collection = PatchCollection([forbidden_area_1, forbidden_area_2], alpha=0.5, color='grey')
             fig = plt.figure()
             fig.canvas.mpl_connect('close_event', self.handle_close)
             ax = plt.axes()
@@ -374,6 +365,15 @@ class DataAnalyser():
             # print dtl.x_log_raw[0, 0:3]
             # print dtl.x_log[0, 0:3]
             # return
+            forbidden_area_1 = Polygon([ (dl, dtl.hb),\
+                                         (ds, dtl.hb+hs),\
+                                         (35, dtl.hb+hs),\
+                                         (35, dtl.hb)], True)
+            forbidden_area_2 = Polygon([ (-dl, dtl.hb),\
+                                         (-ds, dtl.hb+hs),\
+                                         (-35, dtl.hb+hs),\
+                                         (-35, dtl.hb)], True)
+            safety_patch_collection = PatchCollection([forbidden_area_1, forbidden_area_2], alpha=0.5, color='grey')
 
             if perspective == ACTUAL:
                 xb_log = dtl.xb_log#np.loadtxt(dir_path + dir + '/xb_log.txt')
@@ -797,6 +797,9 @@ class DataLoader:
                 self.vert_traj_log = self.get_interpolated_traj(self.vert_traj_log_raw, UAV_time_stamps, new_time_stamps)
                 self.s_vert_log = self.get_adjusted_array(self.s_vert_log_raw, UAV_time_stamps, new_time_stamps)
 
+                self.hb = self.get_USV_altitude(dir_path)
+                print self.hb
+
                 if problem_type == PARALLEL:
                     self.vert_inner_traj_log_raw = np.loadtxt(dir_path + '/vert_inner_traj_log.txt')
 
@@ -878,6 +881,17 @@ class DataLoader:
                     new_traj[i] = traj[i_0]
                     break
         return new_traj
+
+    def get_USV_altitude(self, dir_path):
+
+        file = open(dir_path + '/info.txt')
+        lines = file.readlines()
+        if lines[9].find('altitude:') > 0:
+            substrings = lines[9].split(':')
+            return float(substrings[1])
+        else:
+            print "Couldn't find USV altitude"
+            return 0
 
 
 # def combine_multiple_results(dirs):

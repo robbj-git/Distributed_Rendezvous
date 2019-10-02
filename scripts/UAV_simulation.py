@@ -55,13 +55,14 @@ class UAV_simulator():
         self.dropout_upper_bound = pp.dropout_upper_bound
         self.long_ref = None
         self.lat_ref = None
+        self.hb = pp.hb
 
         self.problemCent = CentralisedProblem(pp.T, pp.A, pp.B, pp.Ab, pp.Bb,\
             pp.Q, pp.P, pp.R, pp.Q_vel, pp.P_vel, pp.used_solver, pp.params, travel_dir = travel_dir)
         self.problemUAV = UAVProblem(pp.T, pp.A,  pp.B,  pp.Q, pp.P, pp.R,\
             self.nUSV, pp.used_solver, pp.params)
         self.problemVert = VerticalProblem(pp.T, pp.Av, pp.Bv, pp.Qv, pp.Pv,\
-            pp.Rv, pp.vert_used_solver, pp.params, pp.hb)
+            pp.Rv, pp.vert_used_solver, pp.params, self.hb)
 
         self.problemUAVFast = FastUAVProblem(pp.T_inner, pp.A, pp.B, pp.Q, pp.P,\
             pp.R, self.used_solver, pp.params)
@@ -479,7 +480,8 @@ class UAV_simulator():
         info_str += 'UAV used horizontal solver: ' + used_solver + '\n'
         info_str += 'and vertical solver: ' + self.vert_used_solver + '\n'
         info_str += 'Delay length [iterations]: ' + str(self.delay_len) + '\n'
-        info_str += ("HIL setup" if self.USE_HIL else "Local setup") + " was used"
+        info_str += ("HIL setup" if self.USE_HIL else "Local setup") + " was used\n"
+        info_str += "USV was at altitude: " + str(self.hb)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/info.txt', [info_str], fmt="%s")
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/x_log.txt', self.x_log)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/xv_log.txt', self.xv_log)
