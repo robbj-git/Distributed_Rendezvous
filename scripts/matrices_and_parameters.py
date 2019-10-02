@@ -19,7 +19,7 @@ wmin_land = -0.3
 # Additional allowed negative vertical velocity per unit height
 kl = 0.2
 vmax = 5.0
-vmax_b = 5.0
+vmax_b = 3.0
 vmin_b = 0.8
 # vmax_x_b = vmax_b
 # vmin_x_b = vmin_b

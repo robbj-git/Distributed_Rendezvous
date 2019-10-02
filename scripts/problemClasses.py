@@ -775,7 +775,7 @@ class USVProblem():
 
 class VerticalProblem():
 
-    def __init__(self, T, Av, Bv, Qv, Pv, Rv, type, params):
+    def __init__(self, T, Av, Bv, Qv, Pv, Rv, type, params, hb = 0):
         self.T = T
         self.Av = Av
         self.Bv = Bv
@@ -786,9 +786,10 @@ class VerticalProblem():
         self.params = params
         self.nv = 2
         self.mv = 1
+        self.hb = hb
         # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
-        self.create_optimisation_matrices()
+        self.create_optimisation_matrices(self.hb)
         self.create_optimisation_problem()
         self.durations = [] #DEBUG
         self.num_iters_log = [] #DEBUG
@@ -799,7 +800,7 @@ class VerticalProblem():
         if type == 'CVXGEN':
             self.ROS_init()
 
-    def create_optimisation_matrices(self):
+    def create_optimisation_matrices(self, hb):
         T = self.T
         nv = self.nv
         mv = self.mv
@@ -872,7 +873,8 @@ class VerticalProblem():
         P_row = range(nv*(T+1) + mv*T + 1)
         P_col = range(nv*(T+1) + mv*T + 1)
         self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
-        self.q_OSQP = 0
+        xb = np.kron(np.ones((T+1, 1)), np.array([[hb], [0]]) )
+        self.q_OSQP = np.block([[-2*np.dot(self.Qv_big, xb)], [np.zeros((mv*T+1, 1))]])
         # Honestly, I can't quite remember wth I was doing here, remade it below
         # self.l_OSQP = np.bmat([[np.dot(self.Phi_v,np.zeros((nv, 1)))],\
         #     [np.full((4*(T+1), 1), -np.inf)],\
@@ -889,7 +891,7 @@ class VerticalProblem():
         self.l_OSQP = np.bmat([
             [np.dot(self.Phi_v, np.zeros((nv, 1)))],    # Dynamics
             [np.dot(params.wmin,np.ones((2*T+1, 1)))],  # Velocity and input constraints
-            [np.dot(params.wmin_land,np.ones((T+1, 1)))], # Touchdown constraints
+            [np.dot(params.wmin_land,np.ones((T+1, 1))) + params.kl*np.full((T+1, 1), hb)], # Touchdown constraints
             [-np.full((T+1,1), np.inf)],                        # Altitude constraints
             [-np.full((T+1,1), np.inf)]                  # Safety constraints
         ])
@@ -900,7 +902,8 @@ class VerticalProblem():
             [np.full((T+1, 1), np.inf)],                  # Touchdown constraints
             [np.full((T+1, 1), np.inf)],                  # Altitude constraints
             [-np.dot(params.hs,np.zeros((T+1, 1))) + \
-                np.dot(params.hs*params.dl, np.ones((T+1, 1)))] # Safety constraints
+                np.dot(params.hs*params.dl, np.ones((T+1, 1))) + \
+                np.full((T+1, 1), (params.dl-params.ds)*hb)] # Safety constraints
         ])
         # INCLUDES SOFT CONSTRAINTS
         self.A_temp = np.bmat([
@@ -975,7 +978,7 @@ class VerticalProblem():
 
         # max_iter = 400 if self.PARALLEL else 200
         self.problemOSQP = osqp.OSQP()
-        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 300)
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, q=self.q_OSQP, verbose=False, max_iter = 300)
 
     def ROS_init(self):
         if self.T == 100:
@@ -1052,7 +1055,7 @@ class VerticalProblem():
                 (self.nv*(self.T+1), 1), order='F')
         elif self.type == 'OSQP':
             start = time.time()
-            self.update_OSQP(xv_m, dist, self.b.value)
+            self.update_OSQP(xv_m, dist, self.b.value, self.hb)
             results = self.problemOSQP.solve()
             if results.x[0] is not None and results.info.status != 'maximum iterations reached':
                 self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
@@ -1150,7 +1153,7 @@ class VerticalProblem():
         self.xb_v.value = np.ones((self.nv*(self.T+1), 1))*xbv_m
         self.dist.value = dist
         self.b.value = (dist <= self.params.ds).astype(int)
-        self.update_OSQP(xv_m, dist, self.b.value)
+        self.update_OSQP(xv_m, dist, self.b.value, self.hb)
         self.parent_conn, child_conn = Pipe()
         self.p = Process(target=self.solve_process, args=(child_conn,))
         self.p.start()
@@ -1161,20 +1164,24 @@ class VerticalProblem():
     def predict_trajectory(self, xv_0, wdes_traj):
         return np.dot(self.Phi_v, xv_0) + np.dot(self.Lambda_v, wdes_traj)
 
-    def update_OSQP(self, x0, dist_traj, binary_traj):
-        b1 = np.diag(np.ravel(binary_traj))
-        b2 = np.diag(np.ravel( np.kron( binary_traj, np.ones((self.nv, 1)))  ))
+    def update_OSQP(self, x0, dist_traj, binary_traj, hb):
         params = self.params
         T = self.T
+        b1 = np.diag(np.ravel(binary_traj))
+        b2 = np.diag(np.ravel( np.kron( binary_traj, np.ones((self.nv, 1)))  ))
+        # xb = np.kron(np.ones((T+1, 1)), np.array([[hb], [0]]) )
         self.l_OSQP[0:(T+1)*self.nv, 0] = np.dot(self.Phi_v, x0)    # Dynamics
         self.l_OSQP[(T+1)*(self.nv+2)+T:(T+1)*(self.nv+3)+T, 0] = \
-            np.dot( (np.eye(T+1)-2*b1), np.full((T+1,1), params.hs) ) # Altitude constraints
+            np.dot( (np.eye(T+1)-2*b1), np.full((T+1,1), params.hs) ) + \
+            np.full((T+1,1), hb) # Altitude constraints
         # I subtract 2*b1 since I want the constraint to be softer than h>=0
         # It doesn't really matter if UAV dips a bit below 0, no reason to fail optimisation because of that
         self.u_OSQP[0:(T+1)*self.nv, 0] = np.dot(self.Phi_v, x0)    # Dynamics
         self.u_OSQP[(T+1)*(self.nv+3)+T:(T+1)*(self.nv+4)+T, 0] = \
             -np.dot(params.hs, np.dot(b1, dist_traj)) + \
-                np.full((T+1,1), params.hs*params.dl)      # Safety constraints
+                np.full((T+1,1), params.hs*params.dl) + \
+                np.dot(b1, np.full((T+1, 1), (params.dl - params.ds)*hb) )     # Safety constraints
+        # self.q_OSQP[0:self.nv*(T+1)] = np.dot(self.Qv_big, 2*xb)  Altitude of USV not changing currently, so we don't have to change anything in update function
         self.P_temp[0:(T+1)*self.nv, 0:(T+1)*self.nv] = 2*np.dot(b2, self.Qv_big)
         P_data = np.diagonal(self.P_temp)
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP)

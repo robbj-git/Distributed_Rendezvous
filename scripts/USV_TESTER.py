@@ -104,7 +104,7 @@ class ProblemParams():
 
 problem_params = ProblemParams()
 
-xb_m = np.array([[-2], [-3], [np.nan], [np.nan]])
+xb_m = np.array([[-2], [1], [np.nan], [np.nan]])
 
 reverse_dir = False
 dir = get_travel_dir(xb_m, reverse_dir)

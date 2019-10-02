@@ -50,6 +50,9 @@ instruct_pub = rospy.Publisher('UAV_instruction', Int32, queue_size = 10, latch 
 rospy.Subscriber('USV_test_round', Int32, USV_test_round_callback)
 rospy.Subscriber('USV_has_stored_data', Int32, USV_store_callback)
 
+# Altitude of the USV, currently assumed constant, which is why it is set here
+hb = 5
+
 class ProblemParams():
     def __init__(self):
         self.CENTRALISED = CENTRALISED
@@ -81,6 +84,7 @@ class ProblemParams():
         self.KVert = KVert
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
             wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b)
+        self.hb = hb
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
         self.PRED_PARALLEL_TRAJ = PRED_PARALLEL_TRAJ
@@ -98,7 +102,7 @@ my_uav_simulator =  None
 # of the vector pointint to its starting position. However, you have to manually make
 # sure that the xb below matches the initial state of the USV in USV_TESTER.py
 # xb = None
-xb = np.array([[-2], [-3], [np.nan], [np.nan]])
+xb = np.array([[-2], [1], [np.nan], [np.nan]])
 if xb is not None and CENTRALISED:
     reverse_dir = False
     dir = get_travel_dir(xb, reverse_dir)
