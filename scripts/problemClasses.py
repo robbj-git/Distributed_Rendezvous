@@ -318,6 +318,341 @@ class CentralisedProblem():
     def predict_USV_traj(self, xb_0, ub_traj):
         return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
 
+class CompleteCentralisedProblem():
+
+    def __init__(self, T, A, B, Ab, Bb, Q, P, R, Q_vel, P_vel, Qb_vel, Pb_vel, type, params, travel_dir = None):
+        self.T = T
+        self.A = A
+        self.B = B
+        self.Ab = Ab
+        self.Bb = Bb
+        self.Q = Q
+        self.P = P
+        self.R = R
+        self.Qb_vel = Qb_vel
+        self.Pb_vel = Pb_vel
+        # self.Q_vel = Q_vel
+        # self.P_vel = P_vel
+        self.params = params
+        self.type = type
+        [self.nUAV, self.mUAV] = B.shape
+        [self.nUSV, self.mUSV] = Bb.shape
+        self.last_solution_duration = np.nan
+        self.travel_dir = travel_dir
+        self.create_optimisation_matrices()
+        self.create_optimisation_problem()
+        if self.type == 'CVXGEN':
+            self.ROS_init()
+
+    def create_optimisation_matrices(self):
+        T = self.T
+        nUAV = self.nUAV
+        mUAV = self.mUAV
+        nUSV = self.nUSV
+        mUSV = self.mUSV
+        params = self.params
+        v_max = params.v_max
+
+        Ex = np.array([ [1, 0, 0, 0, 0, 0, 0, 0],
+                        [0, 1, 0, 0, 0, 0, 0, 0],
+                        [0, 0, 1, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 1, 0, 0, 0, 0]])
+
+        # Cost Matrices
+        self.Q_big_UAV = np.kron(np.eye(T+1), Ex.T)
+        self.Q_big  = np.kron(np.eye(T+1), self.Q)
+        self.Q_big[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P  # Not double-checked
+        self.R_big  = np.kron(np.eye(T),   self.R)
+        self.Qb_big_vel  = np.kron(np.eye(T+1), self.Qb_vel)
+        self.Qb_big_vel[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.Pb_vel
+        self.Q_big_vel  = np.kron(np.eye(T+1), self.Q_vel)
+        self.Q_big_vel[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P_vel
+
+        self.A_mat =  np.array([
+            [0, 0, 1,    0, 0,             0,              0,                   0],
+            [0, 0, 0,    1, 0,             0,              0,                   0],
+            [0, 0, -kdx, 0, 0,             0,              0,                   0],
+            [0, 0, 0, -kdy, 0,             0,              0,                   0],
+            [0, 0, 1,    0, 0,             0,              1,                   0],
+            [0, 0, 1,    0, 0,             0,              0,                   1],
+            [0, 0, 1,    0, -omega_phi**2, 0,              -2*omega_phi*xi_phi, 0],
+            [0, 0, 1,    0, 0,             -omega_theta**2, 0,             -2*omega_theta*xi_theta]
+        ])
+
+        self.B_mat = np.array([
+            [0, 0],
+            [0, 0],
+            [0, 0],
+            [0, 0],
+            [0, 0],
+            [0, 0],
+            [k_phi*omega_phi**2, 0],
+            [0, k_theta*omega_theta**2]
+        ])
+
+        self.C_mat = np.zeros((8, 1))
+
+        # Dynamics Matrices
+        self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
+        self.Lambda = np.zeros(( (T+1)*nUAV, T*mUAV ))
+        self.Phi_b = np.zeros(( (T+1)*nUSV, nUSV ))
+        self.Lambda_b = np.zeros(( (T+1)*nUSV, T*mUSV ))
+        self.Phi_j = np.zeros(( (T+1)*nUAV, nUAV ))
+        self.Lambda_j = np.zeros(( (T+1)*nUAV, T*mUAV ))
+
+        J_mat = np.matrix([[0, 0, 1, 0], [0, 0, -1, 0],\
+                           [0, 0, 0, 1], [0, 0, 0, -1]])
+
+        temp_mat = np.matrix([[v_max],[-v_max],[v_max],[-v_max]])
+        self.V_vec = np.kron( np.ones((T+1, 1)), temp_mat)
+
+        for j in range(T+1):
+            self.Phi[  j*nUAV:(j+1)*nUAV, :] = np.linalg.matrix_power(self.A, j)
+            self.Phi_b[j*nUSV:(j+1)*nUSV, :] = np.linalg.matrix_power(self.Ab, j)
+            self.Phi_j[j*nUSV:(j+1)*nUSV, :] = J_mat*np.linalg.matrix_power(self.A, j)
+
+            for k in range(j):  # range(0) returns empty list
+                self.Lambda[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
+                    np.linalg.matrix_power(self.A, j-k-1)*self.B
+                self.Lambda_b[j*nUSV:(j+1)*nUSV, k*mUSV:(k+1)*mUSV] = \
+                    np.linalg.matrix_power(self.Ab, j-k-1)*self.Bb
+                self.Lambda_j[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
+                    J_mat*np.linalg.matrix_power(self.A, j-k-1)*self.B
+
+        # ------------- OSQP Matrices --------------
+        # Assumes nUAV = nUSV, mUAV = mUSV
+        velocity_extractor = np.zeros(( 2*(T+1), nUAV*(T+1) ))
+        for i in range(T+1):
+            for j in range(2):
+                velocity_extractor[ 2*i+j, nUAV*i+2+j ] = 1
+
+        zeros = np.zeros((nUAV*(T+1), mUAV*T))
+        zeros_sqr = np.zeros((mUAV*T, mUAV*T))
+        zeros_tall = np.zeros((nUAV*(T+1), 2))
+        zeros_short = np.zeros((mUAV*T, 2))
+        self.C = 10*(T+1)*np.eye(2)#np.full((1, 1), 10000*(T+1))
+        if self.travel_dir is None:
+            Q_temp = self.Q_big
+        else:
+            Q_temp = self.Q_big + self.Qb_big_vel
+        P_temp = 2*np.bmat([
+            [self.Q_big+self.Q_big_vel,    zeros,       zeros_tall,   -self.Q_big,       zeros,          zeros_tall],
+            [zeros.T,                    self.R_big,     zeros_short,    zeros.T,       zeros_sqr,       zeros_short],
+            [zeros_tall.T,              zeros_short.T,     self.C,      zeros_tall.T, zeros_short.T, np.zeros((2,2))],
+            [-self.Q_big,                 zeros,         zeros_tall,    Q_temp,         zeros,          zeros_tall],
+            [zeros.T,                    zeros_sqr,     zeros_short,     zeros.T,     self.R_big,       zeros_short],
+            [zeros_tall.T,              zeros_short.T, np.zeros((2,2)), zeros_tall.T, zeros_short.T,          self.C]
+        ])
+        # This matrix should be created straight from the dense counterpart,
+        # because 1. the matrix is not diagonal, 2. it has a non-changing spartsity pattern
+        self.P_OSQP = csc_matrix(P_temp)
+        self.l_OSQP = np.bmat([
+            [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # UAV Dynamics
+            [np.full((T*mUAV, 1), params.amin)],          # UAV Input constraints
+            [np.full((2*(T+1),   1), -params.v_max)],     # UAV Velocity constraints
+            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],    # USV Dynamics
+            [np.full((T*mUSV, 1), params.amin_b)],        # USV Input constraints
+            [np.full((2*(T+1),   1), -params.v_max_b)]    # USV Velocity constraints
+        ])
+        self.u_OSQP = np.bmat([
+            [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # UAV Dynamics
+            [np.full((T*mUAV, 1), params.amax)],          # UAV Input constraints
+            [np.full((2*(T+1),   1), params.v_max)],      # UAV Velocity constraints
+            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],    # USV Dynamics
+            [np.full((T*mUSV, 1), params.amax_b)],        # USV Input constraints
+            [np.full((2*(T+1),   1), params.v_max_b)]     # USV Velocity constraints
+        ])
+        if self.travel_dir is None:
+            self.q_OSQP = np.zeros( (2*nUAV*(T+1) + 2*mUAV*T + 4, 1) )
+        else:
+            x1 = params.v_max_b*self.travel_dir[0]
+            x2 = params.v_min_b*self.travel_dir[0]
+            y1 = params.v_max_b*self.travel_dir[1]
+            y2 = params.v_min_b*self.travel_dir[1]
+            v_max_x_b = max(x1, x2)
+            v_max_y_b = max(y1, y2)
+            v_min_x_b = min(x1, x2)
+            v_min_y_b = min(y1, y2)
+            # print "X:", v_min_x_b, "to", v_max_x_b
+            # print "Y:", v_min_y_b, "to", v_max_y_b
+            v_x_des = 0.9*v_min_x_b + 0.1*v_max_x_b
+            v_y_des = 0.9*v_min_y_b + 0.1*v_max_y_b
+            vel_state = np.array([[0], [0], [v_x_des], [v_y_des]])
+            vel_vec = np.kron(np.ones((T+1, 1)), vel_state)
+            self.q_OSQP = -2*np.bmat([
+                [np.zeros((nUAV*(T+1)+mUAV*T+2, 1))],
+                [np.dot( self.Qb_big_vel, vel_vec)],
+                [np.zeros((T*mUSV+2, 1))]
+            ])
+
+        # A_temp_UAV = np.bmat([
+        #     [np.eye(nUAV*(T+1)), -self.Lambda],                # Dynamics
+        #     [np.zeros((T*mUAV, nUAV*(T+1))), np.eye(T*mUAV)],  # Input constraints
+        #     [velocity_extractor, np.zeros((2*(T+1), T*mUAV))], # Velocity constraints
+        # ])
+        # A_temp_USV = np.bmat([
+        #     [np.eye(nUSV*(T+1)), -self.Lambda_b, np.zeros( (nUSV*(T+1), 1) )],           # Dynamics
+        #     [np.zeros((T*mUSV, nUSV*(T+1))), np.eye(T*mUSV), np.zeros( (T*mUSV, 1) )],   # Input constraints
+        #     [velocity_extractor, np.zeros((2*(T+1), T*mUSV)), np.ones((2*(T+1), 1))],    # Velocity constraints
+        # ])
+        S_mat = np.kron(np.ones((T+1,1)), np.eye(2))
+        self.A_UAV = np.bmat([
+            [np.eye(nUAV*(T+1)),       -self.Lambda,          np.zeros((nUAV*(T+1), 2))],  # UAV Dynamics
+            [zeros.T,                  np.eye(T*mUAV),        np.zeros((T*mUAV, 2))],      # UAV Input constraints
+            [velocity_extractor, np.zeros((2*(T+1), T*mUAV)), S_mat],     # UAV Velocity constraints
+        ])
+        self.A_USV = np.bmat([
+            [np.eye(nUSV*(T+1)),        -self.Lambda_b,       np.zeros((nUSV*(T+1), 2))],   # USV Dynamics
+            [zeros.T,                   np.eye(T*mUSV),       np.zeros((T*mUSV, 2))],       # USV Input constraints
+            [velocity_extractor, np.zeros((2*(T+1), T*mUAV)), S_mat],      # USV Velocity constraints
+        ])
+        zeros = np.zeros( (nUAV*(T+1) + mUAV*T + 2*(T+1), nUAV*(T+1) + mUAV*T + 2) )
+        self.A_temp = np.bmat([
+            [self.A_UAV, zeros],
+            [zeros, self.A_USV]
+        ])
+        self.A_OSQP = csc_matrix(self.A_temp)
+
+    def create_optimisation_problem(self):
+        T = self.T
+        nUAV = self.nUAV
+        mUAV = self.mUAV
+        nUSV = self.nUSV
+        mUSV = self.mUSV
+        params = self.params
+        self.x  = cp.Variable(( nUAV*(T+1), 1 ))
+        self.xb = cp.Variable(( nUSV*(T+1), 1 ))
+        self.u  = cp.Variable(( mUAV*T, 1 ))
+        self.ub = cp.Variable(( mUSV*T, 1 ))
+        self.x_0  = cp.Parameter((nUAV, 1))
+        self.xb_0 = cp.Parameter((nUSV, 1))
+        self.s_UAV = cp.Variable((2, 1))
+        self.s_USV = cp.Variable((2, 1))
+
+        objectiveCent = cp.quad_form(self.x-self.xb, self.Q_big) \
+            + cp.quad_form(self.u, self.R_big) \
+            + cp.quad_form(self.ub, self.R_big)
+        constraintsCent  = [ self.x  ==  self.Phi*self.x_0 \
+            + self.Lambda*self.u ]
+        constraintsCent += [ self.xb == self.Phi_b*self.xb_0 \
+            + self.Lambda_b*self.ub ]
+        #constraintsCent += [self.Phi_j*self.x_0 + self.Lambda_j*self.u \
+        #    <= self.V_vec]
+
+        # COULD PROBABLY DELETE THIS, DOESN'T MAKE SENSE TO USE IT
+        # Better approximation of true constraint set. Not worth computation.
+        # constraintsCent += \
+        #     [self.in_constr_matrix * self.u  <=  self.in_constr_vector]
+        # constraintsCent += \
+        #     [self.in_constr_matrix_b*self.ub <= self.in_constr_vector_b]
+
+        # Multiplying it with square root of 0.5 makes it more conservative,
+        # and bounds the admissible set within the true circular constraint set
+
+        # Assumed mUAV = mUSV
+        in_consr_matrix = np.bmat([[np.eye(mUAV*T)], [-np.eye(mUAV*T)]])
+        constraintsCent += [in_consr_matrix*self.u  <= params.amax*np.sqrt(0.5)]    # TODO: Makes more sense to have amax
+        constraintsCent += [in_consr_matrix*self.ub <= params.amax_b*np.sqrt(0.5)]  # already divided by sqrt(2)
+
+        self.problemCent = cp.Problem(cp.Minimize(objectiveCent), constraintsCent)
+
+        self.problemOSQP = osqp.OSQP()
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, q = self.q_OSQP, A=self.A_OSQP, verbose=False, max_iter = 200)
+
+    def ROS_init(self):
+        print('Waiting for centralised problem solver')
+        rospy.wait_for_service('centralised_problem')
+        print('Finished waiting')
+        self.service = rospy.ServiceProxy('centralised_problem', centralised_problem)
+
+        x_0_msg = Float32MultiArrayStamped()
+        x_0_msg.array.layout.dim.append(MultiArrayDimension())
+        x_0_msg.array.layout.dim[0].size = self.nUAV
+        x_0_msg.array.layout.dim[0].stride = 1
+        x_0_msg.array.layout.dim[0].label = "x_0"
+        self.x_0_msg = x_0_msg
+
+        xb_0_msg = Float32MultiArrayStamped()
+        xb_0_msg.array.layout.dim.append(MultiArrayDimension())
+        xb_0_msg.array.layout.dim[0].size = self.nUAV
+        xb_0_msg.array.layout.dim[0].stride = 1
+        xb_0_msg.array.layout.dim[0].label = "xb_0"
+        self.xb_0_msg = xb_0_msg
+
+        self.req = centralised_problemRequest()
+
+    def solve(self, x_m, xb_m):
+        start = time.time()
+        self.x_0.value = x_m
+        self.xb_0.value = xb_m
+        # print "STARTED SOLVING WITH:", xb_m[0,0], ",", xb_m[1,0]  # DEBUG PRINT
+        if self.type == 'CVXGEN':
+            self.x_0_msg.array.data = np.asarray(x_m).flatten(order='F')   # TODO: Send in ndarray, then flatten will be enough
+            self.xb_0_msg.array.data = np.asarray(xb_m).flatten(order='F') # TODO: Send in ndarray, then flatten will be enough
+            self.req.x_0 = self.x_0_msg
+            self.req.xb_0 = self.xb_0_msg
+            resp = self.service(self.req)
+            self.x.value = np.reshape(resp.x_traj.array.data,\
+                (self.nUAV*(self.T+1), 1), order='F')
+            self.xb.value = np.reshape(resp.xb_traj.array.data,\
+                (self.nUSV*(self.T+1), 1), order='F')
+            self.u.value = np.reshape(resp.u_traj.array.data,\
+                (self.mUAV*self.T, 1), order='F')
+            self.ub.value = np.reshape(resp.ub_traj.array.data,\
+                (self.mUSV*self.T, 1), order='F')
+        elif self.type == 'OSQP':
+            self.update_OSQP(x_m, xb_m)
+            results = self.problemOSQP.solve()
+            T = self.T
+            nUAV = self.nUAV
+            mUAV = self.mUAV
+            # print results.info.status, results.info.iter #DEBUG PRINT
+            self.x.value = np.reshape(results.x[0:nUAV*(T+1)], (-1, 1))
+            self.u.value = np.reshape(results.x[nUAV*(T+1):nUAV*(T+1)+mUAV*T], (-1, 1))
+            self.s_UAV.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T:nUAV*(T+1)+mUAV*T+2], (-1, 1))
+            self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T+2:2*nUAV*(T+1)+mUAV*T+2], (-1, 1))
+            self.ub.value = np.reshape(results.x[2*nUAV*(T+1)+mUAV*T+2:-2], (-1, 1))
+            self.s_USV.value = np.reshape(results.x[-2:], (-1, 1))
+        else:
+            self.problemCent.solve(solver=cp.OSQP, warm_start=True, verbose=False)
+        end = time.time()
+        self.last_solution_duration = end - start
+
+    # def solve_threaded(self, x_m, xb_m):
+    #     thread.start_new_thread(self.solve, (x_m, xb_m))
+
+    def update_OSQP(self, x0, xb0):
+        params = self.params
+        T = self.T
+        mUAV = self.mUAV
+        mUSV = self.mUSV
+        nUAV = self.nUAV
+        nUSV = self.nUSV
+
+        self.l_OSQP[0:(T+1)*nUAV, 0] = np.dot(self.Phi, x0)
+        self.l_OSQP[(T+1)*(nUAV+2)+T*mUAV:(T+1)*(2*nUAV+2)+T*mUSV, 0] = np.dot(self.Phi_b, xb0)
+        self.u_OSQP[0:(T+1)*nUAV, 0] = np.dot(self.Phi, x0)
+        self.u_OSQP[(T+1)*(nUAV+2)+T*mUAV:(T+1)*(2*nUAV+2)+T*mUSV, 0] = np.dot(self.Phi_b, xb0)
+
+        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP)
+
+    def predict_UAV_traj(self, x_0, u_traj):
+        return np.dot(self.Phi, x_0) + np.dot(self.Lambda, u_traj)
+
+    def predict_USV_traj(self, xb_0, ub_traj):
+        return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
+
+    def update_linearisation(self, theta, phi):
+        self.A_mat[2:4, 4:6] = np.array([
+            [0, g/np.cos(theta)**2],
+            [-g/( np.cos(theta)*(np.cos(phi)**2) ), -g*np.tan(phi)*np.tan(theta)/np.cos(theta)]
+        ])
+
+        self.B_mat[2:4, 0:1] = np.array([
+            [g*( np.tan(theta) - theta/(np.cos(theta))**2 )],
+            [(g/np.cos(theta)) * ( -np.tan(phi) + phi/(np.cos(phi)**2) + np.tan(phi)*np.tan(theta)*theta )]
+        ])
+
 class UAVProblem():
 
     def __init__(self, T, A, B, Q, P, R, Q_vel, P_vel, nUSV, type, params):

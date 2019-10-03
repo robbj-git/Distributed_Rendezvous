@@ -639,13 +639,14 @@ class DataAnalyser():
                 vert_pred_log = dtl.vert_traj_log[0::p.nv, t]
 
                 ax.plot(range(t+1), dtl.xv_log[0, 0:t+1], 'blue')
-                ax.plot(range(t, t+T), vert_pred_log, 'green', alpha=0.5)
-                ax.plot(range(t+1), vert_const_log[0:t+1], 'red')
-                if self.file_types[file_index] == PARALLEL:
-                    vert_inner_pred_log = dtl.vert_inner_traj_log[0::p.nv, t]
-                    ax.plot(range(t, t+T_inner), vert_inner_pred_log, 'yellow', alpha=0.5)
-                plt.xlabel('horizontal distance [m]')
+                ax.plot(range(t+1), vert_const_log[0:t+1], 'r--')
+                # ax.plot(range(t, t+T), vert_pred_log, 'green', alpha=0.5)
+                # if self.file_types[file_index] == PARALLEL:
+                #     vert_inner_pred_log = dtl.vert_inner_traj_log[0::p.nv, t]
+                #     ax.plot(range(t, t+T_inner), vert_inner_pred_log, 'yellow', alpha=0.5)
+                plt.xlabel('iteration')
                 plt.ylabel('altitude [m]')
+                plt.legend(['UAV altitude', 'Altitude constraint'])
                 try:
                     plt.grid(True)
                     plt.pause(0.05)
@@ -821,6 +822,49 @@ class DataLoader:
             print "Couldn't find USV altitude"
             return 0
 
+
+if __name__ == '__main__':
+    data_analyser = DataAnalyser(sys.argv[1:])
+    # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
+    # data_analyser.plot_3d_super_realtime()
+    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
+    # data_analyser.compare_topviews(real_time = True)
+    # data_analyser.plot_time_evolution(real_time = True)
+    # data_analyser.plot_with_constraints(real_time = True, perspective = UAV)
+    data_analyser.plot_altitude(real_time = False, perspective = UAV)
+    # data_analyser.plot_with_vel_constraints(real_time = True)
+    # data_analyser.plot_obj_val(real_time = True)
+    # data_analyser.plot_hor_velocities(real_time = True)
+
+    # use_dir = False
+    # use_horizon_vs_performance = False
+    # if len(sys.argv) == 2:
+    #     # directory specified
+    #     dir = sys.argv[1]
+    #     use_dir = True
+    # elif len(sys.argv) > 2:
+    #     # start and end index specified
+    #     # start = int(sys.argv[1])
+    #     # end = int(sys.argv[2])
+    #     if not use_horizon_vs_performance:
+    #         combine_multiple_results(sys.argv[1:3])
+    #         exit()
+    #     else:
+    #         dirs = sys.argv[1:4]
+    # else:
+    #     print "ERROR: Please select directory"
+    #     exit()
+    #
+    # if use_horizon_vs_performance:
+    #     if len(sys.argv) > 2:
+    #         horizon_vs_performance(dirs)
+    #     else:
+    #         horizon_vs_performance([dir])
+    # elif use_dir:
+    #     print_data(dir)
+    # else:
+    #     for i in range(int(start), int(end)+1):
+    #         print_data('Experiment_' + str(i))
 
 # def combine_multiple_results(dirs):
 #     time_list = []
@@ -1415,46 +1459,3 @@ class DataLoader:
 #         i += 1
 #
 #     return vector[i:]
-
-if __name__ == '__main__':
-    data_analyser = DataAnalyser(sys.argv[1:])
-    # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
-    # data_analyser.plot_3d_super_realtime()
-    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
-    # data_analyser.compare_topviews(real_time = True)
-    # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = UAV)
-    data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
-    # data_analyser.plot_with_vel_constraints(real_time = True)
-    # data_analyser.plot_obj_val(real_time = True)
-    # data_analyser.plot_hor_velocities(real_time = True)
-
-    # use_dir = False
-    # use_horizon_vs_performance = False
-    # if len(sys.argv) == 2:
-    #     # directory specified
-    #     dir = sys.argv[1]
-    #     use_dir = True
-    # elif len(sys.argv) > 2:
-    #     # start and end index specified
-    #     # start = int(sys.argv[1])
-    #     # end = int(sys.argv[2])
-    #     if not use_horizon_vs_performance:
-    #         combine_multiple_results(sys.argv[1:3])
-    #         exit()
-    #     else:
-    #         dirs = sys.argv[1:4]
-    # else:
-    #     print "ERROR: Please select directory"
-    #     exit()
-    #
-    # if use_horizon_vs_performance:
-    #     if len(sys.argv) > 2:
-    #         horizon_vs_performance(dirs)
-    #     else:
-    #         horizon_vs_performance([dir])
-    # elif use_dir:
-    #     print_data(dir)
-    # else:
-    #     for i in range(int(start), int(end)+1):
-    #         print_data('Experiment_' + str(i))
