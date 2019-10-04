@@ -13,6 +13,7 @@ from matplotlib.collections import PatchCollection
 import os
 from problemClasses import CentralisedProblem, UAVProblem, VerticalProblem
 from problemClasses import FastUAVProblem, FastVerticalProblem
+from moreProblemClasses import CompleteCentralisedProblem
 from helper_classes import StampedTrajQueue, StampedMsgQueue
 from helper_functions import get_dist_traj, mat_to_multiarray_stamped, shift_trajectory, lat_long_to_pos, fill_lost_values, get_cmd_angle
 from math import atan, asin, acos
@@ -48,9 +49,10 @@ class UAV_simulator():
         self.SAMPLING_TIME = pp.SAMPLING_TIME
         self.USE_HIL = pp.USE_HIL
         self.INTER_ITS = pp.INTER_ITS
-        self.ADD_DROPOUT = problem_params.ADD_DROPOUT
-        self.PRED_PARALLEL_TRAJ = problem_params.PRED_PARALLEL_TRAJ
-        self.SHOULD_SHIFT_MESSAGES = problem_params.SHOULD_SHIFT_MESSAGES
+        self.USE_COMPLETE_HORIZONTAL = pp.USE_COMPLETE_HORIZONTAL
+        self.ADD_DROPOUT = pp.ADD_DROPOUT
+        self.PRED_PARALLEL_TRAJ = pp.PRED_PARALLEL_TRAJ
+        self.SHOULD_SHIFT_MESSAGES = pp.SHOULD_SHIFT_MESSAGES
         self.dropout_lower_bound = pp.dropout_lower_bound
         self.dropout_upper_bound = pp.dropout_upper_bound
         self.long_ref = None
@@ -68,6 +70,14 @@ class UAV_simulator():
             pp.R, self.used_solver, pp.params)
         self.problemVertFast = FastVerticalProblem(pp.T_inner, pp.Av, pp.Bv,\
             pp.Qv, pp.Pv, pp.Rv, pp.vert_used_solver, pp.params)
+
+        if self.USE_COMPLETE_HORIZONTAL:
+            self.problemCent = CompleteCentralisedProblem(pp.T, pp.Ab, pp.Bb,\
+                pp.Q, pp.R, pp.P, pp.R, pp.Qb_vel, pp.Pb_vel, pp.params)
+            self.nUAV = self.problemCent.nUAV
+            self.mUAV = self.problemCent.mUAV
+            self.A = self.problemCent.A
+            self.B = self.problemCent.B
 
         self.i = 0
         # These must be created already in the constructor since they are used in ROS callbacks
@@ -118,7 +128,7 @@ class UAV_simulator():
                 time.sleep(3)
 
     def reset(self, sim_len, x_0, xv_0):
-        self.x_log  = np.full((self.nUAV, sim_len+1), np.nan)
+        self.x_log = np.full((self.nUAV, sim_len+1), np.nan)
         self.xv_log = np.full((self.nv,   sim_len+1), np.nan)
         self.xb_log = np.full((self.nUSV, sim_len+1), np.nan)
         self.uUAV_log = np.full((self.mUAV, sim_len), np.nan)
@@ -142,9 +152,10 @@ class UAV_simulator():
             self.vert_inner_solution_durations = []
 
         # Initial predicted UAV trajectory assumes no control signal applied
-        self.x_traj = self.problemUAV.predict_trajectory(x_0, \
-            np.zeros( (self.mUAV*self.T, 1) ))
-        self.problemUAV.x.value = self.x_traj
+        if not self.CENTRALISED:
+            self.x_traj = self.problemUAV.predict_trajectory(x_0, \
+                np.zeros( (self.mUAV*self.T, 1) ))
+            self.problemUAV.x.value = self.x_traj
         self.xv_traj = self.problemVert.predict_trajectory(xv_0, \
             np.zeros( (self.mv*self.T, 1) )) # Always contains most up-to-date predicted vertical traj
         self.problemVert.xv.value = self.xv_traj
