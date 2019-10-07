@@ -66,7 +66,7 @@ class CompleteCentralisedProblem():
         ])
 
         self.C_c = np.zeros((8, 1))
-        self.update_linearisation(0.3, 0.4) # TODO: Use different argument
+        self.update_linearisation(0.0, 0.0)
 
         [self.nUAV, self.mUAV] = self.B_c.shape
         [self.nUSV, self.mUSV] = Bb.shape
@@ -98,6 +98,7 @@ class CompleteCentralisedProblem():
 
         # Cost Matrices
         Ex = np.block([[np.eye(4), np.zeros((4,4))]])
+        # Ex = np.block([[np.eye(4), np.zeros((4,2))]])
         EQE = np.dot(Ex.T, np.dot(self.Q, Ex))
         EPE = np.dot(Ex.T, np.dot(self.P, Ex))
         self.Q_UAV = np.kron(np.eye(T+1), EQE)
@@ -120,10 +121,11 @@ class CompleteCentralisedProblem():
             Q_temp = self.Q_big
         else:
             Q_temp = self.Q_big + self.Qb_big_vel
+
         P_temp = 2*np.block([
-            [self.Q_UAV,        np.zeros((d1,d2)), self.QE,        np.zeros((d1, c2))],
+            [self.Q_UAV,        np.zeros((d1,d2)), -self.QE,        np.zeros((d1, c2))],
             [np.zeros((d2,d1)), self.R_big,     np.zeros((d2,c1)), np.zeros((d2,c2))],
-            [self.QE.T,         np.zeros((c1,d2)), Q_temp,         np.zeros((c1,c2))],
+            [-self.QE.T,         np.zeros((c1,d2)), Q_temp,         np.zeros((c1,c2))],
             [np.zeros((c2,d1)), np.zeros((c2,d2)), np.zeros((c2,c1)), self.Rb_big]
         ])
         self.P_OSQP = csc_matrix(P_temp)
@@ -165,23 +167,26 @@ class CompleteCentralisedProblem():
         sparse_eye = csc_matrix(np.eye(d1))
         Lambda_sparse = self.get_Lambda_sparse()
         lower_left_mat_sparse = csc_matrix(np.block([
-            [vel_extractor],                # UAV Velocity
+            # [vel_extractor],                # UAV Velocity
             [ang_extractor],                # UAV Angles
-            [np.zeros((d2, d1))]            # UAV Input
+            # [np.zeros((d2, d1))]            # UAV Input
         ]))
         lower_right_mat_sparse = csc_matrix(np.block([
-            [np.zeros((2*(T+1), d2))],      # UAV Velocity
+            # [np.zeros((2*(T+1), d2))],      # UAV Velocity
             [np.zeros((2*(T+1), d2))],      # UAV Angles
-            [cmd_extractor]                 # UAV Input
+            # [cmd_extractor]                 # UAV Input
         ]))
         self.A_UAV = sp.sparse.bmat([
-            [sparse_eye, Lambda_sparse],
+            [sparse_eye, -Lambda_sparse],                # UAV Dynamics
             [lower_left_mat_sparse, lower_right_mat_sparse]
         ])
+        # self.A_USV = csc_matrix(np.block([
+        #     [np.eye(c1), -self.Lambda_b],               # USV Dynamics
+        #     [np.zeros((c2,c1)), np.eye(c2)],            # USV Input
+        #     [vel_extractor_b, np.zeros((2*(T+1), c2))]  # USV velocity
+        # ]))
         self.A_USV = csc_matrix(np.block([
-            [np.eye(c1), -self.Lambda_b],               # USV Dynamics
-            [np.zeros((c2,c1)), np.eye(c2)],            # USV Input
-            [vel_extractor_b, np.zeros((2*(T+1), c2))]  # USV velocity
+            [np.eye(c1), -self.Lambda_b]               # USV Dynamics
         ]))
 
         self.A_OSQP = sp.sparse.bmat([
@@ -189,25 +194,47 @@ class CompleteCentralisedProblem():
             [None, self.A_USV]
         ]).tocsc()
 
+        # self.A_OSQP = csc_matrix(np.block([
+        #     [np.eye(d1), -self.Lambda, np.zeros()],
+        #     [np.zeros(), np.eye(c1), -self.Lambdab]
+        # ]))
+
+        # self.l_OSQP = np.block([
+        #     [np.dot(self.Phi, np.zeros((nUAV, 1))) + self.Xi],    # UAV Dynamics
+        #     [np.full((2*(T+1), 1), -params.v_max)],     # UAV Velocity
+        #     [np.full((2*(T+1), 1), -params.ang_max)],   # UAV Angles
+        #     [np.full((d2, 1), -params.ang_max)],        # UAV Inputs
+        #     [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],  # USV Dynamics
+        #     [np.full((c2, 1), params.amin_b)],          # USV Input constraints
+        #     [np.full((2*(T+1),   1), -params.v_max_b)]  # USV Velocity constraints
+        # ])
+        #
+        # self.u_OSQP = np.block([
+        #     [np.dot(self.Phi, np.zeros((nUAV, 1))) + self.Xi],    # UAV Dynamics
+        #     [np.full((2*(T+1), 1), params.v_max)],      # UAV Velocity
+        #     [np.full((2*(T+1), 1), params.ang_max)],    # UAV Angles
+        #     [np.full((d2, 1), params.ang_max)],         # UAV Inputs
+        #     [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],  # USV Dynamics
+        #     [np.full((c2, 1), params.amax_b)],          # USV Input constraints
+        #     [np.full((2*(T+1),   1), params.v_max_b)]   # USV Velocity constraints
+        # ])
+
+
         self.l_OSQP = np.block([
             [np.dot(self.Phi, np.zeros((nUAV, 1))) + self.Xi],    # UAV Dynamics
-            [np.full((2*(T+1), 1), -params.v_max)],     # UAV Velocity
-            [np.full((2*(T+1), 1), -params.ang_max)],   # UAV Angles
-            [np.full((d2, 1), -params.ang_max)],        # UAV Inputs
-            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],  # USV Dynamics
-            [np.full((c2, 1), params.amin_b)],          # USV Input constraints
-            [np.full((2*(T+1),   1), -params.v_max_b)]  # USV Velocity constraints
+            [np.full((2*(T+1), 1), -np.inf)],   # UAV Angles
+            # [np.full((d2, 1), -params.ang_max)],        # UAV Inputs
+            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))]  # USV Dynamics
         ])
 
         self.u_OSQP = np.block([
             [np.dot(self.Phi, np.zeros((nUAV, 1))) + self.Xi],    # UAV Dynamics
-            [np.full((2*(T+1), 1), params.v_max)],      # UAV Velocity
-            [np.full((2*(T+1), 1), params.ang_max)],    # UAV Angles
-            [np.full((d2, 1), params.ang_max)],         # UAV Inputs
-            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],  # USV Dynamics
-            [np.full((c2, 1), params.amax_b)],          # USV Input constraints
-            [np.full((2*(T+1),   1), params.v_max_b)]   # USV Velocity constraints
+            [np.full((2*(T+1), 1), np.inf)],    # UAV Angles
+            # [np.full((d2, 1), params.ang_max)],         # UAV Inputs
+            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))]  # USV Dynamics
         ])
+
+        print "PAMS", params.ang_max    # DEBUG PRINT
 
     def create_optimisation_problem(self):
         T = self.T
@@ -219,6 +246,8 @@ class CompleteCentralisedProblem():
         self.xb = cp.Variable(( nUSV*(T+1), 1 ))
         self.u  = cp.Variable(( mUAV*T, 1 ))
         self.ub = cp.Variable(( mUSV*T, 1 ))
+        self.s_UAV = cp.Variable(( 1, 1 ))
+        self.s_USV = cp.Variable(( 1, 1 ))
         self.x_0  = cp.Parameter((nUAV, 1))
         self.xb_0 = cp.Parameter((nUSV, 1))
         self.problemOSQP = osqp.OSQP()
@@ -248,13 +277,42 @@ class CompleteCentralisedProblem():
         nUSV = self.nUSV
 
         self.l_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
-        self.l_OSQP[(T+1)*(nUAV)+T*mUAV:(T+1)*(nUAV+nUSV)+T*mUAV] = np.dot(self.Phi_b, xb0)
+        self.l_OSQP[(T+1)*(nUAV+2):(T+1)*(nUAV+nUSV+2)] = np.dot(self.Phi_b, xb0)
         self.u_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
-        self.u_OSQP[(T+1)*(nUAV)+T*mUAV:(T+1)*(nUAV+nUSV)+T*mUAV] = np.dot(self.Phi_b, xb0)
+        self.u_OSQP[(T+1)*(nUAV+2):(T+1)*(nUAV+nUSV+2)] = np.dot(self.Phi_b, xb0)
+
+        # self.l_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
+        # self.l_OSQP[(T+1)*(nUAV+2)+mUAV*T:(T+1)*(nUAV+nUSV+2)+mUAV*T] = np.dot(self.Phi_b, xb0)
+        # self.u_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
+        # self.u_OSQP[(T+1)*(nUAV+2)+mUAV*T:(T+1)*(nUAV+nUSV+2)+mUAV*T] = np.dot(self.Phi_b, xb0)
+        # AREN'T THESE INDICES WRONG??? WHERE'S 2*(T+1)???
+        # self.l_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
+        # self.l_OSQP[(T+1)*(nUAV)+T*mUAV:(T+1)*(nUAV+nUSV)+T*mUAV] = np.dot(self.Phi_b, xb0)
+        # self.u_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
+        # self.u_OSQP[(T+1)*(nUAV)+T*mUAV:(T+1)*(nUAV+nUSV)+T*mUAV] = np.dot(self.Phi_b, xb0)
 
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP)
 
     def update_linearisation(self, theta, phi):
+        # TODO: DELETE ME
+        # self.A_c = np.array([
+        #     [0, 0, 1,    0, 0, 0],
+        #     [0, 0, 0,    1, 0, 0],
+        #     [0, 0, -0.1, 0, 0, 9.8],
+        #     [0, 0, 0, -0.1, -9.8, 0],
+        #     [0, 0, 0,   0,    0,  0],
+        #     [0, 0, 0,   0,    0,  0]
+        # ])
+        #
+        # self.B_c = np.array([
+        #     [0, 0],
+        #     [0, 0],
+        #     [0, 0],
+        #     [0, 0],
+        #     [1, 0],
+        #     [0, 1]
+        # ])
+
         self.A_c[2:4, 4:6] = np.array([
             [0, g/np.cos(theta)**2],
             [-g/( np.cos(theta)*(np.cos(phi)**2) ), -g*np.tan(phi)*np.tan(theta)/np.cos(theta)]

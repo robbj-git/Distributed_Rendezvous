@@ -17,6 +17,10 @@ import thread
 from multiprocessing import Process, Pipe
 import Queue
 import time
+# DEBUG
+from scipy.linalg import expm
+from scipy.integrate import quad
+from IMPORT_ME import SAMPLING_TIME
 
 # Supresses warning during division by 0. Division by zero will always occur
 # in one of the functions, but it is correctly handled afterwards
@@ -51,6 +55,8 @@ class CentralisedProblem():
             self.ROS_init()
 
     def create_optimisation_matrices(self):
+        # DEBUG
+        # self.set_UAV_dynamics()
         T = self.T
         nUAV = self.nUAV
         mUAV = self.mUAV
@@ -85,15 +91,15 @@ class CentralisedProblem():
         for j in range(T+1):
             self.Phi[  j*nUAV:(j+1)*nUAV, :] = np.linalg.matrix_power(self.A, j)
             self.Phi_b[j*nUSV:(j+1)*nUSV, :] = np.linalg.matrix_power(self.Ab, j)
-            self.Phi_j[j*nUSV:(j+1)*nUSV, :] = J_mat*np.linalg.matrix_power(self.A, j)
+            self.Phi_j[j*nUSV:(j+1)*nUSV, :] = np.dot(J_mat,np.linalg.matrix_power(self.A, j))
 
             for k in range(j):  # range(0) returns empty list
                 self.Lambda[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
-                    np.linalg.matrix_power(self.A, j-k-1)*self.B
+                    np.dot(np.linalg.matrix_power(self.A, j-k-1),self.B)
                 self.Lambda_b[j*nUSV:(j+1)*nUSV, k*mUSV:(k+1)*mUSV] = \
-                    np.linalg.matrix_power(self.Ab, j-k-1)*self.Bb
+                    np.dot(np.linalg.matrix_power(self.Ab, j-k-1),self.Bb)
                 self.Lambda_j[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
-                    J_mat*np.linalg.matrix_power(self.A, j-k-1)*self.B
+                    np.dot(J_mat,np.dot(np.linalg.matrix_power(self.A, j-k-1),self.B))
 
         # ------------- OSQP Matrices --------------
         # Assumes nUAV = nUSV, mUAV = mUSV
@@ -315,6 +321,53 @@ class CentralisedProblem():
 
     def predict_USV_traj(self, xb_0, ub_traj):
         return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
+
+    # DEBUG
+    def set_UAV_dynamics(self):
+
+        self.nUAV = 6
+        self.mUAV = 2
+
+        A_c = np.array([
+            [0, 0, 1,    0, 0, 0],
+            [0, 0, 0,    1, 0, 0],
+            [0, 0, -0.1, 0, 0, 9.8],
+            [0, 0, 0, -0.1, -9.8, 0],
+            [0, 0, 0,   0,    0,  0],
+            [0, 0, 0,   0,    0,  0]
+        ])
+
+        B_c = np.array([
+            [0, 0],
+            [0, 0],
+            [0, 0],
+            [0, 0],
+            [1, 0],
+            [0, 1]
+        ])
+
+        # A_c = np.array([
+        #     [0, 0, 1, 0],
+        #     [0, 0, 0, 1],
+        #     [0, 0, -0.1, 0],
+        #     [0, 0, 0, -0.1]
+        # ])
+        #
+        # B_c = np.array([
+        #     [0, 0],
+        #     [0, 0],
+        #     [1, 0],
+        #     [0, 1],
+        # ])
+
+        self.A = expm(A_c*SAMPLING_TIME)
+
+        self.B = np.full(A_c.shape, np.nan)
+        for row in range(A_c.shape[0]):
+            for col in range(A_c.shape[1]):
+                integrand = lambda tau: expm(A_c*(SAMPLING_TIME-tau))[row, col]
+                self.B[row, col] = quad(integrand, 0, SAMPLING_TIME)[0]
+        self.B = np.dot(self.B, B_c)
 
 class UAVProblem():
 
@@ -1076,7 +1129,7 @@ class VerticalProblem():
                 # self.print_constraints_satisfied(self.xv.value, self.wdes.value)
             else:
                 # Optimisation failed
-                print "STATUS:", results.info.status
+                print "VERTICAL STATUS:", results.info.status
                 # Using np.full() doesn't seem to work, since "variables must be
                 # real". Using this approach seems to circumvent that limitation
                 # np.zeros() is used instead of np.empty() since np.empty()

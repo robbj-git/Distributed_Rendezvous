@@ -294,6 +294,7 @@ class UAV_simulator():
             self.update_logs(self.i)
 
             # ------- Simulate Dynamics / Apply Control --------
+
             if self.CENTRALISED:
                 self.send_control_to_USV(self.uUSV)
 
@@ -302,8 +303,12 @@ class UAV_simulator():
             # In parallel case, trajectory is sent at the beggining of the loop
 
             if not self.USE_HIL:
-                self.x  =  self.A*self.x  +  self.B*self.uUAV
-                self.xv = self.Av*self.xv + self.Bv*self.wdes
+                # self.x  =  self.A*self.x  +  self.B*self.uUAV
+                # self.xv = self.Av*self.xv + self.Bv*self.wdes
+                self.x  =  np.dot(self.A,self.x)  +  np.dot(self.B,self.uUAV)
+                if self.USE_COMPLETE_HORIZONTAL:
+                    self.x += self.problemCent.C_d
+                self.xv = np.dot(self.Av,self.xv) + np.dot(self.Bv,self.wdes)
             else:
                 self.publish_HIL_control(self.uUAV, self.wdes)
             # ------- Sleep --------
@@ -388,7 +393,6 @@ class UAV_simulator():
         self.UAV_traj_log[:, i:i+1]  = self.x_traj
         self.vert_traj_log[:, i:i+1] = self.xv_traj
         self.USV_traj_log[:, i:i+1] = self.xb_traj
-        # print "LOGGED:", self.xb_traj[0, 0], ",", self.xb_traj[1, 0] #DEBUG PRINT
         self.s_vert_log[:, i:i+1] = self.problemVert.s.value
         self.obj_val_log[:, i:i+1] = self.problemVert.obj_val
 

@@ -86,7 +86,7 @@ class ProblemParams():
         self.KUSV = KUSV
         self.KVert = KVert
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b)
+            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max = ang_max)
         self.hb = hb
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
@@ -124,8 +124,8 @@ if PARALLEL:
     hor_max = 100#400#100
     hor_min = 100#200#100
 elif CENTRALISED:
-    hor_max = 120#130#120
-    hor_min = 120#80#120
+    hor_max = 60#120#130#120
+    hor_min = 60#120#80#120
 elif DISTRIBUTED:
     hor_max = 100#200#100
     hor_min = 100#100

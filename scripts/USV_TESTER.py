@@ -96,7 +96,7 @@ class ProblemParams():
         self.KUAV = KUAV
         self.KUSV = KUSV
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b)
+            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max = ang_max)
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
         self.PRED_PARALLEL_TRAJ = PRED_PARALLEL_TRAJ
@@ -106,7 +106,8 @@ class ProblemParams():
 
 problem_params = ProblemParams()
 
-xb_m = np.array([[-2], [1], [np.nan], [np.nan]])
+# -2, 1
+xb_m = np.array([[-5], [4], [np.nan], [np.nan]])
 
 reverse_dir = False
 dir = get_travel_dir(xb_m, reverse_dir)
@@ -145,8 +146,8 @@ if PARALLEL:
     hor_max = 100#400#100
     hor_min = 100#200#100
 elif CENTRALISED:
-    hor_max = 120#130#120
-    hor_min = 120#80#120
+    hor_max = 60#120#130#120
+    hor_min = 60#120#80#120
 elif DISTRIBUTED:
     hor_max = 100#200#100
     hor_min = 100#100

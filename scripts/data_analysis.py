@@ -180,6 +180,8 @@ class DataAnalyser():
 
             for t in time:
                 ax.cla()
+                # ax.set_xlim([-1,1])
+                # ax.set_ylim([-1,1])
                 x_pred_traj = UAV_traj_log[0::p.nUAV, t]
                 y_pred_traj = UAV_traj_log[1::p.nUAV, t]
                 xb_pred_traj = USV_traj_log[0::p.nUSV, t]
@@ -202,7 +204,7 @@ class DataAnalyser():
                 plt.legend(['UAV trajectory', 'USV trajectory'])
                 plt.grid(True)
                 try:
-                    plt.pause(0.05)  # TODO: DEBUG: Make 0.05 again
+                    plt.pause(0.05)
                 except:
                     # Window was probably closed
                     return
@@ -827,11 +829,11 @@ if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
     # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
-    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
     # data_analyser.plot_with_constraints(real_time = True, perspective = UAV)
-    data_analyser.plot_altitude(real_time = False, perspective = UAV)
+    # data_analyser.plot_altitude(real_time = False, perspective = UAV)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)

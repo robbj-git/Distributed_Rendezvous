@@ -1,6 +1,6 @@
 from rendezvous_problem.msg import Float32MultiArrayStamped
 from helper_functions import shift_trajectory, get_traj_dir, get_cos_angle_between
-from IMPORT_ME import SAMPLING_TIME
+from IMPORT_ME import SAMPLING_TIME, USE_COMPLETE_HORIZONTAL
 from matrices_and_parameters import n_UAV, n_USV, nv, wmax, wmin, wmin_land, kl, vmax, vmax_b
 import numpy as np
 import Queue
@@ -154,7 +154,11 @@ class StampedTrajQueue():
 class DataAnalysisParams():
 
     def __init__(self):
-        self.nUAV = n_UAV
+        # TODO: Avoid hard-coding here
+        if not USE_COMPLETE_HORIZONTAL:
+            self.nUAV = n_UAV
+        else:
+            self.nUAV = 8
         self.nUSV = n_USV
         self.nv = nv
         self.T = np.nan
