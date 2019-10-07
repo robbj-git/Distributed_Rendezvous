@@ -245,6 +245,7 @@ class UAV_simulator():
 
             # ------- Horizontal Problem --------
             if self.CENTRALISED:
+                print self.x[4:6, 0]
                 self.problemCent.solve(self.x, self.xb)
             elif self.DISTRIBUTED:
                 # TODO: Make xb_traj naturally an array instead of a matrix

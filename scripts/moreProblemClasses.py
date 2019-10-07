@@ -70,11 +70,13 @@ class CompleteCentralisedProblem():
 
         [self.nUAV, self.mUAV] = self.B_c.shape
         [self.nUSV, self.mUSV] = Bb.shape
+        self.ns = 4
         T = self.T
         nUAV = self.nUAV
         mUAV = self.mUAV
         nUSV = self.nUSV
         mUSV = self.mUSV
+        ns = self.ns
         params = self.params
 
         self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
@@ -111,6 +113,7 @@ class CompleteCentralisedProblem():
         self.Rb_big  = np.kron(np.eye(T),   self.Rb)
         self.Qb_big_vel  = np.kron(np.eye(T+1), self.Qb_vel)
         self.Qb_big_vel[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = self.Pb_vel
+        self.C_mat = 1000*np.eye(self.ns)
 
         d1 = nUAV*(T+1)
         d2 = mUAV*T
@@ -123,15 +126,16 @@ class CompleteCentralisedProblem():
             Q_temp = self.Q_big + self.Qb_big_vel
 
         P_temp = 2*np.block([
-            [self.Q_UAV,        np.zeros((d1,d2)), -self.QE,        np.zeros((d1, c2))],
-            [np.zeros((d2,d1)), self.R_big,     np.zeros((d2,c1)), np.zeros((d2,c2))],
-            [-self.QE.T,         np.zeros((c1,d2)), Q_temp,         np.zeros((c1,c2))],
-            [np.zeros((c2,d1)), np.zeros((c2,d2)), np.zeros((c2,c1)), self.Rb_big]
+            [self.Q_UAV,        np.zeros((d1,d2)), np.zeros((d1, ns)), -self.QE,        np.zeros((d1, c2))],
+            [np.zeros((d2,d1)), self.R_big,         np.zeros((d2, ns)), np.zeros((d2,c1)), np.zeros((d2,c2))],
+            [np.zeros((ns,d1)), np.zeros((ns, d2)), self.C_mat,       np.zeros((ns, c1)), np.zeros((ns, c2))],
+            [-self.QE.T,         np.zeros((c1,d2)), np.zeros((c1, ns)), Q_temp,         np.zeros((c1,c2))],
+            [np.zeros((c2,d1)), np.zeros((c2,d2)), np.zeros((c2, ns)),         np.zeros((c2,c1)), self.Rb_big]
         ])
         self.P_OSQP = csc_matrix(P_temp)
 
         if self.travel_dir is None:
-            self.q_OSQP = np.zeros( (nUAV*(T+1) + mUAV*T + nUSV*(T+1) + mUSV*T, 1) )
+            self.q_OSQP = np.zeros( (nUAV*(T+1) + mUAV*T + nUSV*(T+1) + mUSV*T + ns, 1) )
         else:
             x1 = params.v_max_b*self.travel_dir[0]
             x2 = params.v_min_b*self.travel_dir[0]
@@ -146,7 +150,7 @@ class CompleteCentralisedProblem():
             vel_state = np.array([[0], [0], [v_x_des], [v_y_des]])
             vel_vec = np.kron(np.ones((T+1, 1)), vel_state)
             self.q_OSQP = -2*np.block([
-                [np.zeros((d1+d2, 1))],
+                [np.zeros((d1+d2+ns, 1))],
                 [np.dot( self.Qb_big_vel, vel_vec)],
                 [np.zeros((c2, 1))]
             ])
@@ -158,11 +162,17 @@ class CompleteCentralisedProblem():
                        [0, 0, 0, 1, 0, 0, 0, 0]])
         Ma = np.array([[0, 0, 0, 0, 1, 0, 0, 0],
                       [0, 0, 0, 0, 0, 1, 0, 0]])
+        Mv_s = np.array([[1, 0, 0, 0],
+                         [0, 1, 0, 0]])
+        Ma_s = np.array([[0, 0, 1, 0],
+                         [0, 0, 0, 1]])
 
         vel_extractor = np.kron(np.eye(T+1), Mv)
         vel_extractor_b = np.kron(np.eye(T+1), Mvb)
         ang_extractor = np.kron(np.eye(T+1), Ma)
         cmd_extractor = np.kron(np.eye(T), np.eye(2))
+        vel_s_extractor = np.kron(np.ones((T+1, 1)), Mv_s)
+        ang_s_extractor = np.kron(np.ones((T+1, 1)), Ma_s)
 
         sparse_eye = csc_matrix(np.eye(d1))
         Lambda_sparse = self.get_Lambda_sparse()
@@ -171,14 +181,17 @@ class CompleteCentralisedProblem():
             [ang_extractor],                # UAV Angles
             # [np.zeros((d2, d1))]            # UAV Input
         ]))
-        lower_right_mat_sparse = csc_matrix(np.block([
+        lower_mid_mat_sparse = csc_matrix(np.block([
             # [np.zeros((2*(T+1), d2))],      # UAV Velocity
             [np.zeros((2*(T+1), d2))],      # UAV Angles
             # [cmd_extractor]                 # UAV Input
         ]))
+        lower_right_mat_sparse = csc_matrix(np.block([
+            [ang_s_extractor]       # UAV Angles
+        ]))
         self.A_UAV = sp.sparse.bmat([
-            [sparse_eye, -Lambda_sparse],                # UAV Dynamics
-            [lower_left_mat_sparse, lower_right_mat_sparse]
+            [sparse_eye, -Lambda_sparse, csc_matrix(np.zeros((d1, ns)))],                # UAV Dynamics
+            [lower_left_mat_sparse, lower_mid_mat_sparse, lower_right_mat_sparse]
         ])
         # self.A_USV = csc_matrix(np.block([
         #     [np.eye(c1), -self.Lambda_b],               # USV Dynamics
@@ -222,14 +235,14 @@ class CompleteCentralisedProblem():
 
         self.l_OSQP = np.block([
             [np.dot(self.Phi, np.zeros((nUAV, 1))) + self.Xi],    # UAV Dynamics
-            [np.full((2*(T+1), 1), -np.inf)],   # UAV Angles
+            [np.full((2*(T+1), 1), -params.ang_max)],   # UAV Angles
             # [np.full((d2, 1), -params.ang_max)],        # UAV Inputs
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))]  # USV Dynamics
         ])
 
         self.u_OSQP = np.block([
             [np.dot(self.Phi, np.zeros((nUAV, 1))) + self.Xi],    # UAV Dynamics
-            [np.full((2*(T+1), 1), np.inf)],    # UAV Angles
+            [np.full((2*(T+1), 1), params.ang_max)],    # UAV Angles
             # [np.full((d2, 1), params.ang_max)],         # UAV Inputs
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))]  # USV Dynamics
         ])
@@ -248,6 +261,7 @@ class CompleteCentralisedProblem():
         self.ub = cp.Variable(( mUSV*T, 1 ))
         self.s_UAV = cp.Variable(( 1, 1 ))
         self.s_USV = cp.Variable(( 1, 1 ))
+        self.s_UAV_new = cp.Variable((self.ns, 1))
         self.x_0  = cp.Parameter((nUAV, 1))
         self.xb_0 = cp.Parameter((nUSV, 1))
         self.problemOSQP = osqp.OSQP()
@@ -260,12 +274,13 @@ class CompleteCentralisedProblem():
         mUAV = self.mUAV
         nUSV = self.nUSV
         mUSV = self.mUSV
+        ns = self.ns
         self.update_OSQP(x, xb)
         results = self.problemOSQP.solve()
         self.x.value = np.reshape(results.x[0:nUAV*(T+1)], (-1, 1))
         self.u.value = np.reshape(results.x[nUAV*(T+1):nUAV*(T+1)+mUAV*T], (-1, 1))
-        self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T:(nUSV+nUAV)*(T+1)+mUAV*T], (-1, 1))
-        self.ub.value = np.reshape(results.x[(nUSV+nUAV)*(T+1)+mUAV*T:(nUSV+nUAV)*(T+1)+(mUSV+mUAV)*T], (-1, 1))
+        self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T+ns:(nUSV+nUAV)*(T+1)+mUAV*T+ns], (-1, 1))
+        self.ub.value = np.reshape(results.x[(nUSV+nUAV)*(T+1)+mUAV*T+ns:(nUSV+nUAV)*(T+1)+(mUSV+mUAV)*T+ns], (-1, 1))
         end = time()
         self.last_solution_duration = end-start
 
