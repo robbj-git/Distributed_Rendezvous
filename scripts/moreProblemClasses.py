@@ -193,14 +193,14 @@ class CompleteCentralisedProblem():
             [sparse_eye, -Lambda_sparse, csc_matrix(np.zeros((d1, ns)))],                # UAV Dynamics
             [lower_left_mat_sparse, lower_mid_mat_sparse, lower_right_mat_sparse]
         ])
-        # self.A_USV = csc_matrix(np.block([
-        #     [np.eye(c1), -self.Lambda_b],               # USV Dynamics
-        #     [np.zeros((c2,c1)), np.eye(c2)],            # USV Input
-        #     [vel_extractor_b, np.zeros((2*(T+1), c2))]  # USV velocity
-        # ]))
         self.A_USV = csc_matrix(np.block([
-            [np.eye(c1), -self.Lambda_b]               # USV Dynamics
+            [np.eye(c1), -self.Lambda_b],               # USV Dynamics
+            [np.zeros((c2,c1)), np.eye(c2)],            # USV Input
+            [vel_extractor_b, np.zeros((2*(T+1), c2))]  # USV velocity
         ]))
+        # self.A_USV = csc_matrix(np.block([
+        #     [np.eye(c1), -self.Lambda_b]               # USV Dynamics
+        # ]))
 
         self.A_OSQP = sp.sparse.bmat([
             [self.A_UAV, None],
@@ -237,17 +237,19 @@ class CompleteCentralisedProblem():
             [np.dot(self.Phi, np.zeros((nUAV, 1))) + self.Xi],    # UAV Dynamics
             [np.full((2*(T+1), 1), -params.ang_max)],   # UAV Angles
             # [np.full((d2, 1), -params.ang_max)],        # UAV Inputs
-            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))]  # USV Dynamics
+            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],  # USV Dynamics
+            [np.full((c2, 1), params.amin_b)],          # USV Input constraints
+            [np.full((2*(T+1),   1), -params.v_max_b)]  # USV Velocity constraints
         ])
 
         self.u_OSQP = np.block([
             [np.dot(self.Phi, np.zeros((nUAV, 1))) + self.Xi],    # UAV Dynamics
             [np.full((2*(T+1), 1), params.ang_max)],    # UAV Angles
             # [np.full((d2, 1), params.ang_max)],         # UAV Inputs
-            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))]  # USV Dynamics
+            [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],  # USV Dynamics
+            [np.full((c2, 1), params.amax_b)],          # USV Input constraints
+            [np.full((2*(T+1),   1), params.v_max_b)]   # USV Velocity constraints
         ])
-
-        print "PAMS", params.ang_max    # DEBUG PRINT
 
     def create_optimisation_problem(self):
         T = self.T
