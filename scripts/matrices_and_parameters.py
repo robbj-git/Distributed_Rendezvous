@@ -35,6 +35,7 @@ vmax = 5.0
 vmax_b = 3.0
 vmin_b = 0.8
 ang_max = np.radians(30)
+ang_vel_max = np.radians(30)
 # vmax_x_b = vmax_b
 # vmin_x_b = vmin_b
 # vmax_y_b = vmax_b

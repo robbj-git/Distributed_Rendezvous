@@ -11,7 +11,7 @@ from time import time
 # DEBUG
 from matrices_and_parameters import g, k_phi, k_theta, w_phi, w_theta, xi_phi, xi_theta, kdx, kdy
 from matrices_and_parameters import Ab, Bb, Q, R, P, Qb_vel, Pb_vel, amin, amax,\
-    amin_b, amax_b, hs, ds, dl, wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max
+    amin_b, amax_b, hs, ds, dl, wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max
 from helper_classes import Parameters
 import cvxpy as cp
 
@@ -215,7 +215,7 @@ class CompleteCentralisedProblem():
             [np.dot(self.Phi, np.zeros((nUAV, 1))) + self.Xi],    # UAV Dynamics
             [np.full((2*(T+1), 1), -params.v_max)],     # UAV Velocity
             [np.full((2*(T+1), 1), -params.ang_max)],   # UAV Angles
-            [np.full((d2, 1), -params.ang_max)],        # UAV Inputs
+            [np.full((d2, 1), -params.ang_vel_max)],        # UAV Inputs
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],  # USV Dynamics
             [np.full((c2, 1), params.amin_b)],          # USV Input constraints
             [np.full((2*(T+1),   1), -params.v_max_b)]  # USV Velocity constraints
@@ -225,7 +225,7 @@ class CompleteCentralisedProblem():
             [np.dot(self.Phi, np.zeros((nUAV, 1))) + self.Xi],    # UAV Dynamics
             [np.full((2*(T+1), 1), params.v_max)],      # UAV Velocity
             [np.full((2*(T+1), 1), params.ang_max)],    # UAV Angles
-            [np.full((d2, 1), params.ang_max)],         # UAV Inputs
+            [np.full((d2, 1), params.ang_vel_max)],         # UAV Inputs
             [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],  # USV Dynamics
             [np.full((c2, 1), params.amax_b)],          # USV Input constraints
             [np.full((2*(T+1),   1), params.v_max_b)]   # USV Velocity constraints
@@ -344,7 +344,7 @@ class CompleteCentralisedProblem():
         self.Lambda_cols = col_inds
         return csc_matrix((data, (row_inds, col_inds)), shape=(self.nUAV*(self.T+1),self.mUAV*self.T))
 
-if __name__ == '__main__':
-    params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-        wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max = ang_max)
-    my_prob = CompleteCentralisedProblem(100, Ab, Bb, Q, R, P, R, Qb_vel, Pb_vel, params)
+# if __name__ == '__main__':
+#     params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
+#         wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max)
+#     my_prob = CompleteCentralisedProblem(100, Ab, Bb, Q, R, P, R, Qb_vel, Pb_vel, params)

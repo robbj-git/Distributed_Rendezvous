@@ -11,12 +11,12 @@ import copy
 class Parameters():
 
     def __init__(self, amin, amax, amin_b, amax_b, hs, ds, dl, \
-        wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max = 0):
+        wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max):
         self.amin = amin
         self.amax = amax
         self.amin_b = amin_b
-        self.amax_b = amax_b
         self.hs = hs
+        self.amax_b = amax_b
         self.ds = ds
         self.dl = dl
         self.wmin = wmin
@@ -27,6 +27,7 @@ class Parameters():
         self.v_max_b = vmax_b
         self.v_min_b = vmin_b
         self.ang_max = ang_max
+        self.ang_vel_max = ang_vel_max
 
     def __str__(self):
         string = ''
