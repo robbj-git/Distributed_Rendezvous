@@ -47,6 +47,8 @@ class CentralisedProblem():
         self.type = type
         [self.nUAV, self.mUAV] = B.shape
         [self.nUSV, self.mUSV] = Bb.shape
+        self.nUAV_s = 2
+        self.nUSV_s = 2
         self.last_solution_duration = np.nan
         self.travel_dir = travel_dir
         self.create_optimisation_matrices()

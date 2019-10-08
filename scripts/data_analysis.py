@@ -319,6 +319,8 @@ class DataAnalyser():
             for t in time:
                 axes[0].cla()
                 axes[1].cla()
+                axes[0].set_title("UAV")
+                axes[1].set_title("USV")
 
                 pred_UAV_vel_x_log = dtl.UAV_traj_log[2::p.nUAV, t]
                 pred_UAV_vel_y_log = dtl.UAV_traj_log[3::p.nUAV, t]

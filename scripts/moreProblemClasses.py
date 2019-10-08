@@ -241,10 +241,8 @@ class CompleteCentralisedProblem():
         self.xb = cp.Variable(( nUSV*(T+1), 1 ))
         self.u  = cp.Variable(( mUAV*T, 1 ))
         self.ub = cp.Variable(( mUSV*T, 1 ))
-        self.s_UAV = cp.Variable(( 1, 1 ))
-        self.s_USV = cp.Variable(( 1, 1 ))
-        self.s_UAV_new = cp.Variable((self.nUAV_s, 1))
-        self.s_USV_new = cp.Variable(( self.nUSV_s, 2))
+        self.s_UAV = cp.Variable((self.nUAV_s, 1))
+        self.s_USV = cp.Variable(( self.nUSV_s, 1))
         self.x_0  = cp.Parameter((nUAV, 1))
         self.xb_0 = cp.Parameter((nUSV, 1))
         self.problemOSQP = osqp.OSQP()
@@ -258,12 +256,15 @@ class CompleteCentralisedProblem():
         nUSV = self.nUSV
         mUSV = self.mUSV
         nUAV_s = self.nUAV_s
+        nUSV_s = self.nUSV_s
         self.update_OSQP(x, xb)
         results = self.problemOSQP.solve()
         self.x.value = np.reshape(results.x[0:nUAV*(T+1)], (-1, 1))
         self.u.value = np.reshape(results.x[nUAV*(T+1):nUAV*(T+1)+mUAV*T], (-1, 1))
+        self.s_UAV.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T:nUAV*(T+1)+mUAV*T+nUAV_s], (-1, 1))
         self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T+nUAV_s:(nUSV+nUAV)*(T+1)+mUAV*T+nUAV_s], (-1, 1))
         self.ub.value = np.reshape(results.x[(nUSV+nUAV)*(T+1)+mUAV*T+nUAV_s:(nUSV+nUAV)*(T+1)+(mUSV+mUAV)*T+nUAV_s], (-1, 1))
+        self.s_USV.value = np.reshape(results.x[-nUSV_s:], (-1, 1))
         end = time()
         self.last_solution_duration = end-start
 

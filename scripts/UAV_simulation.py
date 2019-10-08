@@ -169,8 +169,8 @@ class UAV_simulator():
             # Stores both positive and negative distances, for nicer plotting
             self.dist_traj_signed = None
         else: # if self.CENTRALISED
-            self.s_UAV_log = np.full((2, sim_len), np.nan)
-            self.s_USV_log = np.full((2, sim_len), np.nan)
+            self.s_UAV_log = np.full((self.problemCent.nUAV_s, sim_len), np.nan)
+            self.s_USV_log = np.full((self.problemCent.nUSV_s, sim_len), np.nan)
             self.uUSV_log = np.full((self.mUSV, sim_len), np.nan)
 
         self.USVApprox = StampedTrajQueue(self.delay_len, should_shift = self.SHOULD_SHIFT_MESSAGES)
@@ -245,7 +245,6 @@ class UAV_simulator():
 
             # ------- Horizontal Problem --------
             if self.CENTRALISED:
-                print self.x[4:6, 0]
                 self.problemCent.solve(self.x, self.xb)
             elif self.DISTRIBUTED:
                 # TODO: Make xb_traj naturally an array instead of a matrix
