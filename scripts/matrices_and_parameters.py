@@ -5,6 +5,19 @@ import numpy as np
 tau_w = 0.4
 g = 9.8
 kw  = 1.0
+k_phi = 0.95
+w_phi = 9.0
+xi_phi =  0.72
+k_theta = 1.02
+w_theta = 11.0
+xi_theta = 0.7
+# Not identified, but set to the parameters sent by Linnea
+kdx = 0.1
+kdy = 0.1
+kdz = 0.0
+# Like kdx and kdy but for boat
+ddx = 0.5
+ddy = 0.5
 
 amin  =  -5.0
 amax  =   5.0
@@ -21,6 +34,8 @@ kl = 0.2
 vmax = 5.0
 vmax_b = 3.0
 vmin_b = 0.8
+ang_max = np.radians(30)
+ang_vel_max = np.radians(30)
 # vmax_x_b = vmax_b
 # vmin_x_b = vmin_b
 # vmax_y_b = vmax_b

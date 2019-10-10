@@ -182,6 +182,8 @@ class DataAnalyser():
 
             for t in time:
                 ax.cla()
+                # ax.set_xlim([-1,1])
+                # ax.set_ylim([-1,1])
                 x_pred_traj = UAV_traj_log[0::p.nUAV, t]
                 y_pred_traj = UAV_traj_log[1::p.nUAV, t]
                 xb_pred_traj = USV_traj_log[0::p.nUSV, t]
@@ -204,7 +206,7 @@ class DataAnalyser():
                 plt.legend(['UAV trajectory', 'USV trajectory'])
                 plt.grid(True)
                 try:
-                    plt.pause(0.05)  # TODO: DEBUG: Make 0.05 again
+                    plt.pause(0.05)
                 except:
                     # Window was probably closed
                     return
@@ -319,6 +321,8 @@ class DataAnalyser():
             for t in time:
                 axes[0].cla()
                 axes[1].cla()
+                axes[0].set_title("UAV")
+                axes[1].set_title("USV")
 
                 pred_UAV_vel_x_log = dtl.UAV_traj_log[2::p.nUAV, t]
                 pred_UAV_vel_y_log = dtl.UAV_traj_log[3::p.nUAV, t]
@@ -641,13 +645,14 @@ class DataAnalyser():
                 vert_pred_log = dtl.vert_traj_log[0::p.nv, t]
 
                 ax.plot(range(t+1), dtl.xv_log[0, 0:t+1], 'blue')
-                ax.plot(range(t, t+T), vert_pred_log, 'green', alpha=0.5)
-                ax.plot(range(t+1), vert_const_log[0:t+1], 'red')
-                if self.file_types[file_index] == PARALLEL:
-                    vert_inner_pred_log = dtl.vert_inner_traj_log[0::p.nv, t]
-                    ax.plot(range(t, t+T_inner), vert_inner_pred_log, 'yellow', alpha=0.5)
-                plt.xlabel('horizontal distance [m]')
+                ax.plot(range(t+1), vert_const_log[0:t+1], 'r--')
+                # ax.plot(range(t, t+T), vert_pred_log, 'green', alpha=0.5)
+                # if self.file_types[file_index] == PARALLEL:
+                #     vert_inner_pred_log = dtl.vert_inner_traj_log[0::p.nv, t]
+                #     ax.plot(range(t, t+T_inner), vert_inner_pred_log, 'yellow', alpha=0.5)
+                plt.xlabel('iteration')
                 plt.ylabel('altitude [m]')
+                plt.legend(['UAV altitude', 'Altitude constraint'])
                 try:
                     plt.grid(True)
                     plt.pause(0.05)
@@ -872,24 +877,6 @@ class DataLoader:
             print "Couldn't find USV altitude"
             return 0
 
-
-# def plot_time_histogram(vector, xlabel, ylabel, bins=10):
-#     plt.hist(vector, bins=bins)
-#     plt.xlabel(xlabel)
-#     plt.ylabel(ylabel)
-#     plt.grid(True)
-#     plt.show()
-#
-# def plot_all_histograms(vectors, colors, legend_list, xlabel, ylabel, bins=10):
-#     for (vector, color) in zip(vectors, colors):
-#         plt.hist(vector, bins=bins, color=color)
-#     # plt.hist(vector1, bins=bins, color=(1.0, 0.0, 0.0, 0.5))
-#     # plt.hist(vector2, bins=bins, color=(0.0, 0.0, 1.0, 0.5))
-#     plt.xlabel(xlabel)
-#     plt.ylabel(ylabel)
-#     plt.grid(True)
-#     plt.legend(legend_list)
-#     plt.show()
 
 if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])

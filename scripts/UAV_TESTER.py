@@ -63,6 +63,7 @@ class ProblemParams():
         self.SAMPLING_TIME = SAMPLING_TIME
         self.USE_HIL = USE_HIL
         self.INTER_ITS = INTER_ITS
+        self.USE_COMPLETE_HORIZONTAL = USE_COMPLETE_HORIZONTAL
         self.A = A
         self.B = B
         self.Ab = Ab
@@ -86,7 +87,7 @@ class ProblemParams():
         self.KUSV = KUSV
         self.KVert = KVert
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b)
+            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max)
         self.hb = hb
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
@@ -96,7 +97,13 @@ class ProblemParams():
         self.dropout_upper_bound = dropout_upper_bound
 
 problem_params = ProblemParams()
-x_m = np.array([[0.0], [0.0], [0.0], [0.0]])
+
+if USE_COMPLETE_HORIZONTAL:
+    nUAV = 8
+else:
+    nUAV = 4
+
+x_m = np.zeros((nUAV, 1))
 xv_m = np.array([[7.0], [0.0]])#np.matrix([[12.0], [0.0]])
 prev_simulator = None
 my_uav_simulator =  None
