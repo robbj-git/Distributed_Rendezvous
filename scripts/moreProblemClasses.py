@@ -282,16 +282,24 @@ class CompleteCentralisedProblem():
         mUSV = self.mUSV
         nUAV_s = self.nUAV_s
         nUSV_s = self.nUSV_s
-        self.update_OSQP(x, xb)
-        # self.actually_update_linearisation(x, xb)
+        # self.update_OSQP(x, xb)
+        self.actually_update_linearisation(x, xb)
         # print "X:", x
         results = self.problemOSQP.solve()
-        self.x.value = np.reshape(results.x[0:nUAV*(T+1)], (-1, 1))
-        self.u.value = np.reshape(results.x[nUAV*(T+1):nUAV*(T+1)+mUAV*T], (-1, 1))
-        self.s_UAV.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T:nUAV*(T+1)+mUAV*T+nUAV_s], (-1, 1))
-        self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T+nUAV_s:(nUSV+nUAV)*(T+1)+mUAV*T+nUAV_s], (-1, 1))
-        self.ub.value = np.reshape(results.x[(nUSV+nUAV)*(T+1)+mUAV*T+nUAV_s:(nUSV+nUAV)*(T+1)+(mUSV+mUAV)*T+nUAV_s], (-1, 1))
-        self.s_USV.value = np.reshape(results.x[-nUSV_s:], (-1, 1))
+        if results.x[0] is not None and results.info.status != 'maximum iterations reached':
+            self.x.value = np.reshape(results.x[0:nUAV*(T+1)], (-1, 1))
+            self.u.value = np.reshape(results.x[nUAV*(T+1):nUAV*(T+1)+mUAV*T], (-1, 1))
+            self.s_UAV.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T:nUAV*(T+1)+mUAV*T+nUAV_s], (-1, 1))
+            self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T+nUAV_s:(nUSV+nUAV)*(T+1)+mUAV*T+nUAV_s], (-1, 1))
+            self.ub.value = np.reshape(results.x[(nUSV+nUAV)*(T+1)+mUAV*T+nUAV_s:(nUSV+nUAV)*(T+1)+(mUSV+mUAV)*T+nUAV_s], (-1, 1))
+            self.s_USV.value = np.reshape(results.x[-nUSV_s:], (-1, 1))
+        else:
+            print "FAILED COMPLETE OPTIMISAITON"
+            self.u.value = np.zeros((mUAV*T, 1))
+            self.ub.value = np.zeros((mUSV*T, 1))
+            self.x.value = self.predict_UAV_traj(x, self.u.value)
+            self.xb.value = self.predict_USV_traj(xb, self.ub.value)
+
         end = time()
         self.last_solution_duration = end-start
 
@@ -338,6 +346,7 @@ class CompleteCentralisedProblem():
         mUSV = self.mUSV
         nUAV = self.nUAV
         nUSV = self.nUSV
+        nUAV_s = self.nUAV_s
         phi = x0[4, 0]
         theta = x0[5, 0]
 
@@ -377,9 +386,9 @@ class CompleteCentralisedProblem():
         # Update OSQP Matrices
 
         self.l_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
-        self.l_OSQP[(T+1)*(nUAV+4)+mUAV*T:(T+1)*(nUAV+nUSV+4)+mUAV*T] = np.dot(self.Phi_b, xb0)
+        self.l_OSQP[(T+1)*(nUAV+nUAV_s)+mUAV*T:(T+1)*(nUAV+nUSV+nUAV_s)+mUAV*T] = np.dot(self.Phi_b, xb0)
         self.u_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
-        self.u_OSQP[(T+1)*(nUAV+4)+mUAV*T:(T+1)*(nUAV+nUSV+4)+mUAV*T] = np.dot(self.Phi_b, xb0)
+        self.u_OSQP[(T+1)*(nUAV+nUAV_s)+mUAV*T:(T+1)*(nUAV+nUSV+nUAV_s)+mUAV*T] = np.dot(self.Phi_b, xb0)
 
         self.set_A_OSQP()
         A_data = self.A_OSQP.data
@@ -405,6 +414,12 @@ class CompleteCentralisedProblem():
         self.Lambda_rows = row_inds
         self.Lambda_cols = col_inds
         return csc_matrix((data, (row_inds, col_inds)), shape=(self.nUAV*(self.T+1),self.mUAV*self.T))
+
+    def predict_UAV_traj(self, x0, u_traj):
+        return np.dot(self.Phi, x0) + np.dot(self.Lambda, u_traj)
+
+    def predict_USV_traj(self, xb0, ub_traj):
+        return np.dot(self.Phi_b, xb0) + np.dot(self.Lambda_b, ub_traj)
 
 # if __name__ == '__main__':
 #     params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
