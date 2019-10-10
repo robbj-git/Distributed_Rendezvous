@@ -41,6 +41,8 @@ class DataAnalyser():
         self.files = files
         self.file_types = self.get_problem_types(files)
         self.p = DataAnalysisParams()
+        self.colors = [(0.12, 0.47, 0.71, 0.5), (1.0, 0.50, 0.05, 0.5), (0.17, 0.63, 0.17, 0.5), (0.84, 0.15, 0.16, 0.5), (0.58, 0.40, 0.74, 0.5)]
+
         # self.x_log  = np.loadtxt(dir_path + dir + '/x_log.txt')
         # self.xb_log = np.loadtxt(dir_path + dir + '/xb_log.txt')
         # self.xv_log = np.loadtxt(dir_path + dir + '/xv_log.txt')
@@ -657,6 +659,35 @@ class DataAnalyser():
             fig.show()
         plt.show()
 
+    def plot_time_histogram(self):
+        fig = plt.figure()
+        ax = plt.axes()
+        for file_index, dir in enumerate(self.files):
+            dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['time'], self.p)
+
+            ax.hist(dtl.mean_iteration_USV, bins=10, color=self.colors[file_index])
+            # if file_index == 0:
+            # _, bins, _ = ax.hist(dtl.mean_iteration_UAV, bins=10, color=self.colors[file_index])
+            # else:
+            #     ax.hist(dtl.mean_iteration_UAV, bins=bins)
+
+        plt.xlabel('mean iteration time [s]')
+        plt.ylabel('number of occurrences')
+        plt.grid(True)
+        plt.show()
+
+    def plot_time_curve(self):
+        fig = plt.figure()
+        ax = plt.axes()
+        for file_index, dir in enumerate(self.files):
+            dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['time'], self.p)
+
+            time_len = dtl.mean_iteration_UAV.shape[0]
+            ax.plot(range(time_len),dtl.mean_iteration_UAV, color=self.colors[file_index])
+
+        plt.grid(True)
+        plt.show()
+
     def handle_close(self, evt):
         self.should_close = True
 
@@ -726,12 +757,31 @@ class DataLoader:
                 self.s_vert_log = self.get_adjusted_array(self.s_vert_log_raw, UAV_time_stamps, new_time_stamps)
 
                 self.hb = self.get_USV_altitude(dir_path)
-                print self.hb
 
                 if problem_type == PARALLEL:
                     self.vert_inner_traj_log_raw = np.loadtxt(dir_path + '/vert_inner_traj_log.txt')
 
                     self.vert_inner_traj_log = self.get_interpolated_traj(self.vert_inner_traj_log_raw, UAV_time_stamps, new_time_stamps)
+
+            elif data_type == 'time':
+                self.mean_iteration_UAV = np.loadtxt(dir_path + '/TEST/MEAN.txt')
+                self.median_iteration = np.loadtxt(dir_path + '/TEST/MEDIAN.txt')
+                self.mean_iteration_USV = np.loadtxt(dir_path + '/TEST/MEAN_USV.txt')
+                self.median_iteration_USV = np.loadtxt(dir_path + '/TEST/MEDIAN_USV.txt')
+                self.hor_mean_UAV = np.loadtxt(dir_path + '/TEST/HOR_MEAN.txt')
+                self.hor_median_UAV = np.loadtxt(dir_path + '/TEST/HOR_MEDIAN.txt')
+                self.hor_mean_USV = np.loadtxt(dir_path + '/TEST/HOR_MEAN_USV.txt')
+                self.hor_median_USV = np.loadtxt(dir_path + '/TEST/HOR_MEDIAN_USV.txt')
+                self.vert_mean = np.loadtxt(dir_path + '/TEST/VERT_MEAN.txt')
+                self.vert_median = np.loadtxt(dir_path + '/TEST/VERT_MEDIAN.txt')
+                self.landing_times = np.loadtxt(dir_path + '/TEST/LANDING_TIMES.txt')
+                if problem_type == PARALLEL:
+                    self.hor_inner_mean_UAV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEAN.txt')
+                    self.hor_inner_median_UAV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEDIAN.txt')
+                    self.hor_inner_mean_USV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEAN_USV.txt')
+                    self.hor_inner_median_USV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEDIAN_USV.txt')
+                    self.vert_inner_mean = np.loadtxt(dir_path + '/TEST/VERT_INNER_MEAN.txt')
+                    self.vert_inner_median = np.loadtxt(dir_path + '/TEST/VERT_INNER_MEDIAN.txt')
 
 
         # print USV_inner_traj_log[0, t] - xb_log[0, t]
@@ -821,6 +871,69 @@ class DataLoader:
             print "Couldn't find USV altitude"
             return 0
 
+
+# def plot_time_histogram(vector, xlabel, ylabel, bins=10):
+#     plt.hist(vector, bins=bins)
+#     plt.xlabel(xlabel)
+#     plt.ylabel(ylabel)
+#     plt.grid(True)
+#     plt.show()
+#
+# def plot_all_histograms(vectors, colors, legend_list, xlabel, ylabel, bins=10):
+#     for (vector, color) in zip(vectors, colors):
+#         plt.hist(vector, bins=bins, color=color)
+#     # plt.hist(vector1, bins=bins, color=(1.0, 0.0, 0.0, 0.5))
+#     # plt.hist(vector2, bins=bins, color=(0.0, 0.0, 1.0, 0.5))
+#     plt.xlabel(xlabel)
+#     plt.ylabel(ylabel)
+#     plt.grid(True)
+#     plt.legend(legend_list)
+#     plt.show()
+
+if __name__ == '__main__':
+    data_analyser = DataAnalyser(sys.argv[1:])
+    # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
+    # data_analyser.plot_3d_super_realtime()
+    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
+    # data_analyser.compare_topviews(real_time = True)
+    # data_analyser.plot_time_evolution(real_time = True)
+    # data_analyser.plot_with_constraints(real_time = True, perspective = UAV)
+    # data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
+    # data_analyser.plot_with_vel_constraints(real_time = True)
+    # data_analyser.plot_obj_val(real_time = True)
+    # data_analyser.plot_hor_velocities(real_time = True)
+    data_analyser.plot_time_histogram()
+    # data_analyser.plot_time_curve()
+
+    # use_dir = False
+    # use_horizon_vs_performance = False
+    # if len(sys.argv) == 2:
+    #     # directory specified
+    #     dir = sys.argv[1]
+    #     use_dir = True
+    # elif len(sys.argv) > 2:
+    #     # start and end index specified
+    #     # start = int(sys.argv[1])
+    #     # end = int(sys.argv[2])
+    #     if not use_horizon_vs_performance:
+    #         combine_multiple_results(sys.argv[1:3])
+    #         exit()
+    #     else:
+    #         dirs = sys.argv[1:4]
+    # else:
+    #     print "ERROR: Please select directory"
+    #     exit()
+    #
+    # if use_horizon_vs_performance:
+    #     if len(sys.argv) > 2:
+    #         horizon_vs_performance(dirs)
+    #     else:
+    #         horizon_vs_performance([dir])
+    # elif use_dir:
+    #     print_data(dir)
+    # else:
+    #     for i in range(int(start), int(end)+1):
+    #         print_data('Experiment_' + str(i))
 
 # def combine_multiple_results(dirs):
 #     time_list = []
@@ -1415,46 +1528,3 @@ class DataLoader:
 #         i += 1
 #
 #     return vector[i:]
-
-if __name__ == '__main__':
-    data_analyser = DataAnalyser(sys.argv[1:])
-    # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
-    # data_analyser.plot_3d_super_realtime()
-    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
-    # data_analyser.compare_topviews(real_time = True)
-    # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = UAV)
-    data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
-    # data_analyser.plot_with_vel_constraints(real_time = True)
-    # data_analyser.plot_obj_val(real_time = True)
-    # data_analyser.plot_hor_velocities(real_time = True)
-
-    # use_dir = False
-    # use_horizon_vs_performance = False
-    # if len(sys.argv) == 2:
-    #     # directory specified
-    #     dir = sys.argv[1]
-    #     use_dir = True
-    # elif len(sys.argv) > 2:
-    #     # start and end index specified
-    #     # start = int(sys.argv[1])
-    #     # end = int(sys.argv[2])
-    #     if not use_horizon_vs_performance:
-    #         combine_multiple_results(sys.argv[1:3])
-    #         exit()
-    #     else:
-    #         dirs = sys.argv[1:4]
-    # else:
-    #     print "ERROR: Please select directory"
-    #     exit()
-    #
-    # if use_horizon_vs_performance:
-    #     if len(sys.argv) > 2:
-    #         horizon_vs_performance(dirs)
-    #     else:
-    #         horizon_vs_performance([dir])
-    # elif use_dir:
-    #     print_data(dir)
-    # else:
-    #     for i in range(int(start), int(end)+1):
-    #         print_data('Experiment_' + str(i))

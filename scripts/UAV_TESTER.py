@@ -47,6 +47,7 @@ rospy.init_node('UAV_main')
 
 round_pub = rospy.Publisher('UAV_test_round', Int32, queue_size = 10, latch = True)
 instruct_pub = rospy.Publisher('UAV_instruction', Int32, queue_size = 10, latch = True)
+experiment_index_pub = rospy.Publisher('experiment_index', Int8, queue_size=1, latch=True)
 rospy.Subscriber('USV_test_round', Int32, USV_test_round_callback)
 rospy.Subscriber('USV_has_stored_data', Int32, USV_store_callback)
 
@@ -112,16 +113,16 @@ else:
     dir = None
 # -------------- TESTING LOOP ----------------
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 1#50
+NUM_TESTS = 2#50
 if PARALLEL:
-    hor_max = 100#400#100
-    hor_min = 100#200#100
+    hor_max = 100#405#100
+    hor_min = 100#300#100
 elif CENTRALISED:
-    hor_max = 120#130#120
-    hor_min = 120#80#120
+    hor_max = 100#150#120
+    hor_min = 100#80#120
 elif DISTRIBUTED:
-    hor_max = 100#200#100
-    hor_min = 100#100
+    hor_max = 100#280#100
+    hor_min = 100
 
 hor_inner = 60#30#15
 cancelled = False
@@ -286,6 +287,7 @@ if not cancelled:
     test_info_str = "min horizon: " + str(hor_min) + "\nmax horizon: " \
         + str(hor_max) + "\nnumber of trials: " + str(NUM_TESTS)
     exp_index = my_uav_simulator.store_data(test_info_str = test_info_str)
+    experiment_index_pub.publish(Int8(exp_index))
 
     # dir_path = '/home/student/robbj_experiment_results/'
     dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
@@ -310,3 +312,6 @@ if not cancelled:
         if rospy.is_shutdown():
             break
         time.sleep(0.1)
+
+print "SENDING -2"
+experiment_index_pub.publish(Int8(-2))

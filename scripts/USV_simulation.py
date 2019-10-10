@@ -18,7 +18,7 @@ class USV_simulator():
 
     def __init__(self, problem_params, travel_dir = None):
         pp = problem_params
-        self.experiment_index = -1  # Used in store_data()
+        # self.experiment_index = -1  # Used in store_data()
         self.T = pp.T
         self.T_inner = pp.T_inner
         self.Ab = pp.Ab
@@ -29,7 +29,6 @@ class USV_simulator():
         [self.nUAV, self.mUAV] = pp.B.shape
         [self.nUSV, self.mUSV] = pp.Bb.shape
 
-        self.experiment_index = -1
         self.T = problem_params.T
         self.T_inner = problem_params.T_inner
         B = problem_params.B
@@ -67,7 +66,7 @@ class USV_simulator():
 
         # --------------------------- ROS SETUP ----------------------------------
         # rospy.init_node('USV_main')
-        rospy.Subscriber('experiment_index', Int8, self.experiment_index_callback)
+        # rospy.Subscriber('experiment_index', Int8, self.experiment_index_callback)
         if not self.CENTRALISED:
             # UAVApprox needs to be initialised here, since UAV_traj_callback
             # can start being called, and it contains a reference to UAVApprox
@@ -319,12 +318,12 @@ class USV_simulator():
 
     # ------------------------------------------
 
-    def store_data(self):
-        while self.experiment_index < 0:
-            if rospy.is_shutdown():
-                break
+    def store_data(self, exp_index):
+        # while self.experiment_index < 0:
+        #     if rospy.is_shutdown():
+        #         break
 
-        i = self.experiment_index
+        i = exp_index
         # dir_path = '/home/student/robbj_experiment_results/'
         dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
 
@@ -360,7 +359,6 @@ class USV_simulator():
             os.mkdir(dir_path + 'Experiment_' + str(i) + '/USV')
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV/UAV_traj_log.txt', self.UAV_traj_log)
 
-        return self.experiment_index
 
     def plot_results(self, real_time):
         fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
@@ -488,5 +486,5 @@ class USV_simulator():
 
     # Used for the function store_data(), to store data into the same folder
     # as the UAV_simulation_NEW.py
-    def experiment_index_callback(self, msg):
-        self.experiment_index = msg.data
+    # def experiment_index_callback(self, msg):
+    #     self.experiment_index = msg.data

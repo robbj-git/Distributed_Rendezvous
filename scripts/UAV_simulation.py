@@ -82,7 +82,7 @@ class UAV_simulator():
         # rospy.init_node('UAV_main')
         self.rate = rospy.Rate(self.SAMPLING_RATE)
         self.USV_input_pub = rospy.Publisher('USV_input', AccelStamped, queue_size = 10)
-        self.experiment_index_pub = rospy.Publisher('experiment_index', Int8, queue_size=1, latch=True)
+        # self.experiment_index_pub = rospy.Publisher('experiment_index', Int8, queue_size=1, latch=True)
         if self.CENTRALISED:
             self.USV_state_sub = rospy.Subscriber(\
                 'USV_state', StateStamped, self.USV_state_callback)
@@ -434,7 +434,7 @@ class UAV_simulator():
     # ----------------------------------------
 
     def store_data(self, test_info_str = None):
-        experiment_index_pub = self.experiment_index_pub
+        # experiment_index_pub = self.experiment_index_pub
         CENTRALISED = self.CENTRALISED
         DISTRIBUTED = self.DISTRIBUTED
         PARALLEL = self.PARALLEL
@@ -456,7 +456,7 @@ class UAV_simulator():
         os.mkdir(dir_path + 'Experiment_' + str(i))
         os.mkdir(dir_path + 'Experiment_' + str(i) + '/UAV')
         os.mkdir(dir_path + 'Experiment_' + str(i) + '/TEST')
-        experiment_index_pub.publish(Int8(i))
+        # experiment_index_pub.publish(Int8(i))
 
         info_str = str(datetime.datetime.now()) + '\ntype: '
         if CENTRALISED:

@@ -30,11 +30,12 @@ import random
 
 lookahead = 0   # Only for parallel
 
-global UAV_test_round, should_change_horizon, should_finish, quit_horizon
+global UAV_test_round, should_change_horizon, should_finish, quit_horizon, exp_index
 UAV_test_round = np.inf
 should_change_horizon = False
 should_finish = False
 quit_horizon = -1
+exp_index = -1
 
 def UAV_test_round_callback(msg):
     global UAV_test_round
@@ -59,12 +60,17 @@ def get_USV_travel_dir(xb, reverse_dir = False):
     else:
         raise ZeroDivisionError("First two elements of argument must have norm greater than zero")
 
+def experiment_index_callback(msg):
+    global exp_index
+    exp_index = msg.data
+
 rospy.init_node('USV_main')
 
 round_pub = rospy.Publisher('USV_test_round', Int32, queue_size = 10, latch = True)
 store_pub = rospy.Publisher('USV_has_stored_data', Int32, queue_size = 1, latch = True)
 rospy.Subscriber('UAV_test_round', Int32, UAV_test_round_callback)
 rospy.Subscriber('UAV_instruction', Int32, UAV_instruction_callback)
+rospy.Subscriber('experiment_index', Int8, experiment_index_callback)
 
 class ProblemParams():
     def __init__(self):
@@ -128,7 +134,7 @@ xb_m[2:] = dir
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 1#50
+NUM_TESTS = 2#100#50
 prev_simulator = None
 my_usv_simulator = None
 
@@ -142,14 +148,14 @@ took_too_long_horizon = -1
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
 if PARALLEL:
-    hor_max = 100#400#100
-    hor_min = 100#200#100
+    hor_max = 100#405#100
+    hor_min = 100#300#100
 elif CENTRALISED:
-    hor_max = 120#130#120
-    hor_min = 120#80#120
+    hor_max = 100#150#120
+    hor_min = 100#80#120
 elif DISTRIBUTED:
-    hor_max = 100#200#100
-    hor_min = 100#100
+    hor_max = 100#280#100
+    hor_min = 100
 
 hor_inner = 60#30#15
 
@@ -262,13 +268,12 @@ for N in range(hor_max, hor_min-1, -1):
         print "Still asked to finish"
         break
 
-
-print "started sleeping"
-if not quit_horizon >= 0:
-    # Sleep for a while, give UAV-tester a chance to finish
-    time.sleep(20)
-
-print "stopped sleeping"
+# print "started sleeping"
+# if not quit_horizon >= 0:
+#     # Sleep for a while, give UAV-tester a chance to finish
+#     time.sleep(20)
+#
+# print "stopped sleeping"
 
 # try:
 #     my_usv_simulator.plot_results(True)
@@ -278,16 +283,23 @@ print "stopped sleeping"
 #     print e
 #     pass
 
-store_pub.publish(Int32(1))
-if quit_horizon >= 0:
+while exp_index == -1:
+    if rospy.is_shutdown():
+        exp_index = -2
+        break
+    if random.randint(1, 101) == 100:
+        print "Waiting for experiment index"
+    time.sleep(0.01)
+
+if quit_horizon >= 0 and exp_index != -2:
     print "Storing!"
     if N == quit_horizon:
-        exp_index = my_usv_simulator.store_data()
+        my_usv_simulator.store_data(exp_index)
     else:
         # It is possible that the outer loop increments N while the UAV tester
         # is still at the previous value of N. If the UAV-tester then quits,
         # my_usv_simulator will not be the correct simulator.
-        exp_index = prev_simulator.store_data()
+        exp_index = prev_simulator.store_data(exp_index)
     if ever_took_too_long:
         print 'OMG HOW ON EARTH DID IT EVER TAKE TOO LONG????? Horizon:', took_too_long_horizon
 
@@ -307,3 +319,5 @@ if quit_horizon >= 0:
 
 else:
     print "nope, no storing", rospy.Time.now()
+
+store_pub.publish(Int32(1))
