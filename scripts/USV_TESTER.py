@@ -134,7 +134,7 @@ xb_m[2:] = dir
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 2#100#50
+NUM_TESTS = 50#100#50
 prev_simulator = None
 my_usv_simulator = None
 
@@ -148,13 +148,13 @@ took_too_long_horizon = -1
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
 if PARALLEL:
-    hor_max = 100#405#100
-    hor_min = 100#300#100
+    hor_max = 420#405#100
+    hor_min = 420#300#100
 elif CENTRALISED:
     hor_max = 100#150#120
     hor_min = 100#80#120
 elif DISTRIBUTED:
-    hor_max = 100#280#100
+    hor_max = 260#100#280#100
     hor_min = 100
 
 hor_inner = 60#30#15
@@ -247,18 +247,18 @@ for N in range(hor_max, hor_min-1, -1):
             print "Mean solution:", np.mean(my_usv_simulator.hor_solution_durations)
         if PARALLEL:
             print "Mean inner solution", np.mean(my_usv_simulator.hor_inner_solution_durations)
-        if np.mean(my_usv_simulator.iteration_durations) > SAMPLING_TIME and \
-            np.median(my_usv_simulator.iteration_durations) > SAMPLING_TIME:
-            print "ITERATION TOOK TOO LONG"
-            took_too_long = True
-        # ------------- FOR PARALLEL ------------
-        if PARALLEL and \
-            np.mean(my_usv_simulator.hor_solution_durations) > \
-                INTER_ITS*SAMPLING_TIME and\
-            np.median(my_usv_simulator.hor_solution_durations) > \
-                INTER_ITS*SAMPLING_TIME:
-            print "SOLUTION TOOK TOO LONG"
-            took_too_long = True
+        # if np.mean(my_usv_simulator.iteration_durations) > SAMPLING_TIME and \
+        #     np.median(my_usv_simulator.iteration_durations) > SAMPLING_TIME:
+        #     print "ITERATION TOOK TOO LONG"
+        #     took_too_long = True
+        # # ------------- FOR PARALLEL ------------
+        # if PARALLEL and \
+        #     np.mean(my_usv_simulator.hor_solution_durations) > \
+        #         INTER_ITS*SAMPLING_TIME and\
+        #     np.median(my_usv_simulator.hor_solution_durations) > \
+        #         INTER_ITS*SAMPLING_TIME:
+        #     print "SOLUTION TOOK TOO LONG"
+        #     took_too_long = True
     if took_too_long:
         print 'USV TEST ACTUALLY TOOK TOO LONG!!!!!!!!!!!!!!'
         ever_took_too_long = True

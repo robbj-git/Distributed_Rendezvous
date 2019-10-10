@@ -665,7 +665,7 @@ class DataAnalyser():
         for file_index, dir in enumerate(self.files):
             dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['time'], self.p)
 
-            ax.hist(dtl.mean_iteration_USV, bins=10, color=self.colors[file_index])
+            ax.hist(dtl.hor_mean_UAV, bins=10, color=self.colors[file_index])
             # if file_index == 0:
             # _, bins, _ = ax.hist(dtl.mean_iteration_UAV, bins=10, color=self.colors[file_index])
             # else:
@@ -673,6 +673,7 @@ class DataAnalyser():
 
         plt.xlabel('mean iteration time [s]')
         plt.ylabel('number of occurrences')
+        plt.legend(['Cascading Distributed', 'Distributed', 'Centralized'])
         plt.grid(True)
         plt.show()
 

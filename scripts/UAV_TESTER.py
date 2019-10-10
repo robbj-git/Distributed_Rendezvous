@@ -113,15 +113,15 @@ else:
     dir = None
 # -------------- TESTING LOOP ----------------
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 2#50
+NUM_TESTS = 50
 if PARALLEL:
-    hor_max = 100#405#100
-    hor_min = 100#300#100
+    hor_max = 420#405#100
+    hor_min = 420#300#100
 elif CENTRALISED:
     hor_max = 100#150#120
     hor_min = 100#80#120
 elif DISTRIBUTED:
-    hor_max = 100#280#100
+    hor_max = 260#100#280#100
     hor_min = 100
 
 hor_inner = 60#30#15
@@ -245,24 +245,24 @@ for N in range(hor_max, hor_min-1, -1):
         # print vert_median_list[i]
         print mean_list[i]
         print mean_list[i] - hor_mean_list[i] - vert_mean_list[i]
-        if PARALLEL and (hor_mean_list[i] > SAMPLING_TIME*INTER_ITS \
-            or hor_median_list[i] > SAMPLING_TIME*INTER_ITS\
-            or vert_mean_list[i] > SAMPLING_TIME*INTER_ITS \
-            or vert_median_list[i] > SAMPLING_TIME*INTER_ITS):
-            took_too_long = True
-            print "TOOK TO LONG!"
-            instruct_pub.publish(Int32(NEXT_HORIZON))
-            break
-        if (np.mean(my_uav_simulator.iteration_durations) > SAMPLING_TIME\
-            or np.median(my_uav_simulator.iteration_durations) > SAMPLING_TIME):
-            print "Uh-oh, took too long!"
-            took_too_long = True
-            instruct_pub.publish(Int32(NEXT_HORIZON))
-            # print np.mean(my_uav_simulator.iteration_durations)
-            print np.median(my_uav_simulator.iteration_durations)
-            # print hor_mean_list[i]
-            # print vert_mean_list[i]
-            break
+        # if PARALLEL and (hor_mean_list[i] > SAMPLING_TIME*INTER_ITS \
+        #     or hor_median_list[i] > SAMPLING_TIME*INTER_ITS\
+        #     or vert_mean_list[i] > SAMPLING_TIME*INTER_ITS \
+        #     or vert_median_list[i] > SAMPLING_TIME*INTER_ITS):
+        #     took_too_long = True
+        #     print "TOOK TO LONG!"
+        #     instruct_pub.publish(Int32(NEXT_HORIZON))
+        #     break
+        # if (np.mean(my_uav_simulator.iteration_durations) > SAMPLING_TIME\
+        #     or np.median(my_uav_simulator.iteration_durations) > SAMPLING_TIME):
+        #     print "Uh-oh, took too long!"
+        #     took_too_long = True
+        #     instruct_pub.publish(Int32(NEXT_HORIZON))
+        #     # print np.mean(my_uav_simulator.iteration_durations)
+        #     print np.median(my_uav_simulator.iteration_durations)
+        #     # print hor_mean_list[i]
+        #     # print vert_mean_list[i]
+        #     break
     if not took_too_long:
         print "Best horizon: ", N
         instruct_pub.publish(Int32(N))
@@ -288,6 +288,7 @@ if not cancelled:
         + str(hor_max) + "\nnumber of trials: " + str(NUM_TESTS)
     exp_index = my_uav_simulator.store_data(test_info_str = test_info_str)
     experiment_index_pub.publish(Int8(exp_index))
+    print "SENT EXPERIMENT INDEX", exp_index
 
     # dir_path = '/home/student/robbj_experiment_results/'
     dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
