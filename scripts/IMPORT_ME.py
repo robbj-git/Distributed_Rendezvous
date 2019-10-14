@@ -13,7 +13,8 @@ ADD_DROPOUT = False # Should a communication loss between the vehicles be simula
 
 PRED_PARALLEL_TRAJ = False
 
-USE_COMPLETE_HORIZONTAL = True
+USE_COMPLETE_HORIZONTAL = False
+USE_COMPLETE_USV = True
 
 dropout_lower_bound = 80    # Iteration index at which communication loss should start
 dropout_upper_bound = 130   # Iteration index at which communication loss should end
@@ -46,4 +47,4 @@ delay_len = -maxint - 1 #DEBUG, set delay to lowest possible value, so that ...
 # ...machines with non-synchronised clocks
 
 # Number of iterations simulation should last
-sim_len = 500
+sim_len = 100

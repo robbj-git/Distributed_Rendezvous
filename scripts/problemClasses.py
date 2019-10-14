@@ -149,10 +149,10 @@ class CentralisedProblem():
         if self.travel_dir is None:
             self.q_OSQP = np.zeros( (2*nUAV*(T+1) + 2*mUAV*T + 4, 1) )
         else:
-            x1 = params.v_max_b*self.travel_dir[0]
-            x2 = params.v_min_b*self.travel_dir[0]
-            y1 = params.v_max_b*self.travel_dir[1]
-            y2 = params.v_min_b*self.travel_dir[1]
+            x1 = params.v_max_b*self.travel_dir[0, 0]
+            x2 = params.v_min_b*self.travel_dir[0, 0]
+            y1 = params.v_max_b*self.travel_dir[1, 0]
+            y2 = params.v_min_b*self.travel_dir[1, 0]
             v_max_x_b = max(x1, x2)
             v_max_y_b = max(y1, y2)
             v_min_x_b = min(x1, x2)
@@ -655,10 +655,10 @@ class USVProblem():
                 [np.zeros((T*mUSV+2, 1))]
             ])
         else:
-            x1 = params.v_max_b*self.travel_dir[0]
-            x2 = params.v_min_b*self.travel_dir[0]
-            y1 = params.v_max_b*self.travel_dir[1]
-            y2 = params.v_min_b*self.travel_dir[1]
+            x1 = params.v_max_b*self.travel_dir[0, 0]
+            x2 = params.v_min_b*self.travel_dir[0, 0]
+            y1 = params.v_max_b*self.travel_dir[1, 0]
+            y2 = params.v_min_b*self.travel_dir[1, 0]
             v_max_x_b = max(x1, x2)
             v_max_y_b = max(y1, y2)
             v_min_x_b = min(x1, x2)

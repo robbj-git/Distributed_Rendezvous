@@ -73,7 +73,7 @@ class UAV_simulator():
 
         if self.USE_COMPLETE_HORIZONTAL:
             self.problemCent = CompleteCentralisedProblem(pp.T, pp.Ab, pp.Bb,\
-                pp.Q, pp.R, pp.P, pp.R, pp.Qb_vel, pp.Pb_vel, pp.params)
+                pp.Q, pp.P, pp.R, pp.R, pp.Qb_vel, pp.Pb_vel, pp.params)
             self.nUAV = self.problemCent.nUAV
             self.mUAV = self.problemCent.mUAV
             self.A = self.problemCent.A
@@ -305,7 +305,7 @@ class UAV_simulator():
             if not self.USE_HIL:
                 # self.x  =  self.A*self.x  +  self.B*self.uUAV
                 # self.xv = self.Av*self.xv + self.Bv*self.wdes
-                self.x  =  np.dot(self.A,self.x)  +  np.dot(self.B,self.uUAV)
+                self.x = np.dot(self.A,self.x)  +  np.dot(self.B,self.uUAV)
                 if self.USE_COMPLETE_HORIZONTAL:
                     self.x += self.problemCent.C_d
                 self.xv = np.dot(self.Av,self.xv) + np.dot(self.Bv,self.wdes)

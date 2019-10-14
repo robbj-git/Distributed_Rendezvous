@@ -2,6 +2,10 @@ import numpy as np
 
 # ------------------- PARAMETERS -------------------
 
+tau_wb = 0.4
+k_psib = 0.5
+tau_psib = 0.5  # TODO: SET THESE TO SOMETHING REASONABLE!!!
+
 tau_w = 0.4
 g = 9.8
 kw  = 1.0
@@ -36,6 +40,9 @@ vmax_b = 3.0
 vmin_b = 0.8
 ang_max = np.radians(30)
 ang_vel_max = np.radians(30)
+psi_max = np.radians(10)
+T_max = 3
+T_min = -1.5
 # vmax_x_b = vmax_b
 # vmin_x_b = vmin_b
 # vmax_y_b = vmax_b

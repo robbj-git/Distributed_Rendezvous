@@ -81,6 +81,7 @@ class ProblemParams():
         self.SAMPLING_TIME = SAMPLING_TIME
         self.USE_HIL = USE_HIL
         self.INTER_ITS = INTER_ITS
+        self.USE_COMPLETE_USV = USE_COMPLETE_USV
         self.A = A
         self.B = B
         self.Ab = Ab
@@ -102,7 +103,7 @@ class ProblemParams():
         self.KUAV = KUAV
         self.KUSV = KUSV
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max)
+            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max, psi_max, T_max, T_min)
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
         self.PRED_PARALLEL_TRAJ = PRED_PARALLEL_TRAJ
@@ -114,10 +115,12 @@ problem_params = ProblemParams()
 
 # -2, 1
 xb_m = np.array([[-5], [4], [np.nan], [np.nan]])
+if USE_COMPLETE_USV:
+    xb_m = np.array([[-5], [4], [np.nan], [np.nan], [0], [0]])
 
 reverse_dir = False
 dir = get_travel_dir(xb_m, reverse_dir)
-xb_m[2:] = dir
+xb_m[2:4] = dir
  # 5 and 0.8
 
 # TODO, REMOVE THIS, DO CALCULATIONS IN USV_SIMULATOR
@@ -135,7 +138,7 @@ xb_m[2:] = dir
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 50#100#50
+NUM_TESTS = 1#100#50
 prev_simulator = None
 my_usv_simulator = None
 
@@ -152,8 +155,8 @@ if PARALLEL:
     hor_max = 420#405#100
     hor_min = 420#300#100
 elif CENTRALISED:
-    hor_max = 100#150#120
-    hor_min = 100#80#120
+    hor_max = 40#100#150#120
+    hor_min = 40#100#80#120
 elif DISTRIBUTED:
     hor_max = 260#100#280#100
     hor_min = 100
@@ -300,7 +303,7 @@ if quit_horizon >= 0 and exp_index != -2:
         # It is possible that the outer loop increments N while the UAV tester
         # is still at the previous value of N. If the UAV-tester then quits,
         # my_usv_simulator will not be the correct simulator.
-        exp_index = prev_simulator.store_data(exp_index)
+        prev_simulator.store_data(exp_index)
     if ever_took_too_long:
         print 'OMG HOW ON EARTH DID IT EVER TAKE TOO LONG????? Horizon:', took_too_long_horizon
 

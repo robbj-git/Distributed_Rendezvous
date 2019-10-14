@@ -106,6 +106,7 @@ class DataAnalyser():
                 time = [time_len-1]
 
             for t in time:
+
                 ax.cla()
                 x_pred_traj = UAV_traj_log[0::p.nUAV, t]
                 y_pred_traj = UAV_traj_log[1::p.nUAV, t]
@@ -711,8 +712,8 @@ class DataLoader:
 
             UAV_time_stamps = np.loadtxt(dir_path + '/UAV_time_stamps.txt')
             USV_time_stamps = np.loadtxt(dir_path + '/USV_time_stamps.txt')
-            t_0 = np.maximum(UAV_time_stamps[0], USV_time_stamps[0])
-            t_f = np.minimum(UAV_time_stamps[-1], USV_time_stamps[-1]) - t_0
+            t_0 = np.minimum(UAV_time_stamps[0], USV_time_stamps[0])
+            t_f = np.maximum(UAV_time_stamps[-1], USV_time_stamps[-1]) - t_0
             UAV_time_stamps = UAV_time_stamps - t_0
             USV_time_stamps = USV_time_stamps - t_0
             new_time_stamps = np.arange(0, t_f, 0.05)
@@ -814,55 +815,81 @@ class DataLoader:
         # # ax1.plot(range(500), USV_time_stamps, 'b')
 
         # plt.show()
+        return
 
     def get_interpolated_traj(self, traj, old_times, new_times):
-        if new_times[0] < old_times[0] or new_times[0] > old_times[-1]:
-            raise LookupError('New time stamps are non-overlapping with old time stamps')
+        # if new_times[0] < old_times[0] or new_times[0] > old_times[-1]:
+        #     raise LookupError('New time stamps are non-overlapping with old time stamps')
         # Assumes interpolation along 0th dimension (x-direction)
         height = traj.shape[0]
         width = new_times.shape[0]
+        len_old_traj = old_times.shape[0]   # old_times can have fewer elements
+        # than traj because time stamp after end of loop  is never logged,
+        # in contrast to e.g. state after end of loop
         new_traj = np.full((height, width), np.nan)
         for row in range(height):
             i_0 = 0
             i_2 = 1
             for i in range(len(new_times)):
-                # if  np.isnan(traj[row, i]):
-                #     print "WAS NAN"
                 while True:
-                    if (old_times[i_2] < new_times[i]):
+                    if (old_times[i_2] < new_times[i]) and i_2 < len_old_traj-1:
                         # haven't passed interpolation point yet, move forward
                         i_0 = i_2
                         i_2 = i_2 + 1
                     else:
-                        # We have just passed interpolation point
-                        x_0 = old_times[i_0]
-                        x_2 = old_times[i_2]
-                        y_0 = traj[row, i_0]
-                        y_2 = traj[row, i_2]
-                        x_1 = new_times[i]
-                        new_traj[row, i] = y_0 + (x_1 - x_0)*(y_2 - y_0)/(x_2 - x_0)
+                        if old_times[i_0] > new_times[i]:
+                            # The old traj had no data points around the time new_times[i]
+                            # Use oldest value from old traj as the first values of new traj
+                            new_traj[row, i] = traj[row, i_0]
+                        elif i_2 == len_old_traj:
+                            # The old traj had no data points around the time new_times[i]
+                            # Use newest value from old traj as the last values of new traj
+                            new_traj[row, i] = traj[row, i_2]
+                        else:
+                            # We have just passed interpolation point
+                            x_0 = old_times[i_0]
+                            x_2 = old_times[i_2]
+                            y_0 = traj[row, i_0]
+                            y_2 = traj[row, i_2]
+                            x_1 = new_times[i]
+                            new_traj[row, i] = y_0 + (x_1 - x_0)*(y_2 - y_0)/(x_2 - x_0)
                         break
         return new_traj
 
+    # Sort of discrete interpolation. Doesn't actually interpolate values
+    # just sets missing values equal to the last known value
     def get_adjusted_array(self, traj, old_times, new_times):
-        if new_times[0] < old_times[0] or new_times[0] > old_times[-1]:
-            raise LookupError('New time stamps are non-overlapping with old time stamps')
+        # if new_times[0] < old_times[0] or new_times[0] > old_times[-1]:
+        #     raise LookupError('New time stamps are non-overlapping with old time stamps')
         # Assumes interpolation along 0th dimension (x-direction)
         height = new_times.shape[0]
         new_traj = np.full((height, ), np.nan)
+        len_old_traj = old_times.shape[0]   # old_times can have fewer elements
+        # than traj because time stamp after end of loop  is never logged,
+        # in contrast to e.g. state after end of loop
         i_0 = 0
         i_2 = 1
         for i in range(len(new_times)):
             # if  np.isnan(traj[row, i]):
             #     print "WAS NAN"
             while True:
-                if (old_times[i_2] < new_times[i]):
+
+                if (old_times[i_2] < new_times[i]) and i_2 < len_old_traj-1:
                     # haven't passed interpolation point yet, move forward
                     i_0 = i_2
                     i_2 = i_2 + 1
                 else:
-                    # We have just passed interpolation point
-                    new_traj[i] = traj[i_0]
+                    if old_times[i_0] > new_times[i]:
+                        # The old traj had no data points around the time new_times[i]
+                        # Use oldest value from old traj as the first values of new traj
+                        new_traj[i] = traj[i_0]
+                    elif i_2 == len_old_traj:
+                        # The old traj had no data points around the time new_times[i]
+                        # Use newest value from old traj as the last values of new traj
+                        new_traj[i] = traj[i_2]
+                    else:
+                        # We have just passed interpolation point
+                        new_traj[i] = traj[i_0]
                     break
         return new_traj
 
@@ -882,15 +909,15 @@ if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
     # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
-    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = UAV)
+    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)
-    data_analyser.plot_time_histogram()
+    # data_analyser.plot_time_histogram()
     # data_analyser.plot_time_curve()
 
     # use_dir = False

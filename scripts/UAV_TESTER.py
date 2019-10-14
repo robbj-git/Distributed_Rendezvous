@@ -64,6 +64,7 @@ class ProblemParams():
         self.USE_HIL = USE_HIL
         self.INTER_ITS = INTER_ITS
         self.USE_COMPLETE_HORIZONTAL = USE_COMPLETE_HORIZONTAL
+        self.USE_COMPLETE_USV = USE_COMPLETE_USV
         self.A = A
         self.B = B
         self.Ab = Ab
@@ -87,7 +88,7 @@ class ProblemParams():
         self.KUSV = KUSV
         self.KVert = KVert
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max)
+            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max, psi_max, T_max, T_min)
         self.hb = hb
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
@@ -112,7 +113,8 @@ my_uav_simulator =  None
 # of the vector pointint to its starting position. However, you have to manually make
 # sure that the xb below matches the initial state of the USV in USV_TESTER.py
 # xb = None
-xb = np.array([[-2], [1], [np.nan], [np.nan]])
+#-2, 1
+xb = np.array([[-5], [4], [np.nan], [np.nan]])
 if xb is not None and CENTRALISED:
     reverse_dir = False
     dir = get_travel_dir(xb, reverse_dir)
@@ -120,13 +122,13 @@ else:
     dir = None
 # -------------- TESTING LOOP ----------------
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 50
+NUM_TESTS = 1
 if PARALLEL:
     hor_max = 420#405#100
     hor_min = 420#300#100
 elif CENTRALISED:
-    hor_max = 100#150#120
-    hor_min = 100#80#120
+    hor_max = 40#100#150#120
+    hor_min = 40#100#80#120
 elif DISTRIBUTED:
     hor_max = 260#100#280#100
     hor_min = 100

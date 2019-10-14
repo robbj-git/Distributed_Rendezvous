@@ -4,6 +4,7 @@ import numpy as np
 from helper_classes import StampedTrajQueue, StampedMsgQueue
 from helper_functions import mat_to_multiarray_stamped, shift_trajectory
 from problemClasses import USVProblem, FastUSVProblem
+from moreProblemClasses import CompleteUSVProblem
 from rendezvous_problem.msg import Float32MultiArrayStamped, StateStamped
 from geometry_msgs.msg import AccelStamped
 from std_msgs.msg import Int8
@@ -14,7 +15,6 @@ from matplotlib.collections import PatchCollection
 import time
 
 class USV_simulator():
-
 
     def __init__(self, problem_params, travel_dir = None):
         pp = problem_params
@@ -54,12 +54,26 @@ class USV_simulator():
         self.ADD_DROPOUT = pp.ADD_DROPOUT
         self.PRED_PARALLEL_TRAJ = pp.PRED_PARALLEL_TRAJ
         self.SHOULD_SHIFT_MESSAGES = pp.SHOULD_SHIFT_MESSAGES
+        self.USE_COMPLETE_USV = pp.USE_COMPLETE_USV
         self.dropout_lower_bound = pp.dropout_lower_bound
         self.dropout_upper_bound = pp.dropout_upper_bound
         self.USV_stopped_at_iter = np.nan
 
-        self.problemUSV = USVProblem(pp.T, pp.Ab, pp.Bb,  pp.Q, pp.P, pp.R,\
-            pp.Qb_vel, pp.Pb_vel, self.nUAV, self.used_solver, self.params, travel_dir = travel_dir)
+
+        if self.USE_COMPLETE_USV:
+            self.problemUSV = CompleteUSVProblem(pp.T, pp.Q, pp.P, pp.R,\
+                pp.Qb_vel, pp.Pb_vel, self.nUAV, self.params, travel_dir = travel_dir)
+            self.nUSV = self.problemUSV.nUSV
+            self.mUSV = self.problemUSV.mUSV
+            self.Ab = self.problemUSV.Ab
+            self.Bb = self.problemUSV.Bb
+            mat_temp = np.block([
+                [np.eye(4), np.zeros((4, 2))]
+            ])
+            self.state_converter = np.kron(np.eye(self.T+1), mat_temp)
+        else:
+            self.problemUSV = USVProblem(pp.T, pp.Ab, pp.Bb,  pp.Q, pp.P, pp.R,\
+                pp.Qb_vel, pp.Pb_vel, self.nUAV, self.used_solver, self.params, travel_dir = travel_dir)
 
         self.problemUSVFast = FastUSVProblem(pp.T_inner, pp.Ab, pp.Bb,\
             pp.Q, pp.P, pp.R, self.used_solver, pp.params)
@@ -226,7 +240,7 @@ class USV_simulator():
             if self.DISTRIBUTED:
                 self.send_traj_to_UAV(self.xb_traj)
 
-            self.xb = self.Ab*self.xb + self.Bb*self.uUSV
+            self.xb = np.dot(self.Ab,self.xb) + np.dot(self.Bb,self.uUSV)
 
             # ------- Sleep --------
             end = time.time()
@@ -290,7 +304,11 @@ class USV_simulator():
             self.hor_inner_solution_durations.append(self.problemUSVFast.last_solution_duration)
 
     def send_traj_to_UAV(self, xb_traj):
-        traj_msg = mat_to_multiarray_stamped(xb_traj, self.T+1, self.nUSV)
+        if self.USE_COMPLETE_USV:
+            traj_msg = mat_to_multiarray_stamped(\
+                np.dot(self.state_converter, xb_traj), self.T+1, self.nUSV)
+        else:
+            traj_msg = mat_to_multiarray_stamped(xb_traj, self.T+1, self.nUSV)
         traj_msg.header.stamp = rospy.Time.now()
         if self.ADD_DROPOUT and (self.i >= self.dropout_lower_bound and \
             self.i <= self.dropout_upper_bound):
@@ -358,7 +376,6 @@ class USV_simulator():
         if not self.CENTRALISED:
             os.mkdir(dir_path + 'Experiment_' + str(i) + '/USV')
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV/UAV_traj_log.txt', self.UAV_traj_log)
-
 
     def plot_results(self, real_time):
         fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
