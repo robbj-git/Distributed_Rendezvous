@@ -127,8 +127,8 @@ if PARALLEL:
     hor_max = 420#405#100
     hor_min = 420#300#100
 elif CENTRALISED:
-    hor_max = 40#100#150#120
-    hor_min = 40#100#80#120
+    hor_max = 40#40#100#150#120
+    hor_min = 40#40#100#80#120
 elif DISTRIBUTED:
     hor_max = 260#100#280#100
     hor_min = 100

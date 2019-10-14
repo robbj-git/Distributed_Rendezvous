@@ -7,7 +7,7 @@ from problemClasses import USVProblem, FastUSVProblem
 from moreProblemClasses import CompleteUSVProblem
 from rendezvous_problem.msg import Float32MultiArrayStamped, StateStamped
 from geometry_msgs.msg import AccelStamped
-from std_msgs.msg import Int8
+from std_msgs.msg import Int8, Bool
 import matplotlib.pyplot as plt
 import os
 from matplotlib.patches import Polygon, Circle
@@ -60,7 +60,7 @@ class USV_simulator():
         self.USV_stopped_at_iter = np.nan
 
 
-        if self.USE_COMPLETE_USV:
+        if self.USE_COMPLETE_USV and self.DISTRIBUTED:
             self.problemUSV = CompleteUSVProblem(pp.T, pp.Q, pp.P, pp.R,\
                 pp.Qb_vel, pp.Pb_vel, self.nUAV, self.params, travel_dir = travel_dir)
             self.nUSV = self.problemUSV.nUSV
@@ -92,6 +92,8 @@ class USV_simulator():
             self.state_pub = rospy.Publisher('USV_state', StateStamped, queue_size = 10)
             self.USV_input_sub = rospy.Subscriber(\
                 'USV_input', AccelStamped, self.USV_input_callback)
+            self.stop_sim_sub = rospy.Subscriber('stop_sim', Bool, self.stop_sim_callback)
+            self.stop_sim = False
         self.rate = rospy.Rate(self.SAMPLING_RATE)
 
     def reset(self, sim_len, xb_0):
@@ -129,9 +131,11 @@ class USV_simulator():
         self.USV_should_stop = False
         self.UAVApprox = StampedTrajQueue(self.delay_len, should_shift = self.SHOULD_SHIFT_MESSAGES)
         self.input_queue = StampedMsgQueue(self.delay_len)
+        self.stop_sim = False
 
     def simulate_problem(self, sim_len, xb_val):
         self.reset(sim_len, xb_val)
+        self.sim_len = sim_len
         # self.USV_should_stop = True # DEBUG
         self.xb = xb_val
 
@@ -167,12 +171,10 @@ class USV_simulator():
                 [uUSV_msg.accel.linear.y]])
 
         start = time.time()
-        for i in range(sim_len):
-            # if i > 0:
-            #     end0 = time.time()
-            #     print end0 - start0
-
-            # print i, rospy.get_time()
+        i = 0
+        while not self.stop_sim:
+            print i
+        # for i in range(sim_len):
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -243,6 +245,9 @@ class USV_simulator():
             self.xb = np.dot(self.Ab,self.xb) + np.dot(self.Bb,self.uUSV)
 
             # ------- Sleep --------
+            i += 1
+            if not self.CENTRALISED and i >= sim_len:
+                break
             end = time.time()
             self.iteration_durations.append(end-start)
             # start0 = time.time()
@@ -252,6 +257,7 @@ class USV_simulator():
             # if end-start < 0.05:
                 # time.sleep(0.05 - end + start)
             start = time.time()
+
 
         # ------------ END OF LOOP ------------
         self.xb_log[:, sim_len:sim_len+1] = self.xb
@@ -286,6 +292,9 @@ class USV_simulator():
             self.hor_solution_durations.append(self.problemUSV.last_solution_duration)
 
     def update_logs(self, i):
+        if self.CENTRALISED and i >= self.sim_len:
+            return
+
         self.xb_log[:, i:i+1] = self.xb
         self.uUSV_log[:, i:i+1] = self.uUSV
         self.USV_times[:, i:i+1] = rospy.get_time()
@@ -467,6 +476,7 @@ class USV_simulator():
             # self.traj_pub.unregister()    This results in an error message for some reason?
         elif self.CENTRALISED:
             self.USV_input_sub.unregister()
+            self.stop_sim.unregister()
 
     # -------------- CALLBACKS ---------------
 
@@ -498,8 +508,9 @@ class USV_simulator():
     # Used in centralised case. Received control input that should be applied
     def USV_input_callback(self, msg):
         self.input_queue.put(msg)
-        # print time.time()
-        # self.uUSV = np.array([[msg.accel.linear.x],[msg.accel.linear.y]])
+
+    def stop_sim_callback(self, msg):
+        self.stop_sim = msg.data
 
     # Used for the function store_data(), to store data into the same folder
     # as the UAV_simulation_NEW.py

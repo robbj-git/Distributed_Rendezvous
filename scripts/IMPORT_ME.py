@@ -3,8 +3,8 @@ from sys import maxint
 
 USE_HIL = False     # Should the UAV communicate with the HIL setup?
 # SET ONE OF THESE TO TRUE
-CENTRALISED = False
-DISTRIBUTED = True
+CENTRALISED = True
+DISTRIBUTED = False
 PARALLEL = False
 
 SAMPLING_RATE = 20              # Dynamics change if this changes
@@ -47,4 +47,4 @@ delay_len = -maxint - 1 #DEBUG, set delay to lowest possible value, so that ...
 # ...machines with non-synchronised clocks
 
 # Number of iterations simulation should last
-sim_len = 100
+sim_len = 500

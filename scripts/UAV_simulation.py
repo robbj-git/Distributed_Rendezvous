@@ -4,7 +4,7 @@ import time
 import datetime
 import numpy as np
 from sensor_msgs.msg import Imu, NavSatFix, Joy
-from std_msgs.msg import Float32, Header
+from std_msgs.msg import Float32, Header, Bool
 from geometry_msgs.msg import Vector3Stamped, QuaternionStamped
 from dji_sdk.srv import SDKControlAuthority
 import matplotlib.pyplot as plt
@@ -71,7 +71,7 @@ class UAV_simulator():
         self.problemVertFast = FastVerticalProblem(pp.T_inner, pp.Av, pp.Bv,\
             pp.Qv, pp.Pv, pp.Rv, pp.vert_used_solver, pp.params)
 
-        if self.USE_COMPLETE_HORIZONTAL:
+        if self.USE_COMPLETE_HORIZONTAL and self.CENTRALISED:
             self.problemCent = CompleteCentralisedProblem(pp.T, pp.Ab, pp.Bb,\
                 pp.Q, pp.P, pp.R, pp.R, pp.Qb_vel, pp.Pb_vel, pp.params)
             self.nUAV = self.problemCent.nUAV
@@ -96,6 +96,7 @@ class UAV_simulator():
         if self.CENTRALISED:
             self.USV_state_sub = rospy.Subscriber(\
                 'USV_state', StateStamped, self.USV_state_callback)
+            self.sim_stop_pub = rospy.Publisher('stop_sim', Bool, queue_size = 1)
         else:
             self.USV_traj_sub = rospy.Subscriber(\
                 'USV_traj', Float32MultiArrayStamped, self.USV_traj_callback)
@@ -213,6 +214,7 @@ class UAV_simulator():
 
         start = time.time()
         for i in range(sim_len):
+            print i
             self.i = i
             if rospy.is_shutdown():
                 return
@@ -322,6 +324,7 @@ class UAV_simulator():
         self.xv_log[:, sim_len:sim_len+1] = self.xv
         if self.CENTRALISED:
             self.xb_log[:, sim_len:sim_len+1] = self.xb
+            self.send_sim_stop()
         else:
             self.xb_log[:, sim_len:sim_len+1] = self.xb_traj[0:self.nUSV, 0:1]
 
@@ -445,6 +448,11 @@ class UAV_simulator():
         axes = [phi_cmd, theta_cmd, wdes, 0.0, 0x02]
         UAV_msg = Joy(Header(), axes, [])
         self.UAV_publisher.publish(UAV_msg)
+
+    def send_sim_stop(self):
+        msg = Bool()
+        msg.data = True
+        self.sim_stop_pub.publish(msg)
 
     # ----------------------------------------
 
