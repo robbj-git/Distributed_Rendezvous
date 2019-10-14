@@ -8,7 +8,7 @@ import Queue
 import os
 # from callbacks import *
 from sensor_msgs.msg import Imu, NavSatFix, Joy
-from std_msgs.msg import Float32, Header, Int8, Int32
+from std_msgs.msg import Float32, Header, Int8, Int32, Time
 from geometry_msgs.msg import Vector3Stamped, QuaternionStamped, AccelStamped
 from rendezvous_problem.msg import StateStamped
 from dji_sdk.srv import SDKControlAuthority
@@ -31,9 +31,11 @@ from UAV_simulation import UAV_simulator
 
 lookahead = 0   # Only for parallel. TODO: Move to IMPORT_ME.py???
 
-global USV_test_round, USV_has_stored_data
+global USV_test_round, USV_has_stored_data, USV_time, UAV_time
 USV_test_round = np.inf
 USV_has_stored_data = 0
+UAV_time = np.nan
+USV_time = np.nan
 
 def USV_test_round_callback(msg):
     global USV_test_round
@@ -43,6 +45,11 @@ def USV_store_callback(msg):
     global USV_has_stored_data
     USV_has_stored_data = msg.data
 
+def USV_time_callback(msg):
+    global USV_time, UAV_time
+    USV_time = msg.data
+    UAV_time = rospy.Time.now()
+
 rospy.init_node('UAV_main')
 
 round_pub = rospy.Publisher('UAV_test_round', Int32, queue_size = 10, latch = True)
@@ -50,6 +57,7 @@ instruct_pub = rospy.Publisher('UAV_instruction', Int32, queue_size = 10, latch 
 experiment_index_pub = rospy.Publisher('experiment_index', Int8, queue_size=1, latch=True)
 rospy.Subscriber('USV_test_round', Int32, USV_test_round_callback)
 rospy.Subscriber('USV_has_stored_data', Int32, USV_store_callback)
+rospy.Subscriber('USV_time', Time, USV_time_callback)
 
 # Altitude of the USV, currently assumed constant, which is why it is set here
 hb = 0
@@ -308,6 +316,8 @@ if not cancelled:
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_MEAN.txt', vert_mean_list)
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_MEDIAN.txt', vert_median_list)
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/LANDING_TIMES.txt', landing_list)
+    time_str = str((UAV_time - USV_time).secs) + "\n" + str((UAV_time - USV_time).nsecs)
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/time_diff.txt', [time_str], fmt="%s")
 
     if PARALLEL:
         np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEAN.txt', hor_inner_mean_list)

@@ -173,7 +173,6 @@ class USV_simulator():
         start = time.time()
         i = 0
         while not self.stop_sim:
-            print i
         # for i in range(sim_len):
             self.i = i
             if rospy.is_shutdown():

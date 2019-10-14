@@ -8,7 +8,7 @@ import Queue
 import os
 # from callbacks import *
 from sensor_msgs.msg import Imu, NavSatFix, Joy
-from std_msgs.msg import Float32, Header, Int8, Int32
+from std_msgs.msg import Float32, Header, Int8, Int32, Time
 from geometry_msgs.msg import Vector3Stamped, QuaternionStamped, AccelStamped
 from rendezvous_problem.msg import StateStamped
 from dji_sdk.srv import SDKControlAuthority
@@ -68,6 +68,7 @@ rospy.init_node('USV_main')
 
 round_pub = rospy.Publisher('USV_test_round', Int32, queue_size = 10, latch = True)
 store_pub = rospy.Publisher('USV_has_stored_data', Int32, queue_size = 1, latch = True)
+time_pub = rospy.Publisher('USV_time', Time, queue_size = 1, latch = False)
 rospy.Subscriber('UAV_test_round', Int32, UAV_test_round_callback)
 rospy.Subscriber('UAV_instruction', Int32, UAV_instruction_callback)
 rospy.Subscriber('experiment_index', Int8, experiment_index_callback)
@@ -286,6 +287,10 @@ for N in range(hor_max, hor_min-1, -1):
 #     print "Error while plotting:"
 #     print e
 #     pass
+
+msg = Time()
+msg.data = rospy.Time.now()
+time_pub.publish(msg)
 
 while exp_index == -1:
     if rospy.is_shutdown():

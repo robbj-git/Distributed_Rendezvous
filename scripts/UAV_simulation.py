@@ -214,7 +214,6 @@ class UAV_simulator():
 
         start = time.time()
         for i in range(sim_len):
-            print i
             self.i = i
             if rospy.is_shutdown():
                 return
