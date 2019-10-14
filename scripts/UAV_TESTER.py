@@ -130,15 +130,15 @@ else:
     dir = None
 # -------------- TESTING LOOP ----------------
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 1
+NUM_TESTS = 1#100
 if PARALLEL:
     hor_max = 420#405#100
     hor_min = 420#300#100
 elif CENTRALISED:
-    hor_max = 40#40#100#150#120
-    hor_min = 40#40#100#80#120
+    hor_max = 240#150#120
+    hor_min = 240#100#80#120
 elif DISTRIBUTED:
-    hor_max = 260#100#280#100
+    hor_max = 251#100#280#100
     hor_min = 100
 
 hor_inner = 60#30#15

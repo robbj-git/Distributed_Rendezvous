@@ -15,6 +15,8 @@ CENTRALISED = 0
 DISTRIBUTED = 1
 PARALLEL    = 2
 
+USE_TIME_CORRECTION = True
+
 # getpass.getuser()
 # print getpass.getuser()
 
@@ -713,6 +715,10 @@ class DataLoader:
 
             UAV_time_stamps = np.loadtxt(dir_path + '/UAV_time_stamps.txt')
             USV_time_stamps = np.loadtxt(dir_path + '/USV_time_stamps.txt')
+            if USE_TIME_CORRECTION:
+                time_list = np.loadtxt(dir_path + '/TEST/time_diff.txt')
+                time_diff = time_list[0] + time_list[1]*0.000000001
+                UAV_time_stamps - time_diff
             t_0 = np.minimum(UAV_time_stamps[0], USV_time_stamps[0])
             t_f = np.maximum(UAV_time_stamps[-1], USV_time_stamps[-1]) - t_0
             UAV_time_stamps = UAV_time_stamps - t_0
