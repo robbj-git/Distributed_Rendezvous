@@ -60,7 +60,7 @@ rospy.Subscriber('USV_has_stored_data', Int32, USV_store_callback)
 rospy.Subscriber('USV_time', Time, USV_time_callback)
 
 # Altitude of the USV, currently assumed constant, which is why it is set here
-hb = 0
+hb = 1
 
 class ProblemParams():
     def __init__(self):
@@ -130,15 +130,15 @@ else:
     dir = None
 # -------------- TESTING LOOP ----------------
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 100
+NUM_TESTS = 1
 if PARALLEL:
-    hor_max = 420#405#100
-    hor_min = 420#300#100
+    hor_max = 200#420#405#100
+    hor_min = 200#420#300#100
 elif CENTRALISED:
-    hor_max = 195#150#120
+    hor_max = 100#195#150#120
     hor_min = 100#80#120
 elif DISTRIBUTED:
-    hor_max = 250#100#280#100
+    hor_max = 100#280#100
     hor_min = 100
 
 hor_inner = 60#30#15

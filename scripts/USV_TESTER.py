@@ -139,7 +139,6 @@ xb_m[2:4] = dir
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 100#50
 prev_simulator = None
 my_usv_simulator = None
 
@@ -152,14 +151,15 @@ took_too_long_horizon = -1
 # SHOULD BE ABLE TO REMOVE, I INIT NODE ABOVE NOW!
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
+NUM_TESTS = 1
 if PARALLEL:
-    hor_max = 420#405#100
-    hor_min = 420#300#100
+    hor_max = 200#420#405#100
+    hor_min = 200#420#300#100
 elif CENTRALISED:
-    hor_max = 195#150#120
+    hor_max = 100#195#150#120
     hor_min = 100#80#120
 elif DISTRIBUTED:
-    hor_max = 250#100#280#100
+    hor_max = 100#280#100
     hor_min = 100
 
 hor_inner = 60#30#15

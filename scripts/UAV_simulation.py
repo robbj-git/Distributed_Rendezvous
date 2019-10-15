@@ -427,7 +427,6 @@ class UAV_simulator():
         if self.ADD_DROPOUT and (self.i >= self.dropout_lower_bound and \
             self.i <= self.dropout_upper_bound):
             # DEBUG: Adds message droput
-            print "DOPPRED"
             pass
         else:
             self.USV_input_pub.publish(USV_input_msg)
@@ -495,7 +494,10 @@ class UAV_simulator():
         info_str += 'and vertical solver: ' + self.vert_used_solver + '\n'
         info_str += 'Delay length [iterations]: ' + str(self.delay_len) + '\n'
         info_str += ("HIL setup" if self.USE_HIL else "Local setup") + " was used\n"
-        info_str += "USV was at altitude: " + str(self.hb)
+        info_str += "USV was at altitude: " + str(self.hb) + "\n"
+        info_str += "Dropout was used\n" if self.ADD_DROPOUT else "Dropout was NOT used\n"
+        if self.ADD_DROPOUT:
+            info_str += "Dropout bounds: " + str(self.dropout_lower_bound) + " to " + str(self.dropout_upper_bound)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/info.txt', [info_str], fmt="%s")
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/x_log.csv', self.x_log, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/xv_log.csv', self.xv_log, delimiter=',')

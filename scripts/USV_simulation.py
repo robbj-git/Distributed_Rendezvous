@@ -322,7 +322,6 @@ class USV_simulator():
             self.i <= self.dropout_upper_bound):
             #DEBUG Adds message dropout
             pass
-            print "DID DROP!"
         else:
             # print traj_msg
             self.traj_pub.publish(traj_msg)

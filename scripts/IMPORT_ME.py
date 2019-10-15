@@ -1,10 +1,10 @@
 from math import ceil
 from sys import maxint
 
-USE_HIL = False     # Should the UAV communicate with the HIL setup?
+USE_HIL = True     # Should the UAV communicate with the HIL setup?
 # SET ONE OF THESE TO TRUE
-CENTRALISED = False
-DISTRIBUTED = True
+CENTRALISED = True
+DISTRIBUTED = False
 PARALLEL = False
 
 SAMPLING_RATE = 20              # Dynamics change if this changes
