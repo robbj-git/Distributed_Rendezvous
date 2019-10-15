@@ -497,35 +497,35 @@ class UAV_simulator():
         info_str += ("HIL setup" if self.USE_HIL else "Local setup") + " was used\n"
         info_str += "USV was at altitude: " + str(self.hb)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/info.txt', [info_str], fmt="%s")
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/x_log.txt', self.x_log)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/xv_log.txt', self.xv_log)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_traj_log.txt', self.UAV_traj_log)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_traj_log.txt', self.vert_traj_log)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/uUAV_log.txt', self.uUAV_log)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/wdes_log.txt', self.wdes_log)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_iteration_durations.txt', self.iteration_durations)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_time_stamps.txt', self.UAV_times)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_solution_durations.txt', self.vert_solution_durations)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_horizontal_durations.txt', self.hor_solution_durations)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_vert_log.txt', self.s_vert_log)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/obj_val_log.txt', self.obj_val_log)
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/x_log.csv', self.x_log, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/xv_log.csv', self.xv_log, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_traj_log.csv', self.UAV_traj_log, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_traj_log.csv', self.vert_traj_log, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/uUAV_log.csv', self.uUAV_log, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/wdes_log.csv', self.wdes_log, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_iteration_durations.csv', self.iteration_durations, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_time_stamps.csv', self.UAV_times, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_solution_durations.csv', self.vert_solution_durations, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_horizontal_durations.csv', self.hor_solution_durations, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_vert_log.csv', self.s_vert_log, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/obj_val_log.csv', self.obj_val_log, delimiter=',')
         if self.CENTRALISED:
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_traj_log.txt', self.USV_traj_log)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_UAV_log.txt', self.s_UAV_log)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_USV_log.txt', self.s_USV_log)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_traj_log.csv', self.USV_traj_log, delimiter=',')
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_UAV_log.csv', self.s_UAV_log, delimiter=',')
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_USV_log.csv', self.s_USV_log, delimiter=',')
         if self.PARALLEL:
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_hor_inner_durations.txt', self.hor_inner_solution_durations)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_inner_durations.txt', self.vert_inner_solution_durations)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_inner_traj_log.txt', self.UAV_inner_traj_log)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_inner_traj_log.txt', self.vert_inner_traj_log)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_hor_inner_durations.csv', self.hor_inner_solution_durations, delimiter=',')
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_inner_durations.csv', self.vert_inner_solution_durations, delimiter=',')
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_inner_traj_log.csv', self.UAV_inner_traj_log, delimiter=',')
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_inner_traj_log.csv', self.vert_inner_traj_log, delimiter=',')
         if test_info_str is not None:
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/test_info.txt', [test_info_str], fmt="%s")
 
         if self.CENTRALISED:
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV/xb_log.txt', self.xb_log)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV/uUSV_log.txt', self.uUSV_log)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV/xb_log.csv', self.xb_log, delimiter=',')
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV/uUSV_log.csv', self.uUSV_log, delimiter=',')
         if not self.CENTRALISED:
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV/USV_traj_log.txt', self.USV_traj_log)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV/USV_traj_log.csv', self.USV_traj_log, delimiter=',')
 
         return i
 

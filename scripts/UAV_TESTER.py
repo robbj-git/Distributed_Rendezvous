@@ -309,21 +309,21 @@ if not cancelled:
 
     # dir_path = '/home/student/robbj_experiment_results/'
     dir_path = os.path.expanduser("~") + '/robbj_experiment_results/'
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEAN.txt', mean_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEDIAN.txt', median_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEAN.txt', hor_mean_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEDIAN.txt', hor_median_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_MEAN.txt', vert_mean_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_MEDIAN.txt', vert_median_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/LANDING_TIMES.txt', landing_list)
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEAN.csv', mean_list, delimiter=',')
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEDIAN.csv', median_list, delimiter=',')
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEAN.csv', hor_mean_list, delimiter=',')
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEDIAN.csv', hor_median_list, delimiter=',')
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_MEAN.csv', vert_mean_list, delimiter=',')
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_MEDIAN.csv', vert_median_list, delimiter=',')
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/LANDING_TIMES.csv', landing_list, delimiter=',')
     time_str = str((UAV_time - USV_time).secs) + "\n" + str((UAV_time - USV_time).nsecs)
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/time_diff.txt', [time_str], fmt="%s")
 
     if PARALLEL:
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEAN.txt', hor_inner_mean_list)
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEDIAN.txt', hor_inner_median_list)
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_INNER_MEAN.txt', vert_inner_mean_list)
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_INNER_MEDIAN.txt', vert_inner_median_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEAN.csv', hor_inner_mean_list, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEDIAN.csv', hor_inner_median_list, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_INNER_MEAN.csv', vert_inner_mean_list, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_INNER_MEDIAN.csv', vert_inner_median_list, delimiter=',')
 
     # Wait for USV to finish storing data. If we exit before this, USV will never receive experiment index
     while USV_has_stored_data == 0:

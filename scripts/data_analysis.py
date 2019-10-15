@@ -713,8 +713,8 @@ class DataLoader:
         p = params
         for data_type in data_types:
 
-            UAV_time_stamps = np.loadtxt(dir_path + '/UAV_time_stamps.txt')
-            USV_time_stamps = np.loadtxt(dir_path + '/USV_time_stamps.txt')
+            UAV_time_stamps = np.loadtxt(dir_path + '/UAV_time_stamps.csv', delimiter=',')
+            USV_time_stamps = np.loadtxt(dir_path + '/USV_time_stamps.csv', delimiter=',')
             if USE_TIME_CORRECTION:
                 time_list = np.loadtxt(dir_path + '/TEST/time_diff.txt')
                 time_diff = time_list[0] + time_list[1]*0.000000001
@@ -723,16 +723,17 @@ class DataLoader:
             t_f = np.maximum(UAV_time_stamps[-1], USV_time_stamps[-1]) - t_0
             UAV_time_stamps = UAV_time_stamps - t_0
             USV_time_stamps = USV_time_stamps - t_0
+            print "HMM", t_f
             new_time_stamps = np.arange(0, t_f, 0.05)
             print "Time span:", len(new_time_stamps), len(UAV_time_stamps), len(USV_time_stamps)    # DEBUG PRINT
             print UAV_time_stamps[-1] - UAV_time_stamps[0]
             print USV_time_stamps[-1] - USV_time_stamps[0]
 
             if data_type == 'horizontal':
-                self.UAV_traj_log_raw = np.loadtxt(dir_path + '/UAV_traj_log.txt')
-                self.USV_traj_log_raw = np.loadtxt(dir_path + '/USV_traj_log.txt')
-                self.x_log_raw  = np.loadtxt(dir_path + '/x_log.txt')
-                self.xb_log_raw = np.loadtxt(dir_path + '/xb_log.txt')
+                self.UAV_traj_log_raw = np.loadtxt(dir_path + '/UAV_traj_log.csv', delimiter=',')
+                self.USV_traj_log_raw = np.loadtxt(dir_path + '/USV_traj_log.csv', delimiter=',')
+                self.x_log_raw  = np.loadtxt(dir_path + '/x_log.csv', delimiter=',')
+                self.xb_log_raw = np.loadtxt(dir_path + '/xb_log.csv', delimiter=',')
 
                 self.UAV_traj_log = self.get_interpolated_traj(self.UAV_traj_log_raw, UAV_time_stamps, new_time_stamps)
                 if problem_type == CENTRALISED:
@@ -740,8 +741,8 @@ class DataLoader:
                 else:
                     self.USV_traj_log = self.get_interpolated_traj(self.USV_traj_log_raw, USV_time_stamps, new_time_stamps)
                 if problem_type != CENTRALISED:
-                    self.USV_traj_log_UAV_raw = np.loadtxt(dir_path + '/UAV/USV_traj_log.txt')
-                    self.UAV_traj_log_USV_raw = np.loadtxt(dir_path + '/USV/UAV_traj_log.txt')
+                    self.USV_traj_log_UAV_raw = np.loadtxt(dir_path + '/UAV/USV_traj_log.csv', delimiter=',')
+                    self.UAV_traj_log_USV_raw = np.loadtxt(dir_path + '/USV/UAV_traj_log.csv', delimiter=',')
                     self.xb_log_UAV_raw = self.USV_traj_log_UAV_raw[0:p.nUSV, :]
                     self.x_log_USV_raw = self.UAV_traj_log_USV_raw[0:p.nUAV, :]
                     self.USV_traj_log_UAV = self.get_interpolated_traj(self.USV_traj_log_UAV_raw, UAV_time_stamps, new_time_stamps)
@@ -756,15 +757,15 @@ class DataLoader:
                 self.xb_log = self.get_interpolated_traj(self.xb_log_raw, USV_time_stamps, new_time_stamps)
 
                 if problem_type == PARALLEL:
-                    self.UAV_inner_traj_log_raw = np.loadtxt(dir_path + '/UAV_inner_traj_log.txt')
-                    self.USV_inner_traj_log_raw = np.loadtxt(dir_path + '/USV_inner_traj_log.txt')
+                    self.UAV_inner_traj_log_raw = np.loadtxt(dir_path + '/UAV_inner_traj_log.csv', delimiter=',')
+                    self.USV_inner_traj_log_raw = np.loadtxt(dir_path + '/USV_inner_traj_log.csv', delimiter=',')
 
                     self.UAV_inner_traj_log = self.get_interpolated_traj(self.UAV_inner_traj_log_raw, UAV_time_stamps, new_time_stamps)
                     self.USV_inner_traj_log = self.get_interpolated_traj(self.USV_inner_traj_log_raw, USV_time_stamps, new_time_stamps)
             elif data_type == 'vertical':
-                self.xv_log_raw = np.loadtxt(dir_path + '/xv_log.txt')
-                self.vert_traj_log_raw = np.loadtxt(dir_path + '/vert_traj_log.txt')
-                self.s_vert_log_raw = np.loadtxt(dir_path + '/s_vert_log.txt')
+                self.xv_log_raw = np.loadtxt(dir_path + '/xv_log.csv', delimiter=',')
+                self.vert_traj_log_raw = np.loadtxt(dir_path + '/vert_traj_log.csv', delimiter=',')
+                self.s_vert_log_raw = np.loadtxt(dir_path + '/s_vert_log.csv', delimiter=',')
 
                 self.xv_log = self.get_interpolated_traj(self.xv_log_raw, UAV_time_stamps, new_time_stamps)
                 self.vert_traj_log = self.get_interpolated_traj(self.vert_traj_log_raw, UAV_time_stamps, new_time_stamps)
@@ -773,29 +774,29 @@ class DataLoader:
                 self.hb = self.get_USV_altitude(dir_path)
 
                 if problem_type == PARALLEL:
-                    self.vert_inner_traj_log_raw = np.loadtxt(dir_path + '/vert_inner_traj_log.txt')
+                    self.vert_inner_traj_log_raw = np.loadtxt(dir_path + '/vert_inner_traj_log.csv', delimiter=',')
 
                     self.vert_inner_traj_log = self.get_interpolated_traj(self.vert_inner_traj_log_raw, UAV_time_stamps, new_time_stamps)
 
             elif data_type == 'time':
-                self.mean_iteration_UAV = np.loadtxt(dir_path + '/TEST/MEAN.txt')
-                self.median_iteration = np.loadtxt(dir_path + '/TEST/MEDIAN.txt')
-                self.mean_iteration_USV = np.loadtxt(dir_path + '/TEST/MEAN_USV.txt')
-                self.median_iteration_USV = np.loadtxt(dir_path + '/TEST/MEDIAN_USV.txt')
-                self.hor_mean_UAV = np.loadtxt(dir_path + '/TEST/HOR_MEAN.txt')
-                self.hor_median_UAV = np.loadtxt(dir_path + '/TEST/HOR_MEDIAN.txt')
-                self.hor_mean_USV = np.loadtxt(dir_path + '/TEST/HOR_MEAN_USV.txt')
-                self.hor_median_USV = np.loadtxt(dir_path + '/TEST/HOR_MEDIAN_USV.txt')
-                self.vert_mean = np.loadtxt(dir_path + '/TEST/VERT_MEAN.txt')
-                self.vert_median = np.loadtxt(dir_path + '/TEST/VERT_MEDIAN.txt')
-                self.landing_times = np.loadtxt(dir_path + '/TEST/LANDING_TIMES.txt')
+                self.mean_iteration_UAV = np.loadtxt(dir_path + '/TEST/MEAN.csv', delimiter=',')
+                self.median_iteration = np.loadtxt(dir_path + '/TEST/MEDIAN.csv', delimiter=',')
+                self.mean_iteration_USV = np.loadtxt(dir_path + '/TEST/MEAN_USV.csv', delimiter=',')
+                self.median_iteration_USV = np.loadtxt(dir_path + '/TEST/MEDIAN_USV.csv', delimiter=',')
+                self.hor_mean_UAV = np.loadtxt(dir_path + '/TEST/HOR_MEAN.csv', delimiter=',')
+                self.hor_median_UAV = np.loadtxt(dir_path + '/TEST/HOR_MEDIAN.csv', delimiter=',')
+                self.hor_mean_USV = np.loadtxt(dir_path + '/TEST/HOR_MEAN_USV.csv', delimiter=',')
+                self.hor_median_USV = np.loadtxt(dir_path + '/TEST/HOR_MEDIAN_USV.csv', delimiter=',')
+                self.vert_mean = np.loadtxt(dir_path + '/TEST/VERT_MEAN.csv', delimiter=',')
+                self.vert_median = np.loadtxt(dir_path + '/TEST/VERT_MEDIAN.csv', delimiter=',')
+                self.landing_times = np.loadtxt(dir_path + '/TEST/LANDING_TIMES.csv', delimiter=',')
                 if problem_type == PARALLEL:
-                    self.hor_inner_mean_UAV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEAN.txt')
-                    self.hor_inner_median_UAV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEDIAN.txt')
-                    self.hor_inner_mean_USV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEAN_USV.txt')
-                    self.hor_inner_median_USV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEDIAN_USV.txt')
-                    self.vert_inner_mean = np.loadtxt(dir_path + '/TEST/VERT_INNER_MEAN.txt')
-                    self.vert_inner_median = np.loadtxt(dir_path + '/TEST/VERT_INNER_MEDIAN.txt')
+                    self.hor_inner_mean_UAV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEAN.csv', delimiter=',')
+                    self.hor_inner_median_UAV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEDIAN.csv', delimiter=',')
+                    self.hor_inner_mean_USV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEAN_USV.csv', delimiter=',')
+                    self.hor_inner_median_USV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEDIAN_USV.csv', delimiter=',')
+                    self.vert_inner_mean = np.loadtxt(dir_path + '/TEST/VERT_INNER_MEAN.csv', delimiter=',')
+                    self.vert_inner_median = np.loadtxt(dir_path + '/TEST/VERT_INNER_MEDIAN.csv', delimiter=',')
 
 
         # print USV_inner_traj_log[0, t] - xb_log[0, t]

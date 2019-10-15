@@ -172,7 +172,7 @@ class USV_simulator():
 
         start = time.time()
         i = 0
-        while not self.stop_sim:
+        while not self.stop_sim or i < sim_len:
         # for i in range(sim_len):
             self.i = i
             if rospy.is_shutdown():
@@ -368,22 +368,22 @@ class USV_simulator():
         #     print 'For some reason it still says that USV_stopped_at_iter is undefined...'
 
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_info.txt', [info_str], fmt="%s")
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/xb_log.txt', self.xb_log)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/uUSV_log.txt', self.uUSV_log)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_iteration_durations.txt', self.iteration_durations)
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_time_stamps.txt', self.USV_times)
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/xb_log.csv', self.xb_log, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/uUSV_log.csv', self.uUSV_log, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_iteration_durations.csv', self.iteration_durations, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_time_stamps.csv', self.USV_times, delimiter=',')
         if not self.CENTRALISED:
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_traj_log.txt', self.USV_traj_log)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_horizontal_durations.txt', self.hor_solution_durations)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_USV_log.txt', self.s_USV_log)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_traj_log.csv', self.USV_traj_log, delimiter=',')
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_horizontal_durations.csv', self.hor_solution_durations, delimiter=',')
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/s_USV_log.csv', self.s_USV_log, delimiter=',')
         if self.PARALLEL:
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_inner_horizontal_durations.txt', self.hor_inner_solution_durations)
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_inner_traj_log.txt', self.USV_inner_traj_log)
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_inner_horizontal_durations.csv', self.hor_inner_solution_durations, delimiter=',')
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_inner_traj_log.csv', self.USV_inner_traj_log, delimiter=',')
 
 
         if not self.CENTRALISED:
-            os.mkdir(dir_path + 'Experiment_' + str(i) + '/USV')
-            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV/UAV_traj_log.txt', self.UAV_traj_log)
+            os.mkdir(dir_path + 'Experiment_' + str(i) + '/USV', delimiter=',')
+            np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV/UAV_traj_log.csv', self.UAV_traj_log, delimiter=',')
 
     def plot_results(self, real_time):
         fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)

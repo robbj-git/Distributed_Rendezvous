@@ -317,14 +317,14 @@ if quit_horizon >= 0 and exp_index != -2:
     if not dir_already_exists:
         os.mkdir(dir_path + 'Experiment_' + str(exp_index) + '/TEST')
     # TODO: Why and when is UAV notified about that the USV has finished storing?
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEAN_USV.txt', it_mean_list)
-    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEDIAN_USV.txt', it_median_list)
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEAN_USV.csv', it_mean_list, delimiter=',')
+    np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEDIAN_USV.csv', it_median_list, delimiter=',')
     if not CENTRALISED:
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEAN_USV.txt', hor_mean_list)
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEDIAN_USV.txt', hor_median_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEAN_USV.csv', hor_mean_list, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEDIAN_USV.csv', hor_median_list, delimiter=',')
     if PARALLEL:
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEAN_USV.txt', hor_inner_mean_list)
-        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEDIAN_USV.txt', hor_inner_median_list)
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEAN_USV.csv', hor_inner_mean_list, delimiter=',')
+        np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEDIAN_USV.csv', hor_inner_median_list, delimiter=',')
 
 else:
     print "nope, no storing", rospy.Time.now()
