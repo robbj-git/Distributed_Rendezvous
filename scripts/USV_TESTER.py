@@ -156,10 +156,10 @@ if PARALLEL:
     hor_max = 420#405#100
     hor_min = 420#300#100
 elif CENTRALISED:
-    hor_max = 240#150#120
-    hor_min = 240#100#80#120
+    hor_max = 195#150#120
+    hor_min = 100#80#120
 elif DISTRIBUTED:
-    hor_max = 251#100#280#100
+    hor_max = 250#100#280#100
     hor_min = 100
 
 hor_inner = 60#30#15
@@ -302,7 +302,6 @@ while exp_index == -1:
 
 if quit_horizon >= 0 and exp_index != -2:
     print "Storing!"
-    print "N:", N, "quit_horizon", quit_horizon
     if N == quit_horizon:
         my_usv_simulator.store_data(exp_index)
     else:

@@ -382,7 +382,7 @@ class USV_simulator():
 
 
         if not self.CENTRALISED:
-            os.mkdir(dir_path + 'Experiment_' + str(i) + '/USV', delimiter=',')
+            os.mkdir(dir_path + 'Experiment_' + str(i) + '/USV')
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV/UAV_traj_log.csv', self.UAV_traj_log, delimiter=',')
 
     def plot_results(self, real_time):
@@ -475,7 +475,7 @@ class USV_simulator():
             # self.traj_pub.unregister()    This results in an error message for some reason?
         elif self.CENTRALISED:
             self.USV_input_sub.unregister()
-            self.stop_sim.unregister()
+            self.stop_sim_sub.unregister()
 
     # -------------- CALLBACKS ---------------
 
