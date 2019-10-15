@@ -139,7 +139,7 @@ xb_m[2:4] = dir
 
 # --------------- TESTING LOOP ------------------
 # NUM_TESTS = 1 DOESN'T WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 1#100#50
+NUM_TESTS = 100#50
 prev_simulator = None
 my_usv_simulator = None
 
@@ -156,8 +156,8 @@ if PARALLEL:
     hor_max = 420#405#100
     hor_min = 420#300#100
 elif CENTRALISED:
-    hor_max = 150#240#150#120
-    hor_min = 150#240#100#80#120
+    hor_max = 240#150#120
+    hor_min = 240#100#80#120
 elif DISTRIBUTED:
     hor_max = 251#100#280#100
     hor_min = 100
@@ -252,18 +252,18 @@ for N in range(hor_max, hor_min-1, -1):
             print "Mean solution:", np.mean(my_usv_simulator.hor_solution_durations)
         if PARALLEL:
             print "Mean inner solution", np.mean(my_usv_simulator.hor_inner_solution_durations)
-        # if np.mean(my_usv_simulator.iteration_durations) > SAMPLING_TIME and \
-        #     np.median(my_usv_simulator.iteration_durations) > SAMPLING_TIME:
-        #     print "ITERATION TOOK TOO LONG"
-        #     took_too_long = True
-        # # ------------- FOR PARALLEL ------------
-        # if PARALLEL and \
-        #     np.mean(my_usv_simulator.hor_solution_durations) > \
-        #         INTER_ITS*SAMPLING_TIME and\
-        #     np.median(my_usv_simulator.hor_solution_durations) > \
-        #         INTER_ITS*SAMPLING_TIME:
-        #     print "SOLUTION TOOK TOO LONG"
-        #     took_too_long = True
+        if np.mean(my_usv_simulator.iteration_durations) > SAMPLING_TIME and \
+            np.median(my_usv_simulator.iteration_durations) > SAMPLING_TIME:
+            print "ITERATION TOOK TOO LONG"
+            took_too_long = True
+        # ------------- FOR PARALLEL ------------
+        if PARALLEL and \
+            np.mean(my_usv_simulator.hor_solution_durations) > \
+                INTER_ITS*SAMPLING_TIME and\
+            np.median(my_usv_simulator.hor_solution_durations) > \
+                INTER_ITS*SAMPLING_TIME:
+            print "SOLUTION TOOK TOO LONG"
+            took_too_long = True
     if took_too_long:
         print 'USV TEST ACTUALLY TOOK TOO LONG!!!!!!!!!!!!!!'
         ever_took_too_long = True
@@ -302,6 +302,7 @@ while exp_index == -1:
 
 if quit_horizon >= 0 and exp_index != -2:
     print "Storing!"
+    print "N:", N, "quit_horizon", quit_horizon
     if N == quit_horizon:
         my_usv_simulator.store_data(exp_index)
     else:
