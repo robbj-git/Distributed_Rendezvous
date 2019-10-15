@@ -170,7 +170,11 @@ class DataAnalyser():
             if perspective == UAV:
                 x_log  = dtl.x_log
                 UAV_traj_log = dtl.UAV_traj_log
-                USV_traj_log = dtl.USV_traj_log_UAV
+                if self.file_types[file_index] == CENTRALISED:
+                    # In centralised case, USV_traj_log is always from UAVs perspective
+                    USV_traj_log = dtl.USV_traj_log
+                else:
+                    USV_traj_log = dtl.USV_traj_log_UAV
                 xb_log = USV_traj_log[0:p.nUSV, :]
             if perspective == USV:
                 xb_log = dtl.xb_log
@@ -718,12 +722,11 @@ class DataLoader:
             if USE_TIME_CORRECTION:
                 time_list = np.loadtxt(dir_path + '/TEST/time_diff.txt')
                 time_diff = time_list[0] + time_list[1]*0.000000001
-                UAV_time_stamps - time_diff
+                UAV_time_stamps = UAV_time_stamps - time_diff
             t_0 = np.minimum(UAV_time_stamps[0], USV_time_stamps[0])
             t_f = np.maximum(UAV_time_stamps[-1], USV_time_stamps[-1]) - t_0
             UAV_time_stamps = UAV_time_stamps - t_0
             USV_time_stamps = USV_time_stamps - t_0
-            print "HMM", t_f
             new_time_stamps = np.arange(0, t_f, 0.05)
             print "Time span:", len(new_time_stamps), len(UAV_time_stamps), len(USV_time_stamps)    # DEBUG PRINT
             print UAV_time_stamps[-1] - UAV_time_stamps[0]
@@ -920,7 +923,7 @@ if __name__ == '__main__':
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_with_constraints(real_time = False, perspective = ACTUAL)
     # data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
