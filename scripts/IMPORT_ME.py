@@ -1,10 +1,10 @@
 from math import ceil
 from sys import maxint
 
-USE_HIL = True     # Should the UAV communicate with the HIL setup?
+USE_HIL = False     # Should the UAV communicate with the HIL setup?
 # SET ONE OF THESE TO TRUE
-CENTRALISED = True
-DISTRIBUTED = False
+CENTRALISED = False
+DISTRIBUTED = True
 PARALLEL = False
 
 SAMPLING_RATE = 20              # Dynamics change if this changes
@@ -14,7 +14,7 @@ ADD_DROPOUT = False # Should a communication loss between the vehicles be simula
 PRED_PARALLEL_TRAJ = False
 
 USE_COMPLETE_HORIZONTAL = False
-USE_COMPLETE_USV = False
+USE_COMPLETE_USV = True
 
 dropout_lower_bound = 80    # Iteration index at which communication loss should start
 dropout_upper_bound = 130   # Iteration index at which communication loss should end

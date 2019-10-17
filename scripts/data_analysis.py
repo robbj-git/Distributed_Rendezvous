@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from mpl_toolkits import mplot3d
 from matrices_and_parameters import dl, ds, hs, nv
 from helper_classes import DataAnalysisParams
@@ -199,6 +200,13 @@ class DataAnalyser():
                 # Actual trajectories
                 ax.plot(x_log[0, t], x_log[1, t], 'bx')
                 ax.plot(xb_log[0, t], xb_log[1, t], 'rx')
+                if p.nUSV == 6:
+                    ax.arrow(xb_log[0, t], xb_log[1,t], np.cos(xb_log[4, t]), np.sin(xb_log[4, t]))
+                    speed = np.sqrt(xb_log[2, t]**2 + xb_log[3, t]**2)
+                    ax.arrow(xb_log[0, t], xb_log[1,t], xb_log[2, t]/speed, xb_log[3, t]/speed, color='red')
+                    ub_log = dtl.ub_log
+                    print "Psi_des:", np.rad2deg(ub_log[1,t]), "Psi:", np.rad2deg(xb_log[4, t])
+                    # ax.arrow(xb_log[0, t], xb_log[1,t], np.cos(ub_log[1,t]), np.sin(ub_log[1,t]), color='blue')
                 # Predicted trajectories
                 ax.plot(x_pred_traj, y_pred_traj, 'blue', alpha=0.4)
                 ax.plot(xb_pred_traj, yb_pred_traj, 'red', alpha=0.4)
@@ -213,6 +221,12 @@ class DataAnalyser():
                 plt.ylabel('y-position [m]')
                 plt.legend(['UAV trajectory', 'USV trajectory'])
                 plt.grid(True)
+                # loc = ticker.MultipleLocator(base=0.1)
+                # ax.xaxis.set_major_locator(loc)
+                # ax.yaxis.set_major_locator(loc)
+                # plt.xticks(np.arange(0, 50, 1))
+                # plt.yticks(np.arange(0, 50, 1))
+                # plt.gca().set_aspect('equal', adjustable='box')
                 try:
                     plt.pause(0.05)
                 except:
@@ -737,6 +751,9 @@ class DataLoader:
                 self.USV_traj_log_raw = np.loadtxt(dir_path + '/USV_traj_log.csv', delimiter=',')
                 self.x_log_raw  = np.loadtxt(dir_path + '/x_log.csv', delimiter=',')
                 self.xb_log_raw = np.loadtxt(dir_path + '/xb_log.csv', delimiter=',')
+                self.nUSV = self.xb_log_raw.shape[0]
+                # if self.nUSV == 6:
+                #     self.xb_log_raw = self.proj_6_to_4(self.xb_log_raw)
 
                 self.UAV_traj_log = self.get_interpolated_traj(self.UAV_traj_log_raw, UAV_time_stamps, new_time_stamps)
                 if problem_type == CENTRALISED:
@@ -745,6 +762,8 @@ class DataLoader:
                     self.USV_traj_log = self.get_interpolated_traj(self.USV_traj_log_raw, USV_time_stamps, new_time_stamps)
                 if problem_type != CENTRALISED:
                     self.USV_traj_log_UAV_raw = np.loadtxt(dir_path + '/UAV/USV_traj_log.csv', delimiter=',')
+                    # if self.nUSV == 6:
+                    #     self.USV_traj_log_raw = self.proj_6_to_4(self.USV_traj_log_raw)
                     self.UAV_traj_log_USV_raw = np.loadtxt(dir_path + '/USV/UAV_traj_log.csv', delimiter=',')
                     self.xb_log_UAV_raw = self.USV_traj_log_UAV_raw[0:p.nUSV, :]
                     self.x_log_USV_raw = self.UAV_traj_log_USV_raw[0:p.nUAV, :]
@@ -758,6 +777,10 @@ class DataLoader:
                     self.xb_log_UAV = self.get_interpolated_traj(self.xb_log_UAV_raw, UAV_time_stamps, new_time_stamps)
                 self.x_log  = self.get_interpolated_traj(self.x_log_raw, UAV_time_stamps, new_time_stamps)
                 self.xb_log = self.get_interpolated_traj(self.xb_log_raw, USV_time_stamps, new_time_stamps)
+                self.u_log_raw = np.loadtxt(dir_path + '/uUAV_log.csv', delimiter=',')
+                self.ub_log_raw = np.loadtxt(dir_path + '/uUSV_log.csv', delimiter=',')
+                self.u_log  = self.get_interpolated_traj(self.u_log_raw, UAV_time_stamps, new_time_stamps)
+                self.ub_log = self.get_interpolated_traj(self.ub_log_raw, USV_time_stamps, new_time_stamps)
 
                 if problem_type == PARALLEL:
                     self.UAV_inner_traj_log_raw = np.loadtxt(dir_path + '/UAV_inner_traj_log.csv', delimiter=',')
@@ -915,6 +938,11 @@ class DataLoader:
             print "Couldn't find USV altitude"
             return 0
 
+    def proj_6_to_4(self, mat):
+        new_mat = np.full((4*mat.shape[0]//6, mat.shape[1]), np.nan)
+        for i in range(mat.shape[0]//6):
+            new_mat[4*i:4*(i+1), :] = mat[6*i:6*i+4]
+        return new_mat
 
 if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
@@ -923,7 +951,7 @@ if __name__ == '__main__':
     data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)

@@ -72,6 +72,7 @@ time_pub = rospy.Publisher('USV_time', Time, queue_size = 1, latch = False)
 rospy.Subscriber('UAV_test_round', Int32, UAV_test_round_callback)
 rospy.Subscriber('UAV_instruction', Int32, UAV_instruction_callback)
 rospy.Subscriber('experiment_index', Int8, experiment_index_callback)
+has_sent_time = False
 
 class ProblemParams():
     def __init__(self):
@@ -115,9 +116,9 @@ class ProblemParams():
 problem_params = ProblemParams()
 
 # -2, 1
-xb_m = np.array([[-5], [4], [np.nan], [np.nan]])
+xb_m = np.array([[5], [-5], [np.nan], [np.nan]])
 if USE_COMPLETE_USV and DISTRIBUTED:
-    xb_m = np.array([[-5], [4], [np.nan], [np.nan], [0], [0]])
+    xb_m = np.block([[xb_m], [np.zeros((2, 1))]])
 
 reverse_dir = False
 dir = get_travel_dir(xb_m, reverse_dir)
@@ -193,6 +194,12 @@ for N in range(hor_max, hor_min-1, -1):
             print "Waiting in loop 1"
         time.sleep(0.01)
         # print 'Waiting at time', time.time(), 'with values', UAV_test_round, USV_test_round, next_test_round
+
+    if not has_sent_time:
+        msg = Time()
+        msg.data = rospy.Time.now()
+        time_pub.publish(msg)
+
     # In case there is some old horizon change request sent by the UAV
     should_change_horizon = False
     if my_usv_simulator is not None:
@@ -287,10 +294,6 @@ for N in range(hor_max, hor_min-1, -1):
 #     print "Error while plotting:"
 #     print e
 #     pass
-
-msg = Time()
-msg.data = rospy.Time.now()
-time_pub.publish(msg)
 
 while exp_index == -1:
     if rospy.is_shutdown():

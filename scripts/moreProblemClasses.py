@@ -40,8 +40,6 @@ class CompleteCentralisedProblem():
         self.travel_dir = None #travel_dir
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
-        # if self.type == 'CVXGEN':
-        #     self.ROS_init()
 
     def create_optimisation_matrices(self):
         # Dynamics Matrices
@@ -482,14 +480,20 @@ class CompleteUSVProblem():
         EPE = np.dot(Ex.T, np.dot(self.Pb, Ex))
         EQE_vel = np.dot(Ex.T, np.dot(self.Qb_vel, Ex))
         EPE_vel = np.dot(Ex.T, np.dot(self.Pb_vel, Ex))
-        self.QE = np.kron(np.eye(T+1), np.dot(Ex.T, self.Qb))
-        self.QE[-nUSV:, -self.nUAV:] = np.dot(Ex.T, self.Pb)
+        self.QE = np.kron(np.eye(T+1), np.dot(self.Qb, Ex))
+        self.QE[-self.nUAV:, -nUSV:] = np.dot(self.Pb, Ex)
+        self.QE_vel = np.kron(np.eye(T+1), np.dot(self.Qb_vel, Ex))
+        self.QE_vel[-self.nUAV:, -nUSV:] = np.dot(self.Pb_vel, Ex)
 
-        self.Qb_big  = np.kron(np.eye(T+1), EQE)
-        self.Qb_big[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = EPE
+        self.Qb_big  = 0*np.kron(np.eye(T+1), self.Qb)
+        self.Qb_big[-4:(T+1)*4, -4:(T+1)*4] = 0*self.Pb
+        self.Qb_big_vel  = np.kron(np.eye(T+1), self.Qb_vel)
+        self.Qb_big_vel[-4:(T+1)*4, -4:(T+1)*4] = self.Pb_vel
         self.Rb_big  = np.kron(np.eye(T),   self.Rb)
-        self.Qb_big_vel  = np.kron(np.eye(T+1), EQE_vel)
-        self.Qb_big_vel[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = EPE_vel
+        self.Qb_big_E  = 0*np.kron(np.eye(T+1), EQE)
+        self.Qb_big_E[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = 0*EPE
+        self.Qb_big_vel_E  = 0*np.kron(np.eye(T+1), EQE_vel)
+        self.Qb_big_vel_E[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = 0*EPE_vel
         # ------------- OSQP Matrices --------------
         velocity_extractor = np.zeros(( 2*(T+1), nUSV*(T+1) ))
         for i in range(T+1):
@@ -502,13 +506,13 @@ class CompleteUSVProblem():
         self.C = 10*(T+1)*np.eye(nUSV_s)
 
         if self.travel_dir is None:
-            P_temp = 2*np.bmat([[self.Qb_big, np.zeros((dim1, dim2)), np.zeros((dim1, nUSV_s))],
+            P_temp = 2*np.bmat([[self.Qb_big_E, np.zeros((dim1, dim2)), np.zeros((dim1, nUSV_s))],
                 [np.zeros((dim2, dim1)), self.Rb_big, np.zeros((dim2, nUSV_s))],
                 [np.zeros((nUSV_s, dim1)), np.zeros((nUSV_s, dim2)), self.C]
             ])
         else:
             # Allows the USV to also track a reference velocity trajectory
-            P_temp = 2*np.bmat([[self.Qb_big+self.Qb_big_vel, np.zeros((dim1, dim2)), np.zeros((dim1, nUSV_s))],
+            P_temp = 2*np.bmat([[self.Qb_big_E+self.Qb_big_vel_E, np.zeros((dim1, dim2)), np.zeros((dim1, nUSV_s))],
                 [np.zeros((dim2, dim1)), 2*self.Rb_big, np.zeros((dim2, nUSV_s))],
                 [np.zeros((nUSV_s, dim1)), np.zeros((nUSV_s, dim2)), self.C]
             ])
@@ -518,7 +522,7 @@ class CompleteUSVProblem():
         self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
         if self.travel_dir is None:
             self.q_OSQP = -2*np.block([
-                [np.dot( self.Qb_big, np.zeros(( (T+1)*self.nUSV, 1 )) )],
+                [np.dot( self.QE, np.zeros(( (T+1)*self.nUAV, 1 )) )],
                 [np.zeros((T*mUSV+nUSV_s, 1))]
             ])
         else:
@@ -534,15 +538,17 @@ class CompleteUSVProblem():
             # print "Y:", v_min_y_b, "to", v_max_y_b
             v_x_des = 0.9*v_min_x_b + 0.1*v_max_x_b
             v_y_des = 0.9*v_min_y_b + 0.1*v_max_y_b
-            vel_state = np.zeros((nUSV, 1))
+            vel_state = np.zeros((4, 1))
             vel_state[2:4, 0:1] = np.array([[v_x_des], [v_y_des]])
             vel_vec = np.kron(np.ones((T+1, 1)), vel_state)
-            self.vel_cost_vec = np.dot( self.Qb_big_vel, vel_vec)
+            self.vel_cost_vec = np.dot( self.QE_vel.T, vel_vec)
             self.q_OSQP = -2*np.bmat([
-                [np.dot( self.Qb_big, np.zeros(( (T+1)*self.nUSV, 1 )) ) + \
+                [0*np.dot( self.QE.T, np.zeros(( (T+1)*self.nUAV, 1 )) ) + \
                     self.vel_cost_vec],
                 [np.zeros((T*mUSV+nUSV_s, 1))]
             ])
+            # DEBUG
+            self.vel_cost = np.dot(vel_vec.T, np.dot(self.Qb_big_vel, vel_vec))
 
     def create_constraint_matrices(self):
         T = self.T
@@ -620,6 +626,7 @@ class CompleteUSVProblem():
         else:
             self.update_OSQP(xb, x_traj)
             results = self.problemOSQP.solve()
+            print "OBJECTIVE:", results.info.obj_val + self.vel_cost[0,0] + self.state_cost[0,0]
             if not results.x[0] is None:
                 self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
                 self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):-self.nUSV_s], (-1, 1))
@@ -653,7 +660,9 @@ class CompleteUSVProblem():
         self.l_OSQP[0:(T+1)*self.nUSV, 0:1] = np.dot(self.Phi_b, xb0)
         self.u_OSQP[0:(T+1)*self.nUSV, 0:1] = np.dot(self.Phi_b, xb0)
         # print "AIGHT", self.q_OSQP[0:(T+1)*self.nUSV, 0:1].shape, np.dot( self.Qb_big, x_traj ).shape, self.vel_cost_vec.shape
-        self.q_OSQP[0:(T+1)*self.nUSV, 0:1] = -2*(np.dot( self.QE, x_traj ) + self.vel_cost_vec)
+        self.q_OSQP[0:(T+1)*self.nUSV, 0:1] = -2*(0*np.dot( self.QE.T, x_traj ) + self.vel_cost_vec)
+
+        self.state_cost = np.dot(x_traj.T, np.dot(self.Qb_big, x_traj))
 
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
 
@@ -747,7 +756,7 @@ class CompleteUSVProblem():
 
         self.Cb = self.C_c*SAMPLING_TIME
 
-    # def actually_update_linearisation(self, x0, xb0):
+    def actually_update_linearisation(self, x0, xb0):
     #     T = self.T
     #     mUAV = self.mUAV
     #     mUSV = self.mUSV
@@ -800,6 +809,7 @@ class CompleteUSVProblem():
     #     self.set_A_OSQP()
     #     A_data = self.A_OSQP.data
     #     self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, Ax=A_data)
+        return
 
     def get_Lambda_sparse(self, Lambda):
         num_entries = self.nUSV*self.mUSV*self.T*(self.T+1)//2

@@ -1,6 +1,6 @@
 from rendezvous_problem.msg import Float32MultiArrayStamped
 from helper_functions import shift_trajectory, get_traj_dir, get_cos_angle_between
-from IMPORT_ME import SAMPLING_TIME, USE_COMPLETE_HORIZONTAL
+from IMPORT_ME import SAMPLING_TIME, USE_COMPLETE_HORIZONTAL, USE_COMPLETE_USV
 from matrices_and_parameters import n_UAV, n_USV, nv, wmax, wmin, wmin_land, kl, vmax, vmax_b
 import numpy as np
 import Queue
@@ -163,7 +163,10 @@ class DataAnalysisParams():
             self.nUAV = n_UAV
         else:
             self.nUAV = 8
-        self.nUSV = n_USV
+        if not USE_COMPLETE_USV:
+            self.nUSV = n_USV
+        else:
+            self.nUSV = 6
         self.nv = nv
         self.T = np.nan
         self.wmax = wmax
