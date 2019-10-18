@@ -49,6 +49,11 @@ def USV_time_callback(msg):
     global USV_time, UAV_time
     USV_time = msg.data
     UAV_time = rospy.Time.now()
+    # Allows for sending of several messages to make sure that at least one arrives
+    # if np.isnan(USV_time):
+    #     USV_time = USV_time_temp
+    #     UAV_time = UAV_time_temp
+    print "TOTS RECEIVED TIME"
 
 rospy.init_node('UAV_main')
 
@@ -58,6 +63,8 @@ experiment_index_pub = rospy.Publisher('experiment_index', Int8, queue_size=1, l
 rospy.Subscriber('USV_test_round', Int32, USV_test_round_callback)
 rospy.Subscriber('USV_has_stored_data', Int32, USV_store_callback)
 rospy.Subscriber('USV_time', Time, USV_time_callback)
+
+time.sleep(0.5) # Give time for subscribers to be created properly
 
 # Altitude of the USV, currently assumed constant, which is why it is set here
 hb = 1
@@ -132,8 +139,8 @@ else:
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
 NUM_TESTS = 1
 if PARALLEL:
-    hor_max = 200#420#405#100
-    hor_min = 200#420#300#100
+    hor_max = 170#420#405#100
+    hor_min = 170#420#300#100
 elif CENTRALISED:
     hor_max = 100#195#150#120
     hor_min = 100#80#120

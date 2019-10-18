@@ -753,8 +753,9 @@ class DataAnalyser():
             time_len = x_log.shape[1]
 
             height_log = dtl.xv_log[0, :] - dtl.hb
-            dist_log = np.sqrt( np.square(x_log[0, :] - xb_log[0, :]) + \
-                np.square(x_log[1, :] - xb_log[1, :]) )
+            dx_log = x_log[0, :] - xb_log[0, :]
+            dy_log = x_log[1, :] - xb_log[1, :]
+            dist_log = np.sqrt( np.square(dx_log) + np.square(dy_log) )
             b_log = (dist_log < ds).astype(int)
             vert_const_log = np.dot(np.diag(b_log), (hs*dl - hs*dist_log)/(dl - ds)) + np.dot(np.diag(1-b_log), np.full((time_len, ), hs))
             vert_const_log = np.maximum(vert_const_log, np.zeros(vert_const_log.shape))
@@ -769,14 +770,9 @@ class DataAnalyser():
             if not os.path.isdir(dir_path+dir+'/Descent_Formated'):
                 os.mkdir(dir_path+dir+'/Descent_Formated')
 
-            new_mat = np.block([[dtl.new_time_stamps[0:t]], [height_log[0:t]], [vert_const_log[0:t]]]).T
-            header = 'time,altitude,vertical constraint'
+            new_mat = np.block([[dtl.new_time_stamps[0:t]], [height_log[0:t]], [vert_const_log[0:t]], [dx_log[0:t]], [dy_log[0:t]], [dist_log[0:t]]]).T
+            header = 'time,altitude,vertical constraint,dx,dy,distance'
             np.savetxt(dir_path+dir+'/Descent_Formated/' + postfix + '.csv', new_mat, delimiter=',', header=header, comments='')
-
-            # np.savetxt(dir_path+dir+'/Descent_Formated_' + postfix + '/time_log.csv', dtl.new_time_stamps.T, delimiter=',', header='time')
-            # np.savetxt(dir_path+dir+'/Descent_Formated_' + postfix + '/height_log.csv', height_log.T, delimiter=',', header='altitude')
-            # np.savetxt(dir_path+dir+'/Descent_Formated_' + postfix + '/vert_const_log.csv', vert_const_log.T, delimiter=',', header='vertical constraint')
-            # TAKE USV ALTITUDE INTO ACCOUNT HERE!!!!! MAYBE JUST SUBTRACT IT FROM ALTITUDE FOR NICER FIT!
 
     def store_formatted_durations(self):
         for file_index, dir in enumerate(self.files):
@@ -1102,15 +1098,15 @@ if __name__ == '__main__':
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    # data_analyser.plot_with_constraints(real_time = True, perspective = UAV)
     # data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)
     # data_analyser.plot_time_histogram()
     # data_analyser.plot_time_curve()
-    # data_analyser.store_formatted_descent(perspective = ACTUAL)
-    data_analyser.store_formatted_durations()
+    data_analyser.store_formatted_descent(perspective = ACTUAL)
+    # data_analyser.store_formatted_durations()
 
     # use_dir = False
     # use_horizon_vs_performance = False

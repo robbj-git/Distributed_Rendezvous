@@ -88,6 +88,10 @@ class UAV_simulator():
         self.xv = np.full((self.nv, 1), np.nan)
         self.xv.fill(np.nan)
 
+        #DEBUG
+        if self.PARALLEL:
+            self.last_pred_x = np.zeros((self.nUAV, 1))
+
         # --------------------------- ROS SETUP ----------------------------------
         # rospy.init_node('UAV_main')
         self.rate = rospy.Rate(self.SAMPLING_RATE)
@@ -258,7 +262,9 @@ class UAV_simulator():
                 else:
                     x0 = self.x
                     traj = self.xb_traj
+                # print "PRED DIST ERROR:", np.sqrt( (x0[0, 0] - self.last_pred_x[0, 0])**2 + (x0[1, 0] - self.last_pred_x[1, 0])**2)
                 self.problemUAV.solve_in_parallel(x0, traj)
+                self.last_pred_x = x0
 
             self.update_hor_trajectories(i)
 
@@ -498,6 +504,14 @@ class UAV_simulator():
         info_str += "Dropout was used\n" if self.ADD_DROPOUT else "Dropout was NOT used\n"
         if self.ADD_DROPOUT:
             info_str += "Dropout bounds: " + str(self.dropout_lower_bound) + " to " + str(self.dropout_upper_bound)
+        info_str += "dl: " + str(self.params.dl) + "\n"
+        info_str += "ds: " + str(self.params.ds) + "\n"
+        info_str += "hs: " + str(self.params.hs) + "\n"
+        info_str += "Received messages WERE shifted to account for delay\n" \
+            if self.SHOULD_SHIFT_MESSAGES else "Received messages were NOT shifted to account for delay\n"
+        if self.PARALLEL:
+            info_str += "Parallel DID predict initial state for outer problem\n" \
+                if self.PRED_PARALLEL_TRAJ else "Parallel did NOT predict initial state for outer problem\n"
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/info.txt', [info_str], fmt="%s")
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/x_log.csv', self.x_log, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/xv_log.csv', self.xv_log, delimiter=',')
@@ -506,6 +520,7 @@ class UAV_simulator():
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/uUAV_log.csv', self.uUAV_log, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/wdes_log.csv', self.wdes_log, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_iteration_durations.csv', self.iteration_durations, delimiter=',')
+        # print np.sum(np.array(self.iteration_durations) >= 0.05)
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_time_stamps.csv', self.UAV_times, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/vert_solution_durations.csv', self.vert_solution_durations, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV_horizontal_durations.csv', self.hor_solution_durations, delimiter=',')

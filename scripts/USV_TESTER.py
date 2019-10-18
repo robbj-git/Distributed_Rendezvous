@@ -154,8 +154,8 @@ took_too_long_horizon = -1
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
 NUM_TESTS = 1
 if PARALLEL:
-    hor_max = 200#420#405#100
-    hor_min = 200#420#300#100
+    hor_max = 170#420#405#100
+    hor_min = 170#420#300#100
 elif CENTRALISED:
     hor_max = 100#195#150#120
     hor_min = 100#80#120
@@ -199,6 +199,7 @@ for N in range(hor_max, hor_min-1, -1):
         msg = Time()
         msg.data = rospy.Time.now()
         time_pub.publish(msg)
+        print "TOTS PUBBED TIME!"
 
     # In case there is some old horizon change request sent by the UAV
     should_change_horizon = False
