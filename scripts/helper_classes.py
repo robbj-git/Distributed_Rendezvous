@@ -159,14 +159,15 @@ class DataAnalysisParams():
 
     def __init__(self):
         # TODO: Avoid hard-coding here
-        if not USE_COMPLETE_HORIZONTAL:
-            self.nUAV = n_UAV
-        else:
-            self.nUAV = 8
-        if not USE_COMPLETE_USV:
-            self.nUSV = n_USV
-        else:
-            self.nUSV = 6
+        # THIS IS A BAD PLACE TO SET THESE, THEY SHOULD BE CALCULATED FROM THE DATA INSTEAD
+        # if not USE_COMPLETE_HORIZONTAL:
+        #     self.nUAV = n_UAV
+        # else:
+        #     self.nUAV = 8
+        # if not USE_COMPLETE_USV:
+        #     self.nUSV = n_USV
+        # else:
+        #     self.nUSV = 6
         self.nv = nv
         self.T = np.nan
         self.wmax = wmax
