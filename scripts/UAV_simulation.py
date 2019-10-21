@@ -271,6 +271,7 @@ class UAV_simulator():
             if self.PARALLEL:
                 self.problemUAVFast.solve(self.x[0:(self.T_inner+1)*self.nUAV],\
                     self.x_traj[0:(self.T_inner+1)*self.nUAV])
+                self.x_traj_inner = self.problemUAVFast.x.value
 
             (self.uUAV, self.uUSV) = self.get_horizontal_control()
             # ------- Vertical Problem --------
@@ -296,6 +297,7 @@ class UAV_simulator():
             if self.PARALLEL:
                 self.problemVertFast.solve(self.xv[0:(self.T_inner+1)*self.nv],
                     self.xv_traj[0:(self.T_inner+1)*self.nv, 0:1])
+                self.xv_traj_inner = self.problemVertFast.xv.value
 
             self.wdes = self.get_vertical_control()
             self.update_logs(self.i)
@@ -360,7 +362,6 @@ class UAV_simulator():
         elif self.DISTRIBUTED:
             self.x_traj = self.problemUAV.x.value
         elif self.PARALLEL:
-            self.x_traj_inner = self.problemUAVFast.x.value
             if self.i%self.INTER_ITS != 0:
                 self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
                 self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
@@ -381,8 +382,6 @@ class UAV_simulator():
                 self.xv_traj = self.problemVert.xv.value
             elif self.PARALLEL and self.i%self.INTER_ITS != 0:
                 self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
-        if self.PARALLEL:
-            self.xv_traj_inner = self.problemVertFast.xv.value
 
     # Also stores solution duration of parallel problem
     def update_parallel_trajectories(self):

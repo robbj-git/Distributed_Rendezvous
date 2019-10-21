@@ -229,6 +229,7 @@ class USV_simulator():
             if self.PARALLEL:
                 self.problemUSVFast.solve(self.xb[0:(self.T_inner+1)*self.nUSV],\
                     self.xb_traj[0:(self.T_inner+1)*self.nUAV])
+                self.xb_traj_inner = self.problemUSVFast.xb.value
 
             (self.uUSV) = self.get_control()
 
@@ -280,7 +281,6 @@ class USV_simulator():
         elif self.DISTRIBUTED:
             self.xb_traj = self.problemUSV.xb.value
         elif self.PARALLEL:
-            self.xb_traj_inner = self.problemUSVFast.xb.value
             if self.i%self.INTER_ITS != 0:
                 self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
 
