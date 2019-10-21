@@ -26,6 +26,7 @@ dir_path = '/home/' + getpass.getuser() + '/robbj_experiment_results/'
 ACTUAL = 0
 UAV = 1
 USV = 2
+RAW = 3
 
 # green_like = '#404788'
 # orange_like = '#DCE319'
@@ -95,8 +96,18 @@ class DataAnalyser():
                 USV_traj_log = dtl.USV_traj_log
                 UAV_traj_log = dtl.UAV_traj_log_USV
                 x_log = UAV_traj_log[0:dtl.nUAV, :]
-            xv_log = dtl.xv_log#np.loadtxt(dir_path + dir + '/xv_log.txt')
-            vert_traj_log = dtl.vert_traj_log#np.loadtxt(dir_path + dir + '/vert_traj_log.txt')
+            if perspective == RAW:
+                x_log = dtl.x_log_raw
+                UAV_traj_log = dtl.UAV_traj_log_raw
+                xb_log = dtl.xb_log_raw
+                USV_traj_log = dtl.xb_log_raw
+
+            if perspective != RAW:
+                xv_log = dtl.xv_log
+                vert_traj_log = dtl.vert_traj_log
+            else:
+                xv_log = dtl.xv_log_raw
+                vert_traj_log = dtl.vert_traj_log_raw
 
             # if self.file_types[file_index] == PARALLEL:
             #     UAV_inner_traj_log = np.loadtxt(dir_path + dir + '/UAV_inner_traj_log.txt')
@@ -118,6 +129,19 @@ class DataAnalyser():
                 xb_pred_traj = USV_traj_log[0::dtl.nUSV, t]
                 yb_pred_traj = USV_traj_log[1::dtl.nUSV, t]
 
+                if perspective != RAW and self.file_types[file_index] == PARALLEL:
+                    x_inner_pred_traj = dtl.UAV_inner_traj_log[0::dtl.nUAV, t]
+                    y_inner_pred_traj = dtl.UAV_inner_traj_log[1::dtl.nUAV, t]
+                    z_inner_pred_traj = dtl.vert_inner_traj_log[0::dtl.nv,  t]
+                    xb_inner_pred_traj = dtl.USV_inner_traj_log[0::dtl.nUSV, t]
+                    yb_inner_pred_traj = dtl.USV_inner_traj_log[1::dtl.nUSV, t]
+                if perspective == RAW and self.file_types[file_index] == PARALLEL:
+                    x_inner_pred_traj = dtl.UAV_inner_traj_log_raw[0::dtl.nUAV, t]
+                    y_inner_pred_traj = dtl.UAV_inner_traj_log_raw[1::dtl.nUAV, t]
+                    z_inner_pred_traj = dtl.vert_inner_traj_log_raw[0::dtl.nv,  t]
+                    xb_inner_pred_traj = dtl.USV_inner_traj_log_raw[0::dtl.nUSV, t]
+                    yb_inner_pred_traj = dtl.USV_inner_traj_log_raw[1::dtl.nUSV, t]
+
                 # Actual trajectories
                 ax.plot3D(x_log[0, 0:t+1], x_log[1, 0:t+1], xv_log[0, 0:t+1], 'b')
                 ax.plot3D(xb_log[0, 0:t+1], xb_log[1, 0:t+1], 0, 'r')
@@ -129,12 +153,8 @@ class DataAnalyser():
                 else:
                     ax.plot3D(x_pred_traj, y_pred_traj,  xv_log[0, t], 'green', alpha=0.5)
                 ax.plot3D(xb_pred_traj, yb_pred_traj, 0, 'green', alpha=0.5)
+
                 if self.file_types[file_index] == PARALLEL:
-                    x_inner_pred_traj = dtl.UAV_inner_traj_log[0::dtl.nUAV, t]
-                    y_inner_pred_traj = dtl.UAV_inner_traj_log[1::dtl.nUAV, t]
-                    z_inner_pred_traj = dtl.vert_inner_traj_log[0::dtl.nv,  t]
-                    xb_inner_pred_traj = dtl.USV_inner_traj_log[0::dtl.nUSV, t]
-                    yb_inner_pred_traj = dtl.USV_inner_traj_log[1::dtl.nUSV, t]
                     ax.plot3D(x_inner_pred_traj, y_inner_pred_traj, z_inner_pred_traj, 'yellow', alpha=0.5)
                     ax.plot3D(xb_inner_pred_traj, yb_inner_pred_traj, 0, 'yellow', alpha=0.5)
 
@@ -182,6 +202,11 @@ class DataAnalyser():
                 USV_traj_log = dtl.USV_traj_log
                 UAV_traj_log = dtl.UAV_traj_log_USV
                 x_log = UAV_traj_log[0:dtl.nUAV, :]
+            if perspective == RAW:
+                x_log = dtl.x_log_raw
+                UAV_traj_log = dtl.UAV_traj_log_raw
+                xb_log = dtl.xb_log_raw
+                USV_traj_log = dtl.xb_log_raw
 
             time_len = x_log.shape[1]-1
             if real_time:
@@ -197,6 +222,18 @@ class DataAnalyser():
                 y_pred_traj = UAV_traj_log[1::dtl.nUAV, t]
                 xb_pred_traj = USV_traj_log[0::dtl.nUSV, t]
                 yb_pred_traj = USV_traj_log[1::dtl.nUSV, t]
+
+                if perspective != RAW and self.file_types[file_index] == PARALLEL:
+                    x_inner_pred_traj = dtl.UAV_inner_traj_log[0::dtl.nUAV, t]
+                    y_inner_pred_traj = dtl.UAV_inner_traj_log[1::dtl.nUAV, t]
+                    xb_inner_pred_traj = dtl.USV_inner_traj_log[0::dtl.nUSV, t]
+                    yb_inner_pred_traj = dtl.USV_inner_traj_log[1::dtl.nUSV, t]
+                if perspective == RAW and self.file_types[file_index] == PARALLEL:
+                    x_inner_pred_traj = dtl.UAV_inner_traj_log_raw[0::dtl.nUAV, t]
+                    y_inner_pred_traj = dtl.UAV_inner_traj_log_raw[1::dtl.nUAV, t]
+                    xb_inner_pred_traj = dtl.USV_inner_traj_log_raw[0::dtl.nUSV, t]
+                    yb_inner_pred_traj = dtl.USV_inner_traj_log_raw[1::dtl.nUSV, t]
+
                 # Actual trajectories
                 ax.plot(x_log[0, t], x_log[1, t], 'bx')
                 ax.plot(xb_log[0, t], xb_log[1, t], 'rx')
@@ -210,13 +247,11 @@ class DataAnalyser():
                 # Predicted trajectories
                 ax.plot(x_pred_traj, y_pred_traj, 'blue', alpha=0.4)
                 ax.plot(xb_pred_traj, yb_pred_traj, 'red', alpha=0.4)
-                if self.file_types[file_index] == PARALLEL:
-                    x_inner_pred_traj = dtl.UAV_inner_traj_log[0::dtl.nUAV, t]
-                    y_inner_pred_traj = dtl.UAV_inner_traj_log[1::dtl.nUAV, t]
-                    xb_inner_pred_traj = dtl.USV_inner_traj_log[0::dtl.nUSV, t]
-                    yb_inner_pred_traj = dtl.USV_inner_traj_log[1::dtl.nUSV, t]
+
+                if self.file_types[file_index]:
                     ax.plot(x_inner_pred_traj, y_inner_pred_traj, 'green', alpha=0.4)
                     ax.plot(xb_inner_pred_traj, yb_inner_pred_traj, 'yellow', alpha=0.4)
+
                 plt.xlabel('x-position [m]')
                 plt.ylabel('y-position [m]')
                 plt.legend(['UAV trajectory', 'USV trajectory'])
@@ -430,7 +465,11 @@ class DataAnalyser():
                 else:
                     x_log = dtl.x_log_USV
                     UAV_traj_log = dtl.UAV_traj_log_USV
-
+            elif perspective == RAW:
+                x_log = dtl.x_log_raw
+                UAV_traj_log = dtl.UAV_traj_log_raw
+                xb_log = dtl.xb_log_raw
+                USV_traj_log = dtl.xb_log_raw
             # # DEBUG RAW
             # x_log = dtl.x_log_raw
             # UAV_traj_log = dtl.UAV_traj_log_raw
@@ -452,13 +491,11 @@ class DataAnalyser():
                 ax.cla()
                 dist_pred_log = np.sqrt( np.square(UAV_traj_log[0::dtl.nUAV, t] - USV_traj_log[0::dtl.nUSV, t])\
                     + np.square(UAV_traj_log[1::dtl.nUAV, t] - USV_traj_log[1::dtl.nUSV, t]) )
-                vert_pred_log = dtl.vert_traj_log[0::dtl.nv, t]
+                if perspective != RAW:
+                    vert_pred_log = dtl.vert_traj_log[0::dtl.nv, t]
+                else:
+                    vert_pred_log = dtl.vert_traj_log_raw[0::dtl.nv, t]
 
-                # TODO: When perspective is ACTUAL, you should use true future trajectory
-                # instead of predicted future trajectories, no? Naah, would only work if you did that only
-                # for horizontal, and kept predicted for vertical. There seems to be no point to it really
-                ax.plot(dist_log[0:t+1], dtl.xv_log[0, 0:t+1], 'blue')
-                ax.plot(dist_pred_log, vert_pred_log, 'green', alpha=0.5)
                 if self.file_types[file_index] == PARALLEL:
                     # IMPORTANT: ACTUAL and UAV doesn't really make sense here, there's no "actual" predicted trajectory
                     # EDIT: Well, couldn't you have a traj predicted by e.g. the UAV be "actual" if you use the USV's prediction of its own position, instead of the UAV's?
@@ -473,8 +510,22 @@ class DataAnalyser():
                             + np.square(dtl.UAV_inner_traj_log[1:T_inner*dtl.nUAV:dtl.nUAV, t]\
                             - USV_traj_log[1:T_inner*dtl.nUSV:dtl.nUSV, t])\
                         )
+                    elif perspective == RAW:
+                        dist_inner_pred_log = np.sqrt( \
+                            np.square(dtl.UAV_inner_traj_log_raw[0::dtl.nUAV, t] - dtl.USV_inner_traj_log_raw[0::dtl.nUSV, t])\
+                            + np.square(dtl.UAV_inner_traj_log_raw[1::dtl.nUAV, t] - dtl.USV_inner_traj_log_raw[1::dtl.nUSV, t]) )
 
-                    vert_inner_pred_log = dtl.vert_inner_traj_log[0::dtl.nv, t]
+                    if perspective != RAW:
+                        vert_inner_pred_log = dtl.vert_inner_traj_log[0::dtl.nv, t]
+                    elif perspective == RAW:
+                        vert_inner_pred_log = dtl.vert_inner_traj_log_raw[0::dtl.nv, t]
+
+                # TODO: When perspective is ACTUAL, you should use true future trajectory
+                # instead of predicted future trajectories, no? Naah, would only work if you did that only
+                # for horizontal, and kept predicted for vertical. There seems to be no point to it really
+                ax.plot(dist_log[0:t+1], dtl.xv_log[0, 0:t+1], 'blue')
+                ax.plot(dist_pred_log, vert_pred_log, 'green', alpha=0.5)
+                if self.file_types[file_index] == PARALLEL:
                     ax.plot(dist_inner_pred_log, vert_inner_pred_log, 'yellow', alpha=0.5)
                 ax.add_collection(safety_patch_collection)
                 plt.xlabel('horizontal distance [m]')
@@ -644,8 +695,13 @@ class DataAnalyser():
                 else:
                     x_log = dtl.x_log_USV
                     UAV_traj_log = dtl.UAV_traj_log_USV
+            elif perspective == RAW:
+                xb_log = dtl.xb_log_raw
+                USV_traj_log = dtl.USV_traj_log_raw
+                x_log = dtl.x_log_raw
+                UAV_traj_log = dtl.UAV_traj_log_raw
 
-            time_len = dtl.x_log.shape[1]-1
+            time_len = x_log.shape[1]-1
             dist_log = np.sqrt( np.square(x_log[0, 0:time_len] - xb_log[0, 0:time_len]) + \
                 np.square(x_log[1, 0:time_len] - xb_log[1, 0:time_len]) )
             b_log = (dist_log < ds).astype(int)
@@ -664,9 +720,14 @@ class DataAnalyser():
                 ax.cla()
                 # dist_pred_log = np.sqrt( np.square(UAV_traj_log[0::dtl.nUAV, t] - USV_traj_log[0::dtl.nUSV, t])\
                 #     + np.square(UAV_traj_log[1::dtl.nUAV, t] - USV_traj_log[1::dtl.nUSV, t]) )
-                vert_pred_log = dtl.vert_traj_log[0::dtl.nv, t]
+                if perspective != RAW:
+                    vert_pred_log = dtl.vert_traj_log[0::dtl.nv, t]
+                    xv_log = dtl.xv_log
+                if perspective == RAW:
+                    vert_pred_log = dtl.vert_traj_log_raw[0::dtl.nv, t]
+                    xv_log = dtl.xv_log_raw
 
-                ax.plot(range(t+1), dtl.xv_log[0, 0:t+1], 'blue')
+                ax.plot(range(t+1), xv_log[0, 0:t+1], 'blue')
                 ax.plot(range(t+1), vert_const_log[0:t+1], 'r--')
                 # ax.plot(range(t, t+T), vert_pred_log, 'green', alpha=0.5)
                 # if self.file_types[file_index] == PARALLEL:
@@ -749,10 +810,16 @@ class DataAnalyser():
                     x_log = dtl.x_log
                 else:
                     x_log = dtl.x_log_USV
+            elif perspective == RAW:
+                xb_log = dtl.xb_log_raw
+                x_log = dtl.x_log_raw
 
             time_len = x_log.shape[1]
 
-            height_log = dtl.xv_log[0, :] - dtl.hb
+            if perspective != RAW:
+                height_log = dtl.xv_log[0, :] - dtl.hb
+            else:
+                height_log = dtl.xv_log_raw[0, :] - dtl.hb
             dx_log = x_log[0, :] - xb_log[0, :]
             dy_log = x_log[1, :] - xb_log[1, :]
             dist_log = np.sqrt( np.square(dx_log) + np.square(dy_log) )
@@ -1095,17 +1162,17 @@ if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
     # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
-    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
+    # data_analyser.plot_topview(real_time = True, perspective = RAW)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = UAV)
-    # data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_with_constraints(real_time = True, perspective = RAW)
+    # data_analyser.plot_altitude(real_time = True, perspective = RAW)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)
     # data_analyser.plot_time_histogram()
     # data_analyser.plot_time_curve()
-    data_analyser.store_formatted_descent(perspective = ACTUAL)
+    # data_analyser.store_formatted_descent(perspective = RAW)
     # data_analyser.store_formatted_durations()
 
     # use_dir = False
