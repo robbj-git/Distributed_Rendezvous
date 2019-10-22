@@ -245,12 +245,12 @@ class DataAnalyser():
                     print "Psi_des:", np.rad2deg(ub_log[1,t]), "Psi:", np.rad2deg(xb_log[4, t])
                     # ax.arrow(xb_log[0, t], xb_log[1,t], np.cos(ub_log[1,t]), np.sin(ub_log[1,t]), color='blue')
                 # Predicted trajectories
-                ax.plot(x_pred_traj, y_pred_traj, 'blue', alpha=0.4)
-                ax.plot(xb_pred_traj, yb_pred_traj, 'red', alpha=0.4)
+                ax.plot(x_pred_traj, y_pred_traj, 'b', alpha=0.4)
+                ax.plot(xb_pred_traj, yb_pred_traj, 'r', alpha=0.4)
 
                 if self.file_types[file_index]:
-                    ax.plot(x_inner_pred_traj, y_inner_pred_traj, 'green', alpha=0.4)
-                    ax.plot(xb_inner_pred_traj, yb_inner_pred_traj, 'yellow', alpha=0.4)
+                    ax.plot(x_inner_pred_traj, y_inner_pred_traj, 'g', alpha=0.4)
+                    ax.plot(xb_inner_pred_traj, yb_inner_pred_traj, 'y', alpha=0.4)
 
                 plt.xlabel('x-position [m]')
                 plt.ylabel('y-position [m]')
@@ -263,6 +263,8 @@ class DataAnalyser():
                 # plt.yticks(np.arange(0, 50, 1))
                 # plt.gca().set_aspect('equal', adjustable='box')
                 try:
+                    # ax.set_xlim([0, 12])
+                    # ax.set_ylim([-12, 0])
                     plt.pause(0.05)
                 except:
                     # Window was probably closed
@@ -475,11 +477,6 @@ class DataAnalyser():
                 xv_log = dtl.xv_log_raw
             else:
                 xv_log = dtl.xv_log
-            # # DEBUG RAW
-            # x_log = dtl.x_log_raw
-            # UAV_traj_log = dtl.UAV_traj_log_raw
-            # xb_log = dtl.xb_log_raw
-            # USV_traj_log = dtl.USV_traj_log_raw
 
             time_len = dtl.x_log.shape[1]-1
             dist_log = np.sqrt( np.square(x_log[0, 0:time_len] - xb_log[0, 0:time_len]) + \
