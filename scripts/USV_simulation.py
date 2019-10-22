@@ -213,8 +213,13 @@ class USV_simulator():
                 self.problemUSV.solve(self.xb, self.x_traj, self.USV_should_stop)
             elif self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
-                    xb0 = self.xb_traj_inner[self.INTER_ITS*self.nUSV\
-                        :(self.INTER_ITS+1)*self.nUSV]
+                    # We need to take elements from (self.INTER_ITS+1)*self.nUAV
+                    # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
+                    # is at this point still from iteration i-1. Since we want to predict
+                    # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
+                    # steps into the future
+                    xb0 = self.xb_traj_inner[(self.INTER_ITS+1)*self.nUSV\
+                        :(self.INTER_ITS+2)*self.nUSV]
                     traj = shift_trajectory(self.x_traj, self.nUAV, self.INTER_ITS)
                 else:
                     xb0 = self.xb

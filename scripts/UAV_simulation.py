@@ -256,8 +256,13 @@ class UAV_simulator():
                 self.problemUAV.solve(self.x, np.asarray(self.xb_traj))
             elif self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
-                    x0 = self.x_traj_inner[self.INTER_ITS*self.nUAV\
-                        :(self.INTER_ITS+1)*self.nUAV]
+                    # We need to take elements from (self.INTER_ITS+1)*self.nUAV
+                    # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
+                    # is at this point still from iteration i-1. Since we want to predict
+                    # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
+                    # steps into the future
+                    x0 = self.x_traj_inner[(self.INTER_ITS+1)*self.nUAV\
+                        :(self.INTER_ITS+2)*self.nUAV]
                     traj = shift_trajectory(self.xb_traj, self.nUSV, self.INTER_ITS)
                 else:
                     x0 = self.x
@@ -281,8 +286,13 @@ class UAV_simulator():
                     self.problemVert.solve(self.xv, 0.0, np.asarray(self.dist_traj))
                 elif self.PARALLEL and i % self.INTER_ITS == 0:
                     if self.PRED_PARALLEL_TRAJ:
-                        xv0 = self.xv_traj[self.INTER_ITS*self.nv:\
-                            (self.INTER_ITS+1)*self.nv]
+                        # We need to take elements from (self.INTER_ITS+1)*self.nUAV
+                        # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
+                        # is at this point still from iteration i-1. Since we want to predict
+                        # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
+                        # steps into the future
+                        xv0 = self.xv_traj[(self.INTER_ITS+1)*self.nv:\
+                            (self.INTER_ITS+2)*self.nv]
                         dist_traj = shift_trajectory(np.asarray(self.dist_traj),\
                             1, self.INTER_ITS)
                     else:

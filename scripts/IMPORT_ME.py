@@ -11,7 +11,7 @@ SAMPLING_RATE = 20              # Dynamics change if this changes
 SAMPLING_TIME = 1.0/SAMPLING_RATE
 ADD_DROPOUT = False # Should a communication loss between the vehicles be simulated?
 
-PRED_PARALLEL_TRAJ = False
+PRED_PARALLEL_TRAJ = True
 
 USE_COMPLETE_HORIZONTAL = False
 USE_COMPLETE_USV = False
