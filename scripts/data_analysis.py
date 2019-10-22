@@ -100,7 +100,7 @@ class DataAnalyser():
                 x_log = dtl.x_log_raw
                 UAV_traj_log = dtl.UAV_traj_log_raw
                 xb_log = dtl.xb_log_raw
-                USV_traj_log = dtl.xb_log_raw
+                USV_traj_log = dtl.USV_traj_log_raw
 
             if perspective != RAW:
                 xv_log = dtl.xv_log
@@ -206,7 +206,7 @@ class DataAnalyser():
                 x_log = dtl.x_log_raw
                 UAV_traj_log = dtl.UAV_traj_log_raw
                 xb_log = dtl.xb_log_raw
-                USV_traj_log = dtl.xb_log_raw
+                USV_traj_log = dtl.USV_traj_log_raw
 
             time_len = x_log.shape[1]-1
             if real_time:
@@ -469,7 +469,7 @@ class DataAnalyser():
                 x_log = dtl.x_log_raw
                 UAV_traj_log = dtl.UAV_traj_log_raw
                 xb_log = dtl.xb_log_raw
-                USV_traj_log = dtl.xb_log_raw
+                USV_traj_log = dtl.USV_traj_log_raw
             # # DEBUG RAW
             # x_log = dtl.x_log_raw
             # UAV_traj_log = dtl.UAV_traj_log_raw
