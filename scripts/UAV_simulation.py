@@ -256,13 +256,25 @@ class UAV_simulator():
                 self.problemUAV.solve(self.x, np.asarray(self.xb_traj))
             elif self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
-                    # We need to take elements from (self.INTER_ITS+1)*self.nUAV
-                    # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
-                    # is at this point still from iteration i-1. Since we want to predict
-                    # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
-                    # steps into the future
-                    x0 = self.x_traj_inner[(self.INTER_ITS+1)*self.nUAV\
-                        :(self.INTER_ITS+2)*self.nUAV]
+                    if i <= self.INTER_ITS:
+                        # Up until and including i == INTER_ITS, the inner trajectory
+                        # will here only track the initial outer trajectory,
+                        # which is stationary at the origin. We know for a fact
+                        # that the UAV will NOT stay at the origin
+                        # for the iterations after i == INTER_ITS, so using the inner
+                        # trajectory for prediction at this point would be wrong.
+                        # We use instead the outer prediction, which at iteration
+                        # i == INTER_ITS will finally predict that the UAV will actually move
+                        x0 = self.x_traj[self.INTER_ITS*self.nUAV\
+                            :(self.INTER_ITS+1)*self.nUAV]
+                    else:
+                        # We need to take elements from (self.INTER_ITS+1)*self.nUAV
+                        # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
+                        # is at this point still from iteration i-1. Since we want to predict
+                        # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
+                        # steps into the future
+                        x0 = self.x_traj_inner[(self.INTER_ITS+1)*self.nUAV\
+                            :(self.INTER_ITS+2)*self.nUAV]
                     traj = shift_trajectory(self.xb_traj, self.nUSV, self.INTER_ITS)
                 else:
                     x0 = self.x
@@ -286,13 +298,25 @@ class UAV_simulator():
                     self.problemVert.solve(self.xv, 0.0, np.asarray(self.dist_traj))
                 elif self.PARALLEL and i % self.INTER_ITS == 0:
                     if self.PRED_PARALLEL_TRAJ:
-                        # We need to take elements from (self.INTER_ITS+1)*self.nUAV
-                        # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
-                        # is at this point still from iteration i-1. Since we want to predict
-                        # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
-                        # steps into the future
-                        xv0 = self.xv_traj[(self.INTER_ITS+1)*self.nv:\
-                            (self.INTER_ITS+2)*self.nv]
+                        if i <= self.INTER_ITS:
+                            # Up until and including i == INTER_ITS, the inner trajectory
+                            # will here only track the initial outer trajectory,
+                            # which is stationary at the origin. We know for a fact
+                            # that the UAV will NOT stay at the origin
+                            # for the iterations after i == INTER_ITS, so using the inner
+                            # trajectory for prediction at this point would be wrong.
+                            # We use instead the outer prediction, which at iteration
+                            # i == INTER_ITS will finally predict that the UAV will actually move
+                            xv0 = self.xv_traj[self.INTER_ITS*self.nv:\
+                                (self.INTER_ITS+1)*self.nv]
+                        else:
+                            # We need to take elements from (self.INTER_ITS+1)*self.nUAV
+                            # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
+                            # is at this point still from iteration i-1. Since we want to predict
+                            # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
+                            # steps into the future
+                            xv0 = self.xv_traj_inner[(self.INTER_ITS+1)*self.nv:\
+                                (self.INTER_ITS+2)*self.nv]
                         dist_traj = shift_trajectory(np.asarray(self.dist_traj),\
                             1, self.INTER_ITS)
                     else:
