@@ -53,6 +53,7 @@ class UAV_simulator():
         self.ADD_DROPOUT = pp.ADD_DROPOUT
         self.PRED_PARALLEL_TRAJ = pp.PRED_PARALLEL_TRAJ
         self.SHOULD_SHIFT_MESSAGES = pp.SHOULD_SHIFT_MESSAGES
+        self.SOLVE_PARALLEL_AT_END = pp.SOLVE_PARALLEL_AT_END
         self.dropout_lower_bound = pp.dropout_lower_bound
         self.dropout_upper_bound = pp.dropout_upper_bound
         self.long_ref = None
@@ -87,10 +88,6 @@ class UAV_simulator():
         self.x = np.full((self.nUAV, 1), np.nan)
         self.xv = np.full((self.nv, 1), np.nan)
         self.xv.fill(np.nan)
-
-        #DEBUG
-        if self.PARALLEL:
-            self.last_pred_x = np.zeros((self.nUAV, 1))
 
         # --------------------------- ROS SETUP ----------------------------------
         # rospy.init_node('UAV_main')
@@ -254,7 +251,7 @@ class UAV_simulator():
             elif self.DISTRIBUTED:
                 # TODO: Make xb_traj naturally an array instead of a matrix
                 self.problemUAV.solve(self.x, np.asarray(self.xb_traj))
-            elif self.PARALLEL and i % self.INTER_ITS == 0:
+            elif self.PARALLEL and i % self.INTER_ITS == 0 and not self.SOLVE_PARALLEL_AT_END:
                 if self.PRED_PARALLEL_TRAJ:
                     if i <= self.INTER_ITS:
                         # Up until and including i == INTER_ITS, the inner trajectory
@@ -279,9 +276,7 @@ class UAV_simulator():
                 else:
                     x0 = self.x
                     traj = self.xb_traj
-                # print "PRED DIST ERROR:", np.sqrt( (x0[0, 0] - self.last_pred_x[0, 0])**2 + (x0[1, 0] - self.last_pred_x[1, 0])**2)
                 self.problemUAV.solve_in_parallel(x0, traj)
-                self.last_pred_x = x0
 
             self.update_hor_trajectories(i)
 
@@ -290,13 +285,27 @@ class UAV_simulator():
                     self.x_traj[0:(self.T_inner+1)*self.nUAV])
                 self.x_traj_inner = self.problemUAVFast.x.value
 
+            if self.PARALLEL and self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
+                if self.PRED_PARALLEL_TRAJ:
+                    if i <= self.INTER_ITS:
+                        x0 = self.x_traj[self.INTER_ITS*self.nUAV\
+                            :(self.INTER_ITS+1)*self.nUAV]
+                    else:
+                        x0 = self.x_traj_inner[self.INTER_ITS*self.nUAV\
+                            :(self.INTER_ITS+1)*self.nUAV]
+                    traj = shift_trajectory(self.xb_traj, self.nUSV, self.INTER_ITS)
+                else:
+                    x0 = self.x
+                    traj = self.xb_traj
+                self.problemUAV.solve_in_parallel(x0, traj)
+
             (self.uUAV, self.uUSV) = self.get_horizontal_control()
             # ------- Vertical Problem --------
             if self.dist_traj is not None:
                 if not self.PARALLEL:
                     # TODO: Make dist_traj naturally be an array instead of a matrix
                     self.problemVert.solve(self.xv, 0.0, np.asarray(self.dist_traj))
-                elif self.PARALLEL and i % self.INTER_ITS == 0:
+                elif self.PARALLEL and not self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
                     if self.PRED_PARALLEL_TRAJ:
                         if i <= self.INTER_ITS:
                             # Up until and including i == INTER_ITS, the inner trajectory
@@ -332,6 +341,23 @@ class UAV_simulator():
                 self.problemVertFast.solve(self.xv[0:(self.T_inner+1)*self.nv],
                     self.xv_traj[0:(self.T_inner+1)*self.nv, 0:1])
                 self.xv_traj_inner = self.problemVertFast.xv.value
+
+            if self.PARALLEL and self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
+                if self.PRED_PARALLEL_TRAJ:
+                    if i <= self.INTER_ITS:
+                        xv0 = self.xv_traj[self.INTER_ITS*self.nv:\
+                            (self.INTER_ITS+1)*self.nv]
+                    else:
+                        xv0 = self.xv_traj_inner[self.INTER_ITS*self.nv:\
+                            (self.INTER_ITS+1)*self.nv]
+                    dist_traj = shift_trajectory(np.asarray(self.dist_traj),\
+                        1, self.INTER_ITS)
+                else:
+                    xv0 = self.xv
+                    dist_traj = np.asarray(self.dist_traj)
+                # TODO: Make dist_traj nartually an array instead of matrix
+                self.problemVert.solve_in_parallel(xv0, 0.0,\
+                    dist_traj)
 
             self.wdes = self.get_vertical_control()
             self.update_logs(self.i)

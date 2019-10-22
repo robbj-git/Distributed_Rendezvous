@@ -55,6 +55,7 @@ class USV_simulator():
         self.PRED_PARALLEL_TRAJ = pp.PRED_PARALLEL_TRAJ
         self.SHOULD_SHIFT_MESSAGES = pp.SHOULD_SHIFT_MESSAGES
         self.USE_COMPLETE_USV = pp.USE_COMPLETE_USV
+        self.SOLVE_PARALLEL_AT_END = pp.SOLVE_PARALLEL_AT_END
         self.dropout_lower_bound = pp.dropout_lower_bound
         self.dropout_upper_bound = pp.dropout_upper_bound
         self.USV_stopped_at_iter = np.nan
@@ -211,7 +212,7 @@ class USV_simulator():
             # ------- Solving Problem --------
             if self.DISTRIBUTED:
                 self.problemUSV.solve(self.xb, self.x_traj, self.USV_should_stop)
-            elif self.PARALLEL and i % self.INTER_ITS == 0:
+            elif self.PARALLEL and not self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
                     if i <= self.INTER_ITS:
                         # Up until and including i == INTER_ITS, the inner trajectory
@@ -247,6 +248,34 @@ class USV_simulator():
                 self.problemUSVFast.solve(self.xb[0:(self.T_inner+1)*self.nUSV],\
                     self.xb_traj[0:(self.T_inner+1)*self.nUAV])
                 self.xb_traj_inner = self.problemUSVFast.xb.value
+
+            if self.PARALLEL and self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
+                if self.PRED_PARALLEL_TRAJ:
+                    if i <= self.INTER_ITS:
+                        # Up until and including i == INTER_ITS, the inner trajectory
+                        # will here only track the initial outer trajectory,
+                        # which is stationary at the origin. We know for a fact
+                        # that the UAV will NOT stay at the origin
+                        # for the iterations after i == INTER_ITS, so using the inner
+                        # trajectory for prediction at this point would be wrong.
+                        # We use instead the outer prediction, which at iteration
+                        # i == INTER_ITS will finally predict that the USV will actually move
+                        xb0 = self.xb_traj[self.INTER_ITS*self.nUSV:\
+                            (self.INTER_ITS+1)*self.nUSV]
+                    else:
+                        # We need to take elements from (self.INTER_ITS+1)*self.nUAV
+                        # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
+                        # is at this point still from iteration i-1. Since we want to predict
+                        # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
+                        # steps into the future
+                        xb0 = self.xb_traj_inner[(self.INTER_ITS+1)*self.nUSV\
+                            :(self.INTER_ITS+2)*self.nUSV]
+                    traj = shift_trajectory(self.x_traj, self.nUAV, self.INTER_ITS)
+                else:
+                    xb0 = self.xb
+                    traj = self.x_traj
+                self.problemUSV.solve_in_parallel(xb0, traj,\
+                    self.USV_should_stop)
 
             (self.uUSV) = self.get_control()
 

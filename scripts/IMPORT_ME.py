@@ -16,6 +16,8 @@ PRED_PARALLEL_TRAJ = True
 USE_COMPLETE_HORIZONTAL = False
 USE_COMPLETE_USV = False
 
+SOLVE_PARALLEL_AT_END = True
+
 dropout_lower_bound = 80    # Iteration index at which communication loss should start
 dropout_upper_bound = 130   # Iteration index at which communication loss should end
 

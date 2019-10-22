@@ -109,6 +109,7 @@ class ProblemParams():
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
         self.PRED_PARALLEL_TRAJ = PRED_PARALLEL_TRAJ
+        self.SOLVE_PARALLEL_AT_END = SOLVE_PARALLEL_AT_END
         self.SHOULD_SHIFT_MESSAGES = SHOULD_SHIFT_MESSAGES
         self.dropout_lower_bound = dropout_lower_bound
         self.dropout_upper_bound = dropout_upper_bound
