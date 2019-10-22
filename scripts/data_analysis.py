@@ -470,6 +470,11 @@ class DataAnalyser():
                 UAV_traj_log = dtl.UAV_traj_log_raw
                 xb_log = dtl.xb_log_raw
                 USV_traj_log = dtl.USV_traj_log_raw
+
+            if perspective == RAW:
+                xv_log = dtl.xv_log_raw
+            else:
+                xv_log = dtl.xv_log
             # # DEBUG RAW
             # x_log = dtl.x_log_raw
             # UAV_traj_log = dtl.UAV_traj_log_raw
@@ -523,7 +528,7 @@ class DataAnalyser():
                 # TODO: When perspective is ACTUAL, you should use true future trajectory
                 # instead of predicted future trajectories, no? Naah, would only work if you did that only
                 # for horizontal, and kept predicted for vertical. There seems to be no point to it really
-                ax.plot(dist_log[0:t+1], dtl.xv_log[0, 0:t+1], 'blue')
+                ax.plot(dist_log[0:t+1], xv_log[0, 0:t+1], 'blue')
                 ax.plot(dist_pred_log, vert_pred_log, 'green', alpha=0.5)
                 if self.file_types[file_index] == PARALLEL:
                     ax.plot(dist_inner_pred_log, vert_inner_pred_log, 'yellow', alpha=0.5)
