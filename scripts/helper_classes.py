@@ -134,12 +134,13 @@ class StampedTrajQueue():
         else:
             self.traj_msg = new_traj_msg
             return_array = np.reshape(self.traj_msg.array.data, (-1, 1))
-            if self.should_shift:
-                d = int(np.floor((rospy.Time.now() - msg_candidate.header.stamp).to_sec()/SAMPLING_TIME))
-                print "shifted", d
-                return shift_trajectory(return_array, 4, d)   # TODO: Somehow get hold of variable nUAV so that you don't have to hard-code 4
-            else:
-                return return_array
+            # if self.should_shift:
+            #     d = int(np.floor((rospy.Time.now() - msg_candidate.header.stamp).to_sec()/SAMPLING_TIME))
+            #     print "shifted", d
+            #     return shift_trajectory(return_array, 4, d)   # TODO: Somehow get hold of variable nUAV so that you don't have to hard-code 4
+            # else:
+                # return return_array
+            return return_array
 
     def put_traj(self, traj_msg):
         if self.traj_queue.full():

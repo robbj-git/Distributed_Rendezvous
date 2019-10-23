@@ -214,6 +214,11 @@ class DataAnalyser():
                 UAV_traj_log = dtl.UAV_traj_log_raw
                 xb_log = dtl.xb_log_raw
                 USV_traj_log = dtl.USV_traj_log_raw
+
+                # DEBUG
+                UAV_traj_log_USV = dtl.UAV_traj_log_USV_raw
+                USV_traj_log_UAV = dtl.USV_traj_log_UAV_raw
+
             if perspective == RAW_UAV:
                 x_log = dtl.x_log_raw
                 UAV_traj_log = dtl.UAV_traj_log_raw
@@ -226,6 +231,9 @@ class DataAnalyser():
             else:
                 time = [time_len-1]
 
+            black_star_x = 0
+            black_star_y = 0
+
             for t in time:
                 ax.cla()
                 # ax.set_xlim([-1,1])
@@ -234,6 +242,11 @@ class DataAnalyser():
                 y_pred_traj = UAV_traj_log[1::dtl.nUAV, t]
                 xb_pred_traj = USV_traj_log[0::dtl.nUSV, t]
                 yb_pred_traj = USV_traj_log[1::dtl.nUSV, t]
+                # DEBUG
+                # x_pred_traj_USV = UAV_traj_log_USV[0::dtl.nUAV, t]
+                # y_pred_traj_USV = UAV_traj_log_USV[1::dtl.nUAV, t]
+                # xb_pred_traj_UAV = USV_traj_log_UAV[0::dtl.nUAV, t]
+                # yb_pred_traj_UAV = USV_traj_log_UAV[1::dtl.nUAV, t]
 
                 if perspective != RAW and self.file_types[file_index] == PARALLEL:
                     x_inner_pred_traj = dtl.UAV_inner_traj_log[0::dtl.nUAV, t]
@@ -246,10 +259,10 @@ class DataAnalyser():
                     xb_inner_pred_traj = dtl.USV_inner_traj_log_raw[0::dtl.nUSV, t]
                     yb_inner_pred_traj = dtl.USV_inner_traj_log_raw[1::dtl.nUSV, t]
 
+
                 # Actual trajectories
                 ax.plot(x_log[0, t], x_log[1, t], 'bx')
                 ax.plot(xb_log[0, t], xb_log[1, t], 'rx')
-                # print "STATE DFIF", x_log[:, t] - xb_log[:, t]
                 if dtl.nUSV == 6:
                     ax.arrow(xb_log[0, t], xb_log[1,t], np.cos(xb_log[4, t]), np.sin(xb_log[4, t]))
                     speed = np.sqrt(xb_log[2, t]**2 + xb_log[3, t]**2)
@@ -260,12 +273,17 @@ class DataAnalyser():
                 # Predicted trajectories
                 ax.plot(x_pred_traj, y_pred_traj, 'b.', alpha=0.4)
                 ax.plot(xb_pred_traj, yb_pred_traj, 'r.', alpha=0.4)
+                # ax.plot(x_pred_traj_USV, y_pred_traj_USV, 'k.', alpha=0.1)  # DEBUG
+                # ax.plot(xb_pred_traj_UAV, yb_pred_traj_UAV, 'k.', alpha=0.1)  # DEBUG
 
                 if self.file_types[file_index] == PARALLEL:
                     ax.plot(x_inner_pred_traj, y_inner_pred_traj, 'g*', alpha=0.4)
                     ax.plot(xb_inner_pred_traj, yb_inner_pred_traj, 'y*', alpha=0.4)
-
-                # print "DIFF:",x_pred_traj[0:5]-x_inner_pred_traj[0:5]
+                    # DEBUG
+                    # if t%5 == 0:
+                    #     black_star_x = xb_inner_pred_traj[5]
+                    #     black_star_y = yb_inner_pred_traj[5]
+                    # ax.plot(black_star_x, black_star_y, 'k*', alpha=1)
 
                 plt.xlabel('x-position [m]')
                 plt.ylabel('y-position [m]')
@@ -278,12 +296,14 @@ class DataAnalyser():
                 # plt.yticks(np.arange(0, 50, 1))
                 # plt.gca().set_aspect('equal', adjustable='box')
                 try:
-                    # ax.set_xlim([4, 8])
-                    # ax.set_ylim([-8, -4])
-                    # ax.set_xlim([0, 12])
-                    # ax.set_ylim([-12, 0])
-                    plt.pause(0.05)
-                except:
+                    # ax.set_xlim([2, 6])
+                    # ax.set_ylim([-6, -2])
+                    ax.set_xlim([0, 12])
+                    ax.set_ylim([-20, 0])
+                    plt.pause(0.5)
+                    # raw_input()
+                except Exception as e:
+                    # print e
                     # Window was probably closed
                     return
                 if self.should_close:   # Window was closed
@@ -1309,10 +1329,10 @@ if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
     # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
-    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_topview(real_time = True, perspective = RAW)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)

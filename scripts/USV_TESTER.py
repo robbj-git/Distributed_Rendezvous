@@ -117,7 +117,7 @@ class ProblemParams():
 problem_params = ProblemParams()
 
 # -2, 1
-xb_m = np.array([[5], [-5], [np.nan], [np.nan]])
+xb_m = np.array([[3], [-3], [np.nan], [np.nan]])
 if USE_COMPLETE_USV and DISTRIBUTED:
     xb_m = np.block([[xb_m], [np.zeros((2, 1))]])
 

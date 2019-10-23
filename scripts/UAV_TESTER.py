@@ -34,8 +34,8 @@ lookahead = 0   # Only for parallel. TODO: Move to IMPORT_ME.py???
 global USV_test_round, USV_has_stored_data, USV_time, UAV_time
 USV_test_round = np.inf
 USV_has_stored_data = 0
-UAV_time = np.nan
-USV_time = np.nan
+UAV_time = None
+USV_time = None
 
 def USV_test_round_callback(msg):
     global USV_test_round
@@ -130,7 +130,7 @@ my_uav_simulator =  None
 # sure that the xb below matches the initial state of the USV in USV_TESTER.py
 # xb = None
 #-2, 1
-xb = np.array([[-5], [4], [np.nan], [np.nan]])
+xb = np.array([[3], [-3], [np.nan], [np.nan]])
 if xb is not None and CENTRALISED:
     reverse_dir = False
     dir = get_travel_dir(xb, reverse_dir)
@@ -199,6 +199,14 @@ for N in range(hor_max, hor_min-1, -1):
         # We deinitialise here because hopefully old messages have stopped arriving by now
         my_uav_simulator.deinitialise()
     prev_simulator = my_uav_simulator
+
+    # while UAV_time is None:
+    #     if rospy.is_shutdown():
+    #         break
+    #     if random.randint(1, 101) == 100:
+    #         print "Waiting in time loop"
+    #     time.sleep(0.01)
+
     my_uav_simulator = UAV_simulator(problem_params, travel_dir = dir)
 
     # Makes sure that UAV receives info about round being -1 before the round changes to 0
@@ -324,7 +332,11 @@ if not cancelled:
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_MEAN.csv', vert_mean_list, delimiter=',')
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_MEDIAN.csv', vert_median_list, delimiter=',')
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/LANDING_TIMES.csv', landing_list, delimiter=',')
-    time_str = str((UAV_time - USV_time).secs) + "\n" + str((UAV_time - USV_time).nsecs)
+    try:
+        time_str = str((UAV_time - USV_time).secs) + "\n" + str((UAV_time - USV_time).nsecs)
+    except:
+        print "Failed to store time difference between vehicles"
+        time_str = "nan\nnan"
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/time_diff.txt', [time_str], fmt="%s")
 
     if PARALLEL:

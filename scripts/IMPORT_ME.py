@@ -18,6 +18,8 @@ USE_COMPLETE_USV = False
 
 SOLVE_PARALLEL_AT_END = True
 
+SHOULD_SHIFT_MESSAGES = True
+
 dropout_lower_bound = 80    # Iteration index at which communication loss should start
 dropout_upper_bound = 130   # Iteration index at which communication loss should end
 
@@ -38,8 +40,6 @@ INTER_ITS = 5  # Number of iteration between each solution of the parallel optim
 # Instructions
 NEXT_HORIZON = 0
 FOUND_HORIZON = 1
-
-SHOULD_SHIFT_MESSAGES = False
 
 # Simulated minimum delay between a sent and received message
 delay_time = 0.75   # Measured in seconds

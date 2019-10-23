@@ -188,10 +188,16 @@ class USV_simulator():
                             [uUSV_msg.accel.linear.y]])
                     except IndexError:
                         self.uUSV = np.zeros((self.mUSV, 1))
-                elif self.DISTRIBUTED or \
-                    (self.PARALLEL and i % self.INTER_ITS == 0):
+                elif self.DISTRIBUTED or self.PARALLEL:
+                    # (self.PARALLEL and i % self.INTER_ITS == 0):
                     try:
                         self.x_traj = self.UAVApprox.get_traj()
+                        if self.SHOULD_SHIFT_MESSAGES:
+                            # Trajectory is sent at the end of the USV iteration,
+                            # so if we assume that the vehicles' iterations
+                            # are synchronised, the message won't be received
+                            # until the iteration after being sent
+                            self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
                     except IndexError:
                         # Use shifted old trajectory if no new trajectory is available
                         self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
@@ -199,6 +205,7 @@ class USV_simulator():
             if self.PARALLEL and i%self.INTER_ITS == 0 and i > 0:
                 self.update_parallel_trajectories()
                 self.send_traj_to_UAV(self.xb_traj)
+                # print i, "xb0", self.xb_traj[0, 0]
 
             # TODO: Make this togglable from IMPORT_ME
             # # Make the USV stop once the vehicles are within safe landing distance
@@ -233,6 +240,7 @@ class USV_simulator():
                         # steps into the future
                         xb0 = self.xb_traj_inner[(self.INTER_ITS+1)*self.nUSV\
                             :(self.INTER_ITS+2)*self.nUSV]
+                    # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
                     traj = shift_trajectory(self.x_traj, self.nUAV, self.INTER_ITS)
                 else:
                     xb0 = self.xb
@@ -268,8 +276,9 @@ class USV_simulator():
                         # is at this point still from iteration i-1. Since we want to predict
                         # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
                         # steps into the future
-                        xb0 = self.xb_traj_inner[(self.INTER_ITS+1)*self.nUSV\
-                            :(self.INTER_ITS+2)*self.nUSV]
+                        xb0 = self.xb_traj_inner[self.INTER_ITS*self.nUSV\
+                            :(self.INTER_ITS+1)*self.nUSV]
+                    # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
                     traj = shift_trajectory(self.x_traj, self.nUAV, self.INTER_ITS)
                 else:
                     xb0 = self.xb

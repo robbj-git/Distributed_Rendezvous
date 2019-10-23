@@ -230,10 +230,16 @@ class UAV_simulator():
                     except IndexError:
                         # Leave self.xb unchanged
                         pass
-                elif self.DISTRIBUTED or \
-                    (self.PARALLEL and i % self.INTER_ITS == 0):
+                elif self.DISTRIBUTED or self.PARALLEL:
+                    # (self.PARALLEL and i % self.INTER_ITS == 0):
                     try:
                         self.xb_traj = self.USVApprox.get_traj()
+                        if self.SHOULD_SHIFT_MESSAGES:
+                            # Trajectory is sent at the end of the USV iteration,
+                            # so if we assume that the vehicles' iterations
+                            # are synchronised, the message won't be received
+                            # until the iteration after being sent
+                            self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
                     except IndexError:
                         # Use shifted old trajectory if no new trajectory is available
                         self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
@@ -272,6 +278,7 @@ class UAV_simulator():
                         # steps into the future
                         x0 = self.x_traj_inner[(self.INTER_ITS+1)*self.nUAV\
                             :(self.INTER_ITS+2)*self.nUAV]
+                    # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
                     traj = shift_trajectory(self.xb_traj, self.nUSV, self.INTER_ITS)
                 else:
                     x0 = self.x
@@ -293,6 +300,7 @@ class UAV_simulator():
                     else:
                         x0 = self.x_traj_inner[self.INTER_ITS*self.nUAV\
                             :(self.INTER_ITS+1)*self.nUAV]
+                    # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
                     traj = shift_trajectory(self.xb_traj, self.nUSV, self.INTER_ITS)
                 else:
                     x0 = self.x
@@ -424,7 +432,7 @@ class UAV_simulator():
         elif self.PARALLEL:
             if self.i%self.INTER_ITS != 0:
                 self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
-                self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
+                # self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
 
         self.dist_traj = get_dist_traj(self.x_traj, self.xb_traj, self.T, \
             self.nUAV, self.nUSV)
