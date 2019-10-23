@@ -27,6 +27,7 @@ ACTUAL = 0
 UAV = 1
 USV = 2
 RAW = 3
+RAW_UAV = 4
 
 # green_like = '#404788'
 # orange_like = '#DCE319'
@@ -101,6 +102,12 @@ class DataAnalyser():
                 UAV_traj_log = dtl.UAV_traj_log_raw
                 xb_log = dtl.xb_log_raw
                 USV_traj_log = dtl.USV_traj_log_raw
+            if perspective == RAW_UAV:
+                x_log = dtl.x_log_raw
+                UAV_traj_log = dtl.UAV_traj_log_raw
+                USV_traj_log = dtl.USV_traj_log_UAV_raw
+                xb_log = USV_traj_log[0:dtl.nUSV, :]
+
 
             if perspective != RAW:
                 xv_log = dtl.xv_log
@@ -207,6 +214,11 @@ class DataAnalyser():
                 UAV_traj_log = dtl.UAV_traj_log_raw
                 xb_log = dtl.xb_log_raw
                 USV_traj_log = dtl.USV_traj_log_raw
+            if perspective == RAW_UAV:
+                x_log = dtl.x_log_raw
+                UAV_traj_log = dtl.UAV_traj_log_raw
+                USV_traj_log = dtl.USV_traj_log_UAV_raw
+                xb_log = USV_traj_log[0:dtl.nUSV, :]
 
             time_len = x_log.shape[1]-1
             if real_time:
@@ -237,6 +249,7 @@ class DataAnalyser():
                 # Actual trajectories
                 ax.plot(x_log[0, t], x_log[1, t], 'bx')
                 ax.plot(xb_log[0, t], xb_log[1, t], 'rx')
+                # print "STATE DFIF", x_log[:, t] - xb_log[:, t]
                 if dtl.nUSV == 6:
                     ax.arrow(xb_log[0, t], xb_log[1,t], np.cos(xb_log[4, t]), np.sin(xb_log[4, t]))
                     speed = np.sqrt(xb_log[2, t]**2 + xb_log[3, t]**2)
@@ -245,12 +258,14 @@ class DataAnalyser():
                     print "Psi_des:", np.rad2deg(ub_log[1,t]), "Psi:", np.rad2deg(xb_log[4, t])
                     # ax.arrow(xb_log[0, t], xb_log[1,t], np.cos(ub_log[1,t]), np.sin(ub_log[1,t]), color='blue')
                 # Predicted trajectories
-                ax.plot(x_pred_traj, y_pred_traj, 'b', alpha=0.4)
-                ax.plot(xb_pred_traj, yb_pred_traj, 'r', alpha=0.4)
+                ax.plot(x_pred_traj, y_pred_traj, 'b.', alpha=0.4)
+                ax.plot(xb_pred_traj, yb_pred_traj, 'r.', alpha=0.4)
 
-                if self.file_types[file_index]:
-                    ax.plot(x_inner_pred_traj, y_inner_pred_traj, 'g', alpha=0.4)
-                    ax.plot(xb_inner_pred_traj, yb_inner_pred_traj, 'y', alpha=0.4)
+                if self.file_types[file_index] == PARALLEL:
+                    ax.plot(x_inner_pred_traj, y_inner_pred_traj, 'g*', alpha=0.4)
+                    ax.plot(xb_inner_pred_traj, yb_inner_pred_traj, 'y*', alpha=0.4)
+
+                # print "DIFF:",x_pred_traj[0:5]-x_inner_pred_traj[0:5]
 
                 plt.xlabel('x-position [m]')
                 plt.ylabel('y-position [m]')
@@ -263,6 +278,8 @@ class DataAnalyser():
                 # plt.yticks(np.arange(0, 50, 1))
                 # plt.gca().set_aspect('equal', adjustable='box')
                 try:
+                    # ax.set_xlim([4, 8])
+                    # ax.set_ylim([-8, -4])
                     # ax.set_xlim([0, 12])
                     # ax.set_ylim([-12, 0])
                     plt.pause(0.05)
@@ -472,6 +489,11 @@ class DataAnalyser():
                 UAV_traj_log = dtl.UAV_traj_log_raw
                 xb_log = dtl.xb_log_raw
                 USV_traj_log = dtl.USV_traj_log_raw
+            if perspective == RAW_UAV:
+                x_log = dtl.x_log_raw
+                UAV_traj_log = dtl.UAV_traj_log_raw
+                USV_traj_log = dtl.USV_traj_log_UAV_raw
+                xb_log = USV_traj_log[0:dtl.nUSV, :]
 
             if perspective == RAW:
                 xv_log = dtl.xv_log_raw
@@ -702,6 +724,11 @@ class DataAnalyser():
                 USV_traj_log = dtl.USV_traj_log_raw
                 x_log = dtl.x_log_raw
                 UAV_traj_log = dtl.UAV_traj_log_raw
+            if perspective == RAW_UAV:
+                x_log = dtl.x_log_raw
+                UAV_traj_log = dtl.UAV_traj_log_raw
+                USV_traj_log = dtl.USV_traj_log_UAV_raw
+                xb_log = USV_traj_log[0:dtl.nUSV, :]
 
             time_len = x_log.shape[1]-1
             dist_log = np.sqrt( np.square(x_log[0, 0:time_len] - xb_log[0, 0:time_len]) + \
@@ -815,6 +842,11 @@ class DataAnalyser():
             elif perspective == RAW:
                 xb_log = dtl.xb_log_raw
                 x_log = dtl.x_log_raw
+            elif perspective == RAW_UAV:
+                x_log = dtl.x_log_raw
+                USV_traj_log = dtl.USV_traj_log_UAV_raw     # WAIT!!!
+                xb_log = USV_traj_log[0:dtl.nUSV, :]
+
 
             time_len = x_log.shape[1]
 
@@ -1015,6 +1047,119 @@ class DataLoader:
         # plt.show()
         return
 
+    def __init__alt(self, dir_path, problem_type, data_types, perspective, raw, params):
+        # # self.debug_convert_txt_to_csv(dir_path, problem_type)
+        # # exit()
+        # p = params
+        # for data_type in data_types:
+        #
+        #     UAV_time_stamps = np.loadtxt(dir_path + '/UAV_time_stamps.csv', delimiter=',')
+        #     USV_time_stamps = np.loadtxt(dir_path + '/USV_time_stamps.csv', delimiter=',')
+        #     if USE_TIME_CORRECTION:
+        #         time_list = np.loadtxt(dir_path + '/TEST/time_diff.txt')
+        #         time_diff = time_list[0] + time_list[1]*0.000000001
+        #         UAV_time_stamps = UAV_time_stamps - time_diff
+        #     t_0 = np.minimum(UAV_time_stamps[0], USV_time_stamps[0])
+        #     t_f = np.maximum(UAV_time_stamps[-1], USV_time_stamps[-1]) - t_0
+        #     UAV_time_stamps = UAV_time_stamps - t_0
+        #     USV_time_stamps = USV_time_stamps - t_0
+        #     new_time_stamps = np.arange(0, t_f, 0.05)
+        #     self.new_time_stamps = new_time_stamps
+        #     print "Time span:", len(new_time_stamps), len(UAV_time_stamps), len(USV_time_stamps)    # DEBUG PRINT
+        #     print UAV_time_stamps[-1] - UAV_time_stamps[0]
+        #     print USV_time_stamps[-1] - USV_time_stamps[0]
+        #
+        #     if data_type == 'horizontal':
+        #         self.nUAV = self.x_log_raw.shape[0]
+        #         self.nUSV = self.xb_log_raw.shape[0]
+        #         if perspective == ACTUAL or perspective == UAV:
+        #             self.UAV_traj_log = np.loadtxt(dir_path + '/UAV_traj_log.csv', delimiter=',')
+        #             self.x_log  = np.loadtxt(dir_path + '/x_log.csv', delimiter=',')
+        #         if perspective == ACTUAL or perspective == USV:
+        #             self.USV_traj_log = np.loadtxt(dir_path + '/USV_traj_log.csv', delimiter=',')
+        #             self.xb_log = np.loadtxt(dir_path + '/xb_log.csv', delimiter=',')
+        #             # UPDATED ABOVE HERE, OLD BELOW HERE!!!
+        #         self.UAV_traj_log_raw = np.loadtxt(dir_path + '/UAV_traj_log.csv', delimiter=',')
+        #         self.USV_traj_log_raw = np.loadtxt(dir_path + '/USV_traj_log.csv', delimiter=',')
+        #         self.x_log_raw  = np.loadtxt(dir_path + '/x_log.csv', delimiter=',')
+        #         self.xb_log_raw = np.loadtxt(dir_path + '/xb_log.csv', delimiter=',')
+        #
+        #         self.UAV_traj_log = self.get_interpolated_traj(self.UAV_traj_log_raw, UAV_time_stamps, new_time_stamps)
+        #         if problem_type == CENTRALISED:
+        #             self.USV_traj_log = self.get_interpolated_traj(self.USV_traj_log_raw, UAV_time_stamps, new_time_stamps)
+        #         else:
+        #             self.USV_traj_log = self.get_interpolated_traj(self.USV_traj_log_raw, USV_time_stamps, new_time_stamps)
+        #         if problem_type != CENTRALISED:
+        #             self.USV_traj_log_UAV_raw = np.loadtxt(dir_path + '/UAV/USV_traj_log.csv', delimiter=',')
+        #             # if self.nUSV == 6:
+        #             #     self.USV_traj_log_raw = self.proj_6_to_4(self.USV_traj_log_raw)
+        #             self.UAV_traj_log_USV_raw = np.loadtxt(dir_path + '/USV/UAV_traj_log.csv', delimiter=',')
+        #             self.xb_log_UAV_raw = self.USV_traj_log_UAV_raw[0:self.nUSV, :]
+        #             self.x_log_USV_raw = self.UAV_traj_log_USV_raw[0:self.nUAV, :]
+        #             self.USV_traj_log_UAV = self.get_interpolated_traj(self.USV_traj_log_UAV_raw, UAV_time_stamps, new_time_stamps)
+        #             self.UAV_traj_log_USV = self.get_interpolated_traj(self.UAV_traj_log_USV_raw, USV_time_stamps, new_time_stamps)
+        #             self.xb_log_UAV = self.get_interpolated_traj(self.xb_log_UAV_raw, UAV_time_stamps, new_time_stamps)
+        #             self.x_log_USV = self.get_interpolated_traj(self.x_log_USV_raw, USV_time_stamps, new_time_stamps)
+        #         else:
+        #             # In centralised case, the only log of USV trajectories is already from the UAV's perspective
+        #             self.xb_log_UAV_raw = self.USV_traj_log_raw[0:self.nUSV, :]
+        #             self.xb_log_UAV = self.get_interpolated_traj(self.xb_log_UAV_raw, UAV_time_stamps, new_time_stamps)
+        #         self.x_log  = self.get_interpolated_traj(self.x_log_raw, UAV_time_stamps, new_time_stamps)
+        #         self.xb_log = self.get_interpolated_traj(self.xb_log_raw, USV_time_stamps, new_time_stamps)
+        #         self.u_log_raw = np.loadtxt(dir_path + '/uUAV_log.csv', delimiter=',')
+        #         self.ub_log_raw = np.loadtxt(dir_path + '/uUSV_log.csv', delimiter=',')
+        #         self.u_log  = self.get_interpolated_traj(self.u_log_raw, UAV_time_stamps, new_time_stamps)
+        #         self.ub_log = self.get_interpolated_traj(self.ub_log_raw, USV_time_stamps, new_time_stamps)
+        #
+        #         self.mUAV = self.u_log_raw.shape[0]
+        #         self.mUSV = self.ub_log_raw.shape[0]
+        #
+        #         if problem_type == PARALLEL:
+        #             self.UAV_inner_traj_log_raw = np.loadtxt(dir_path + '/UAV_inner_traj_log.csv', delimiter=',')
+        #             self.USV_inner_traj_log_raw = np.loadtxt(dir_path + '/USV_inner_traj_log.csv', delimiter=',')
+        #
+        #             self.UAV_inner_traj_log = self.get_interpolated_traj(self.UAV_inner_traj_log_raw, UAV_time_stamps, new_time_stamps)
+        #             self.USV_inner_traj_log = self.get_interpolated_traj(self.USV_inner_traj_log_raw, USV_time_stamps, new_time_stamps)
+        #     elif data_type == 'vertical':
+        #         self.xv_log_raw = np.loadtxt(dir_path + '/xv_log.csv', delimiter=',')
+        #         self.vert_traj_log_raw = np.loadtxt(dir_path + '/vert_traj_log.csv', delimiter=',')
+        #         self.s_vert_log_raw = np.loadtxt(dir_path + '/s_vert_log.csv', delimiter=',')
+        #
+        #         self.xv_log = self.get_interpolated_traj(self.xv_log_raw, UAV_time_stamps, new_time_stamps)
+        #         self.vert_traj_log = self.get_interpolated_traj(self.vert_traj_log_raw, UAV_time_stamps, new_time_stamps)
+        #         self.s_vert_log = self.get_adjusted_array(self.s_vert_log_raw, UAV_time_stamps, new_time_stamps)
+        #
+        #         self.nv = self.xv_log_raw.shape[0]
+        #
+        #         self.hb = self.get_USV_altitude(dir_path)
+        #
+        #         if problem_type == PARALLEL:
+        #             self.vert_inner_traj_log_raw = np.loadtxt(dir_path + '/vert_inner_traj_log.csv', delimiter=',')
+        #
+        #             self.vert_inner_traj_log = self.get_interpolated_traj(self.vert_inner_traj_log_raw, UAV_time_stamps, new_time_stamps)
+        #
+        #     elif data_type == 'time':
+        #         self.mean_iteration_UAV = np.loadtxt(dir_path + '/TEST/MEAN.csv', delimiter=',')
+        #         self.median_iteration = np.loadtxt(dir_path + '/TEST/MEDIAN.csv', delimiter=',')
+        #         self.mean_iteration_USV = np.loadtxt(dir_path + '/TEST/MEAN_USV.csv', delimiter=',')
+        #         self.median_iteration_USV = np.loadtxt(dir_path + '/TEST/MEDIAN_USV.csv', delimiter=',')
+        #         self.hor_mean_UAV = np.loadtxt(dir_path + '/TEST/HOR_MEAN.csv', delimiter=',')
+        #         self.hor_median_UAV = np.loadtxt(dir_path + '/TEST/HOR_MEDIAN.csv', delimiter=',')
+        #         self.vert_mean = np.loadtxt(dir_path + '/TEST/VERT_MEAN.csv', delimiter=',')
+        #         self.vert_median = np.loadtxt(dir_path + '/TEST/VERT_MEDIAN.csv', delimiter=',')
+        #         self.landing_times = np.loadtxt(dir_path + '/TEST/LANDING_TIMES.csv', delimiter=',')
+        #         if problem_type != CENTRALISED:
+        #             self.hor_mean_USV = np.loadtxt(dir_path + '/TEST/HOR_MEAN_USV.csv', delimiter=',')
+        #             self.hor_median_USV = np.loadtxt(dir_path + '/TEST/HOR_MEDIAN_USV.csv', delimiter=',')
+        #         if problem_type == PARALLEL:
+        #             self.hor_inner_mean_UAV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEAN.csv', delimiter=',')
+        #             self.hor_inner_median_UAV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEDIAN.csv', delimiter=',')
+        #             self.hor_inner_mean_USV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEAN_USV.csv', delimiter=',')
+        #             self.hor_inner_median_USV = np.loadtxt(dir_path + '/TEST/HOR_INNER_MEDIAN_USV.csv', delimiter=',')
+        #             self.vert_inner_mean = np.loadtxt(dir_path + '/TEST/VERT_INNER_MEAN.csv', delimiter=',')
+        #             self.vert_inner_median = np.loadtxt(dir_path + '/TEST/VERT_INNER_MEDIAN.csv', delimiter=',')
+        return
+
     def get_interpolated_traj(self, traj, old_times, new_times):
         # if new_times[0] < old_times[0] or new_times[0] > old_times[-1]:
         #     raise LookupError('New time stamps are non-overlapping with old time stamps')
@@ -1164,11 +1309,11 @@ if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
     # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
-    # data_analyser.plot_topview(real_time = True, perspective = RAW)
+    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    data_analyser.plot_with_constraints(real_time = True, perspective = RAW)
-    # data_analyser.plot_altitude(real_time = True, perspective = RAW)
+    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    # data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)

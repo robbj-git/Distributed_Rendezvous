@@ -1336,7 +1336,7 @@ class FastUAVProblem():
         # Cost Matrices
         self.Q_big  = np.kron(np.eye(T+1), self.Q)
         self.Q_big[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P  # Not double-checked
-        self.R_big  = np.kron(np.eye(T),   self.R)
+        self.R_big  = 0*np.kron(np.eye(T),   self.R)
 
         # Dynamics Matrices
         self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
@@ -1451,7 +1451,7 @@ class FastUSVProblem():
         self.Q_big  = np.kron(np.eye(T+1), self.Q)
         self.Q_big[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = self.P  # Not double-checked
         self.Q_big_sparse = csc_matrix(self.Q_big)
-        self.R_big  = np.kron(np.eye(T),   self.R)
+        self.R_big  = 0*np.kron(np.eye(T),   self.R)
 
         # Dynamics Matrices
         self.Phi_b = np.zeros(( (T+1)*nUSV, nUSV ))
@@ -1581,7 +1581,7 @@ class FastVerticalProblem():
         # Cost Matrices
         self.Qv_big = np.kron(np.eye(T+1), self.Qv)       # I haven't double-checked that this is correct
         self.Qv_big[-nv:(T+1)*nv, -nv:(T+1)*nv] = self.Pv
-        self.Rv_big = np.kron(np.eye(T),   self.Rv)
+        self.Rv_big = 0*np.kron(np.eye(T),   self.Rv)
 
         velocity_extractor = np.zeros(( T+1, nv*(T+1) ))
         for i in range(T+1):
