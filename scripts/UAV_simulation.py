@@ -155,12 +155,14 @@ class UAV_simulator():
 
         # Initial predicted UAV trajectory assumes no control signal applied
         if not self.CENTRALISED:
-            self.x_traj = self.problemUAV.predict_trajectory(x_0, \
-                np.zeros( (self.mUAV*self.T, 1) ))
+            self.u_traj = np.zeros( (self.mUAV*self.T, 1) )
+            self.x_traj = self.problemUAV.predict_trajectory(x_0, self.u_traj)
             self.problemUAV.x.value = self.x_traj
-        self.xv_traj = self.problemVert.predict_trajectory(xv_0, \
-            np.zeros( (self.mv*self.T, 1) )) # Always contains most up-to-date predicted vertical traj
+            self.problemUAV.u.value = self.u_traj
+        self.wdes_traj = np.zeros( (self.mv*self.T, 1) )
+        self.xv_traj = self.problemVert.predict_trajectory(xv_0, self.wdes_traj) # Always contains most up-to-date predicted vertical traj
         self.problemVert.xv.value = self.xv_traj
+        self.problemVert.wdes.value = self.wdes_traj
         self.xb_traj = None # Always contains most up-to-date USV predicted traj
         if self.PARALLEL:
             self.x_traj_inner = self.x_traj[:, 0:self.T_inner]
@@ -288,8 +290,9 @@ class UAV_simulator():
             self.update_hor_trajectories(i)
 
             if self.PARALLEL:
-                self.problemUAVFast.solve(self.x[0:(self.T_inner+1)*self.nUAV],\
-                    self.x_traj[0:(self.T_inner+1)*self.nUAV])
+                self.problemUAVFast.solve(self.x,\
+                    self.x_traj[0:(self.T_inner+1)*self.nUAV],
+                    self.u_traj[0:self.T_inner*self.mUAV])
                 self.x_traj_inner = self.problemUAVFast.x.value
 
             if self.PARALLEL and self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
@@ -346,8 +349,9 @@ class UAV_simulator():
             self.update_vert_trajectories()
 
             if self.PARALLEL:
-                self.problemVertFast.solve(self.xv[0:(self.T_inner+1)*self.nv],
-                    self.xv_traj[0:(self.T_inner+1)*self.nv, 0:1])
+                self.problemVertFast.solve(self.xv,
+                    self.xv_traj[0:(self.T_inner+1)*self.nv, 0:1],
+                    self.wdes_traj[0:self.T_inner*self.mv, 0:1])
                 self.xv_traj_inner = self.problemVertFast.xv.value
 
             if self.PARALLEL and self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
@@ -427,11 +431,15 @@ class UAV_simulator():
         if self.CENTRALISED:
             self.x_traj  = self.problemCent.x.value
             self.xb_traj = self.problemCent.xb.value
+            self.u_traj  = self.problemCent.u.value
+            self.ub_traj = self.problemCent.ub.value
         elif self.DISTRIBUTED:
             self.x_traj = self.problemUAV.x.value
+            self.u_traj = self.problemUAV.u.value
         elif self.PARALLEL:
             if self.i%self.INTER_ITS != 0:
                 self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
+                self.u_traj = shift_trajectory(self.u_traj, self.mUAV, 1)
                 # self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
 
         self.dist_traj = get_dist_traj(self.x_traj, self.xb_traj, self.T, \
@@ -443,20 +451,29 @@ class UAV_simulator():
     def update_vert_trajectories(self):
         if np.isnan(self.problemVert.xv.value).any():
             # Failed to solve vertical problem, rise up to a safe height
-            wdes_traj = np.full((self.T*self.mv, 1), self.params.wmax)
-            self.xv_traj = self.problemVert.predict_trajectory(self.xv, wdes_traj)
+            self.wdes_traj = np.full((self.T*self.mv, 1), self.params.wmax)
+            self.xv_traj = self.problemVert.predict_trajectory(self.xv, self.wdes_traj)
         else:
             if not self.PARALLEL:
                 self.xv_traj = self.problemVert.xv.value
+                self.wdes_traj = self.problemVert.wdes.value
             elif self.PARALLEL and self.i%self.INTER_ITS != 0:
                 self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
+                self.wdes_traj = shift_trajectory(self.wdes_traj, self.mv, 1)
 
     # Also stores solution duration of parallel problem
     def update_parallel_trajectories(self):
         self.problemUAV.end_process()
         self.problemVert.end_process()
         self.x_traj = self.problemUAV.x.value
-        self.xv_traj = self.problemVert.xv.value
+        self.u_traj = self.problemUAV.u.value
+        if np.isnan(self.problemVert.xv.value).any():
+            # Failed to solve vertical problem, rise up to a safe height
+            self.wdes_traj = np.full((self.T*self.mv, 1), self.params.wmax)
+            self.xv_traj = self.problemVert.predict_trajectory(self.xv, self.wdes_traj)
+        else:
+            self.wdes_traj = self.problemVert.wdes.value
+            self.xv_traj = self.problemVert.xv.value
         self.hor_solution_durations.append(self.problemUAV.last_solution_duration)
         self.vert_solution_durations.append(self.problemVert.last_solution_duration)
 

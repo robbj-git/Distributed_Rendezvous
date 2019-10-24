@@ -119,8 +119,8 @@ class USV_simulator():
             self.hor_inner_solution_durations = []
 
         # Initial predicted trajectory assumes no control signal applied
-        self.xb_traj = self.problemUSV.predict_trajectory(xb_0, \
-            np.zeros( (self.mUSV*self.T, 1) ))
+        self.ub_traj = np.zeros( (self.mUSV*self.T, 1) )
+        self.xb_traj = self.problemUSV.predict_trajectory(xb_0, self.ub_traj)
         self.problemUSV.xb.value = self.xb_traj
 
         if self.PARALLEL:
@@ -253,8 +253,9 @@ class USV_simulator():
                 self.update_trajectories()
 
             if self.PARALLEL:
-                self.problemUSVFast.solve(self.xb[0:(self.T_inner+1)*self.nUSV],\
-                    self.xb_traj[0:(self.T_inner+1)*self.nUAV])
+                self.problemUSVFast.solve(self.xb,
+                    self.xb_traj[0:(self.T_inner+1)*self.nUSV],
+                    self.ub_traj[0:self.T_inner*self.mUSV])
                 self.xb_traj_inner = self.problemUSVFast.xb.value
 
             if self.PARALLEL and self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
@@ -335,13 +336,16 @@ class USV_simulator():
             pass
         elif self.DISTRIBUTED:
             self.xb_traj = self.problemUSV.xb.value
+            self.ub_traj = self.problemUSV.ub.value
         elif self.PARALLEL:
             if self.i%self.INTER_ITS != 0:
                 self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
+                self.ub_traj = shift_trajectory(self.ub_traj, self.mUSV, 1)
 
     def update_parallel_trajectories(self):
         self.problemUSV.end_process()
         self.xb_traj = self.problemUSV.xb.value
+        self.ub_traj = self.problemUSV.ub.value
         if self.problemUSV.last_solution_duration is not None:
             self.hor_solution_durations.append(self.problemUSV.last_solution_duration)
 

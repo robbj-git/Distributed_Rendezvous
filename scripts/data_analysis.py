@@ -298,9 +298,9 @@ class DataAnalyser():
                 try:
                     # ax.set_xlim([2, 6])
                     # ax.set_ylim([-6, -2])
-                    ax.set_xlim([0, 12])
-                    ax.set_ylim([-20, 0])
-                    plt.pause(0.5)
+                    # ax.set_xlim([0, 12])
+                    # ax.set_ylim([-20, 0])
+                    plt.pause(0.05)
                     # raw_input()
                 except Exception as e:
                     # print e
@@ -1329,10 +1329,10 @@ if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
     # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
     # data_analyser.plot_3d_super_realtime()
-    data_analyser.plot_topview(real_time = True, perspective = RAW)
+    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_altitude(real_time = True, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
