@@ -130,7 +130,7 @@ my_uav_simulator =  None
 # sure that the xb below matches the initial state of the USV in USV_TESTER.py
 # xb = None
 #-2, 1
-xb = np.array([[3], [-3], [np.nan], [np.nan]])
+xb = np.array([[-3], [3], [np.nan], [np.nan]])
 if xb is not None and CENTRALISED:
     reverse_dir = False
     dir = get_travel_dir(xb, reverse_dir)

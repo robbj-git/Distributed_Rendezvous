@@ -117,13 +117,13 @@ class ProblemParams():
 problem_params = ProblemParams()
 
 # -2, 1
-xb_m = np.array([[3], [-3], [np.nan], [np.nan]])
+xb_m = np.array([[-3], [3], [np.nan], [np.nan]])
 if USE_COMPLETE_USV and DISTRIBUTED:
     xb_m = np.block([[xb_m], [np.zeros((2, 1))]])
 
 reverse_dir = False
 dir = get_travel_dir(xb_m, reverse_dir)
-xb_m[2:4] = dir
+xb_m[2:4] = np.zeros((2, 1))#dir
  # 5 and 0.8
 
 # TODO, REMOVE THIS, DO CALCULATIONS IN USV_SIMULATOR
