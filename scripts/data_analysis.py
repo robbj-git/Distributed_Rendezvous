@@ -575,6 +575,8 @@ class DataAnalyser():
                 plt.xlabel('horizontal distance [m]')
                 plt.ylabel('height [m]')
                 try:
+                    ax.set_xlim([0,5])
+                    ax.set_ylim([0,8])
                     plt.grid(True)
                     plt.pause(0.05)
                 except:

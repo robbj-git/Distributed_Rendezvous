@@ -65,7 +65,7 @@ class UAV_simulator():
         self.problemUAV = UAVProblem(pp.T, pp.A,  pp.B,  pp.Q, pp.P, pp.R,\
             pp.Q_vel, pp.P_vel, self.nUSV, pp.used_solver, pp.params)
         self.problemVert = VerticalProblem(pp.T, pp.Av, pp.Bv, pp.Qv, pp.Pv,\
-            pp.Rv, pp.vert_used_solver, pp.params, self.hb)
+            pp.Rv, pp.vert_used_solver, pp.params, self.hb, self.PARALLEL)
 
         self.problemUAVFast = FastUAVProblem(pp.T_inner, pp.A, pp.B, pp.Q, pp.P,\
             pp.R, self.used_solver, pp.params)

@@ -835,7 +835,7 @@ class USVProblem():
 
 class VerticalProblem():
 
-    def __init__(self, T, Av, Bv, Qv, Pv, Rv, type, params, hb = 0):
+    def __init__(self, T, Av, Bv, Qv, Pv, Rv, type, params, hb = 0, use_many_its = False):
         self.T = T
         self.Av = Av
         self.Bv = Bv
@@ -850,7 +850,7 @@ class VerticalProblem():
         # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
         self.create_optimisation_matrices(self.hb)
-        self.create_optimisation_problem()
+        self.create_optimisation_problem(use_many_its)
         self.durations = [] #DEBUG
         self.num_iters_log = [] #DEBUG
         self.obj_val = np.nan
@@ -933,8 +933,8 @@ class VerticalProblem():
         P_row = range(nv*(T+1) + mv*T + 1)
         P_col = range(nv*(T+1) + mv*T + 1)
         self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
-        xb = np.kron(np.ones((T+1, 1)), np.array([[hb], [0]]) )
-        self.q_OSQP = np.block([[-2*np.dot(self.Qv_big, xb)], [np.zeros((mv*T+1, 1))]])
+        self.xb_v = np.kron(np.ones((T+1, 1)), np.array([[hb], [0]]) )
+        self.q_OSQP = np.block([[-2*np.dot(self.Qv_big, self.xb_v)], [np.zeros((mv*T+1, 1))]])
         # Honestly, I can't quite remember wth I was doing here, remade it below
         # self.l_OSQP = np.bmat([[np.dot(self.Phi_v,np.zeros((nv, 1)))],\
         #     [np.full((4*(T+1), 1), -np.inf)],\
@@ -989,40 +989,40 @@ class VerticalProblem():
         # ])
         self.A_OSQP = csc_matrix(self.A_temp)
 
-    def create_optimisation_problem(self):
+    def create_optimisation_problem(self, use_many_its):
         T = self.T
         nv = self.nv
         params = self.params
         self.xv = cp.Variable(( nv*(T+1), 1 ))
         self.wdes = cp.Variable(( T, 1 ))
         self.s = cp.Variable((1, 1))
-        self.xb_v = cp.Parameter(( nv*(T+1), 1 ))
+        # self.xb_v = cp.Parameter(( nv*(T+1), 1 ))
         self.xv_0 = cp.Parameter(( nv, 1 ))
         self.dist = cp.Parameter(( T+1, 1 ))
         self.b  = cp.Parameter(( T+1,  1))  # True if within landing distance
         self.b2 = cp.Parameter(( nv*(T+1),  ))
 
-        safe_states_extractor = cp.diag( self.b2 )
-        self.safe_states_extractor = safe_states_extractor  #DEBUG
-        objectiveVert = cp.quad_form(self.wdes, self.Rv_big) +\
-            cp.quad_form(safe_states_extractor*(self.xv-self.xb_v), self.Qv_big)
-        # Dynamics constraint
-        constraintsVert = [self.xv == self.Phi_v*self.xv_0 \
-            + self.Lambda_v*self.wdes]
-        # Velocity constraints, above 0-constraint, and touchdown constraints
-        constraintsVert += [self.vert_constraints_matrix*self.xv \
-            <= self.vert_constraints_vector]
-        # Input constraints
-        constraintsVert += [params.wmin <= self.wdes, self.wdes <= params.wmax]
-
-        # Safety constraints
-        constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
-            <= cp.diag(self.b)*(params.hs*params.dl - params.hs*self.dist)]
+        # safe_states_extractor = cp.diag( self.b2 )
+        # self.safe_states_extractor = safe_states_extractor  #DEBUG
+        # objectiveVert = cp.quad_form(self.wdes, self.Rv_big) +\
+        #     cp.quad_form(safe_states_extractor*(self.xv-self.xb_v), self.Qv_big)
+        # # Dynamics constraint
+        # constraintsVert = [self.xv == self.Phi_v*self.xv_0 \
+        #     + self.Lambda_v*self.wdes]
+        # # Velocity constraints, above 0-constraint, and touchdown constraints
+        # constraintsVert += [self.vert_constraints_matrix*self.xv \
+        #     <= self.vert_constraints_vector]
+        # # Input constraints
+        # constraintsVert += [params.wmin <= self.wdes, self.wdes <= params.wmax]
+        #
+        # # Safety constraints
         # constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
-        #     <= cp.diag(self.b)*(params.hs*params.dl + params.hs*self.dist)]
-        # Safe height constraints
-        constraintsVert += [-self.height_extractor*self.xv \
-            <= -params.hs*(np.ones(( T+1, 1 )) - self.b)]
+        #     <= cp.diag(self.b)*(params.hs*params.dl - params.hs*self.dist)]
+        # # constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
+        # #     <= cp.diag(self.b)*(params.hs*params.dl + params.hs*self.dist)]
+        # # Safe height constraints
+        # constraintsVert += [-self.height_extractor*self.xv \
+        #     <= -params.hs*(np.ones(( T+1, 1 )) - self.b)]
 
         # # RIDICULOUS DEBUG!!!!
         # new_mat = np.bmat([[self.vert_constraints_matrix, np.zeros((4*(T+1),T))], \
@@ -1033,12 +1033,13 @@ class VerticalProblem():
         #     [-params.wmin*np.ones((T,1))]])
         # constraintsVert += [new_mat*cp.bmat([[self.xv],[self.wdes]]) <= new_vec]
 
-        self.problemVert = \
-            cp.Problem(cp.Minimize(objectiveVert), constraintsVert)
+        # self.problemVert = \
+        #     cp.Problem(cp.Minimize(objectiveVert), constraintsVert)
 
         # max_iter = 400 if self.PARALLEL else 200
         self.problemOSQP = osqp.OSQP()
-        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, q=self.q_OSQP, verbose=False, max_iter = 300)
+        its = 500 if use_many_its else 300
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, q=self.q_OSQP, verbose=False, max_iter = its)
 
     def ROS_init(self):
         if self.T == 100:
@@ -1094,7 +1095,6 @@ class VerticalProblem():
         # TODO: Rename xv_m to just xv, or xv_0?
         self.xv_0.value = xv_m
         # USV vertical state assumed constant
-        self.xb_v.value = np.ones((nv*(T+1), 1))*xbv_m
         self.dist.value = dist
         self.b.value = (dist <= self.params.ds).astype(int)
         # Each element in the binary vector is repeated twice,
@@ -1115,7 +1115,7 @@ class VerticalProblem():
                 (self.nv*(self.T+1), 1), order='F')
         elif self.type == 'OSQP':
             start = time.time()
-            self.update_OSQP(xv_m, dist, self.b.value, self.hb)
+            self.update_OSQP(xv_m, dist, self.b.value, self.xb_v)
             results = self.problemOSQP.solve()
             if results.x[0] is not None and results.info.status != 'maximum iterations reached':
                 self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
@@ -1142,40 +1142,6 @@ class VerticalProblem():
             duration = time.time() - start
             self.num_iters_log.append(results.info.iter)
             self.durations.append(duration)
-        else:   # self.type == 'CVXPY'
-            try:
-                start = time.time()
-                self.problemVert.solve(solver=cp.OSQP, warm_start=False, verbose=False, max_iter = 5000)
-                duration = time.time() - start
-                stats = self.problemVert.solver_stats
-                self.num_iters_log.append(stats.num_iters)
-                self.durations.append(duration)
-                # #DEBUG
-                # print "CONSTRAINT SATISFACTION CVXPY:"
-                # self.print_constraints_satisfied(self.xv.value, self.wdes.value)
-            except cp.error.SolverError as e:
-                print "Vertical problem:"
-                print e
-                # Using np.full() doesn't seem to work, since "variables must be
-                # real". Using this approach seems to circumvent that limitation
-                # np.zeros() is used instead of np.empty() since np.empty()
-                # sometimes contains non-real values, causing an exception
-                self.wdes.value = np.zeros((self.T, 1))
-                self.wdes.value.fill(np.nan)
-                self.xv.value = np.zeros( (self.nv*(self.T+1), 1))
-                self.xv.value.fill(np.nan)
-            # Exception is not thrown in problem was unbounded or infeasible
-            if self.problemVert.status == 'unbounded' or\
-                self.problemVert.status == 'infeasible':
-                print "Vertical problem: Problem was unbounded or infeasible"
-                # Using np.full() doesn't seem to work, since "variables must be
-                # real". Using this approach seems to circumvent that limitation
-                # np.zeros() is used instead of np.empty() since np.empty()
-                # sometimes contains non-real values, causing an exception
-                self.wdes.value = np.zeros((self.T, 1))
-                self.wdes.value.fill(np.nan)
-                self.xv.value = np.zeros( (self.nv*(self.T+1), 1))
-                self.xv.value.fill(np.nan)
 
         end = time.time()
         self.last_solution_duration = end - start
@@ -1183,6 +1149,7 @@ class VerticalProblem():
     def solve_process(self, conn):
         start = time.time()
         results = self.problemOSQP.solve()
+        xv = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
         if results.info.status == 'maximum iterations reached':
             results.x.fill(np.nan)
         end = time.time()
@@ -1210,10 +1177,10 @@ class VerticalProblem():
         self.last_solution_duration = duration
 
     def solve_in_parallel(self, xv_m, xbv_m, dist):
-        self.xb_v.value = np.ones((self.nv*(self.T+1), 1))*xbv_m
+        # self.xb_v.value = np.ones((self.nv*(self.T+1), 1))*xbv_m
         self.dist.value = dist
         self.b.value = (dist <= self.params.ds).astype(int)
-        self.update_OSQP(xv_m, dist, self.b.value, self.hb)
+        self.update_OSQP(xv_m, dist, self.b.value, self.xb_v)
         self.parent_conn, child_conn = Pipe()
         self.p = Process(target=self.solve_process, args=(child_conn,))
         self.p.start()
@@ -1224,11 +1191,12 @@ class VerticalProblem():
     def predict_trajectory(self, xv_0, wdes_traj):
         return np.dot(self.Phi_v, xv_0) + np.dot(self.Lambda_v, wdes_traj)
 
-    def update_OSQP(self, x0, dist_traj, binary_traj, hb):
+    def update_OSQP(self, x0, dist_traj, binary_traj, xb_v):
         params = self.params
         T = self.T
         b1 = np.diag(np.ravel(binary_traj))
         b2 = np.diag(np.ravel( np.kron( binary_traj, np.ones((self.nv, 1)))  ))
+        hb = xb_v[0, 0]
         # xb = np.kron(np.ones((T+1, 1)), np.array([[hb], [0]]) )
         self.l_OSQP[0:(T+1)*self.nv, 0] = np.dot(self.Phi_v, x0)    # Dynamics
         self.l_OSQP[(T+1)*(self.nv+2)+T:(T+1)*(self.nv+3)+T, 0] = \
@@ -1241,10 +1209,13 @@ class VerticalProblem():
             -np.dot(params.hs, np.dot(b1, dist_traj)) + \
                 np.full((T+1,1), params.hs*params.dl) + \
                 np.dot(b1, np.full((T+1, 1), (params.dl - params.ds)*hb) )     # Safety constraints
-        # self.q_OSQP[0:self.nv*(T+1)] = np.dot(self.Qv_big, 2*xb)  Altitude of USV not changing currently, so we don't have to change anything in update function
+        self.q_OSQP[0:(T+1)*self.nv, 0] = -2*np.dot(b2, np.dot(self.Qv_big, xb_v))
+        # [0:(T+1)*self.nUSV, 0]
+        # self.q_OSQP = np.block([[-2*np.dot(self.Qv_big, xb)], [np.zeros((mv*T+1, 1))]])
+
         self.P_temp[0:(T+1)*self.nv, 0:(T+1)*self.nv] = 2*np.dot(b2, self.Qv_big)
         P_data = np.diagonal(self.P_temp)
-        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP)
+        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
         self.problemOSQP.update(Px=P_data)
 
     # DEBUG: Checks if a solution satisfies all constraints
@@ -1704,6 +1675,7 @@ class FastVerticalProblem():
             start = time.time()
             self.update_OSQP(xv_m, xv_des_m, wdes_des)
             results = self.problemOSQP.solve()
+
             if results.x[0] is not None:
                 self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
                 self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):], (-1, 1))
