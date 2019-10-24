@@ -67,7 +67,7 @@ rospy.Subscriber('USV_time', Time, USV_time_callback)
 time.sleep(0.5) # Give time for subscribers to be created properly
 
 # Altitude of the USV, currently assumed constant, which is why it is set here
-hb = 1
+hb = 2
 
 class ProblemParams():
     def __init__(self):
