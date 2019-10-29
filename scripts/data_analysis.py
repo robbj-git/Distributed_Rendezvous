@@ -890,14 +890,35 @@ class DataAnalyser():
                 if has_landed and height_log[t] > 0:
                     break
 
+            dist_range = np.arange(min(dist_log[0:t]), max(dist_log[0:t]), step=0.1)
+            b_range = (dist_range < ds).astype(int)
+            vert_const_range = np.dot(np.diag(b_range), (hs*dl - hs*dist_range)/(dl - ds)) + np.dot(np.diag(1-b_range), np.full((len(dist_range), ), hs))
+
             if not os.path.isdir(dir_path+dir+'/Descent_Formated'):
                 os.mkdir(dir_path+dir+'/Descent_Formated')
 
+            print dist_log[0:t].shape, dist_range.shape
+
             new_mat = np.block([[dtl.new_time_stamps[0:t]], [height_log[0:t]], [vert_const_log[0:t]], [dx_log[0:t]], [dy_log[0:t]], [dist_log[0:t]]]).T
+            other_mat = np.block([[dist_range], [vert_const_range]]).T
             header = 'time,altitude,vertical constraint,dx,dy,distance'
+            other_header = 'distance range,vertical constraint range'
             np.savetxt(dir_path+dir+'/Descent_Formated/' + postfix + '.csv', new_mat, delimiter=',', header=header, comments='')
+            np.savetxt(dir_path+dir+'/Descent_Formated/' + postfix + '_ranges.csv', other_mat, delimiter=',', header=other_header, comments='')
 
     def store_formatted_durations(self):
+
+        # Find appropriate bin width
+        dataloaders = []
+        max_width = 0
+        for file_index, dir in enumerate(self.files):
+            dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['time'], self.p)
+            dataloaders.append(dtl)
+            data_width = max(dtl.mean_iteration_UAV) - min(dtl.mean_iteration_UAV)
+            max_width = max(data_width, max_width)
+
+        bin_width = max_width*0.1
+
         for file_index, dir in enumerate(self.files):
 
             if file_index == 0:
@@ -909,9 +930,13 @@ class DataAnalyser():
             else:
                 post_fix = str(file_index)
 
-            dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['time'], self.p)
+            # dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['time'], self.p)
+            dtl = dataloaders[file_index]
 
-            (n, bins, _) = plt.hist(dtl.mean_iteration_UAV, bins=10)
+            data_width = max(dtl.mean_iteration_UAV) - min(dtl.mean_iteration_UAV)
+            num_bins = int(np.ceil(data_width/bin_width))
+            (n, bins, _) = plt.hist(dtl.mean_iteration_UAV, bins=num_bins)
+            plt.show()
             bin_mids = np.empty((len(bins)-1,))
             for i in range(len(bins)-1):
                 bin_mids[i] = (bins[i] + bins[i+1])*0.5
@@ -922,7 +947,6 @@ class DataAnalyser():
             if not os.path.isdir(dir_path+'Formated_Durations'):
                 os.mkdir(dir_path+'Formated_Durations')
             np.savetxt(dir_path+'Formated_Durations/time_' + postfix + '.csv', mat.T, delimiter=',', header=headers, comments='')
-            # np.savetxt(dir_path+dir+'/Descent_Formated/' + postfix + '.csv', new_mat, delimiter=',', header=header, comments='')
 
     def handle_close(self, evt):
         self.should_close = True
@@ -1335,13 +1359,13 @@ if __name__ == '__main__':
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
     # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)
-    data_analyser.plot_altitude(real_time = False, perspective = ACTUAL)
+    # data_analyser.plot_altitude(real_time = False, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)
     # data_analyser.plot_time_histogram()
     # data_analyser.plot_time_curve()
-    # data_analyser.store_formatted_descent(perspective = RAW)
+    data_analyser.store_formatted_descent(perspective = ACTUAL)
     # data_analyser.store_formatted_durations()
 
     # use_dir = False
