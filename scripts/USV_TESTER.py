@@ -117,7 +117,7 @@ class ProblemParams():
 problem_params = ProblemParams()
 
 # -2, 1
-xb_m = np.array([[-3], [3], [np.nan], [np.nan]])
+xb_m = np.array([[-6], [6], [np.nan], [np.nan]])
 if USE_COMPLETE_USV and DISTRIBUTED:
     xb_m = np.block([[xb_m], [np.zeros((2, 1))]])
 
@@ -153,10 +153,10 @@ took_too_long_horizon = -1
 # SHOULD BE ABLE TO REMOVE, I INIT NODE ABOVE NOW!
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
-NUM_TESTS = 1
+NUM_TESTS = 100
 if PARALLEL:
-    hor_max = 170#420#405#100
-    hor_min = 170#420#300#100
+    hor_max = 347#170#420#405#100
+    hor_min = 347#170#420#300#100
 elif CENTRALISED:
     hor_max = 100#195#150#120
     hor_min = 100#80#120

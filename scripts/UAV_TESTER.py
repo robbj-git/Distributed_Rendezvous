@@ -130,7 +130,7 @@ my_uav_simulator =  None
 # sure that the xb below matches the initial state of the USV in USV_TESTER.py
 # xb = None
 #-2, 1
-xb = np.array([[-3], [3], [np.nan], [np.nan]])
+xb = np.array([[-6], [6], [np.nan], [np.nan]])
 if xb is not None and CENTRALISED:
     reverse_dir = False
     dir = get_travel_dir(xb, reverse_dir)
@@ -138,10 +138,10 @@ else:
     dir = None
 # -------------- TESTING LOOP ----------------
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 1
+NUM_TESTS = 100
 if PARALLEL:
-    hor_max = 170#420#405#100
-    hor_min = 170#420#300#100
+    hor_max = 347#170#420#405#100
+    hor_min = 347#170#420#300#100
 elif CENTRALISED:
     hor_max = 100#195#150#120
     hor_min = 100#80#120
