@@ -837,17 +837,16 @@ class DataAnalyser():
 
             if file_index == 0:
                 postfix = 'centralised'
-                hs = 3
             elif file_index == 1:
                 postfix = 'distributed'
-                hs = 4
             elif file_index == 2:
                 postfix = 'cascading'
-                hs = 4
             else:
                 post_fix = str(file_index)
 
             dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['horizontal', 'vertical'], self.p)
+
+            hs = dtl.hs
 
             if perspective == ACTUAL:
                 xb_log = dtl.xb_log
@@ -893,11 +892,10 @@ class DataAnalyser():
             dist_range = np.arange(min(dist_log[0:t]), max(dist_log[0:t]), step=0.1)
             b_range = (dist_range < ds).astype(int)
             vert_const_range = np.dot(np.diag(b_range), (hs*dl - hs*dist_range)/(dl - ds)) + np.dot(np.diag(1-b_range), np.full((len(dist_range), ), hs))
+            vert_const_range = np.maximum(vert_const_range, np.zeros(vert_const_range.shape))
 
             if not os.path.isdir(dir_path+dir+'/Descent_Formated'):
                 os.mkdir(dir_path+dir+'/Descent_Formated')
-
-            print dist_log[0:t].shape, dist_range.shape
 
             new_mat = np.block([[dtl.new_time_stamps[0:t]], [height_log[0:t]], [vert_const_log[0:t]], [dx_log[0:t]], [dy_log[0:t]], [dist_log[0:t]]]).T
             other_mat = np.block([[dist_range], [vert_const_range]]).T
@@ -980,6 +978,7 @@ class DataLoader:
             print "Time span:", len(new_time_stamps), len(UAV_time_stamps), len(USV_time_stamps)    # DEBUG PRINT
             print UAV_time_stamps[-1] - UAV_time_stamps[0]
             print USV_time_stamps[-1] - USV_time_stamps[0]
+            (self.dl, self.ds, self.hs) = self.get_safety_region(dir_path)
 
             if data_type == 'horizontal':
                 self.UAV_traj_log_raw = np.loadtxt(dir_path + '/UAV_traj_log.csv', delimiter=',')
@@ -1351,6 +1350,34 @@ class DataLoader:
         np.savetxt(dir_path + '/UAV_time_stamps.csv', self.UAV_time_stamps, delimiter=',')
         np.savetxt(dir_path + '/USV_time_stamps.csv', self.USV_time_stamps, delimiter=',')
 
+    def get_safety_region(self, dir_path):
+        file = open(dir_path + '/info.txt')
+        lines = file.readlines()
+        if lines[11].find('dl:') == -1:
+            add = 1
+        else:
+            add = 0
+
+        if lines[11+add].find('dl:') > -1:
+            substrings = lines[11+add].split(':')
+            dl = float(substrings[1])
+        else:
+            print "Couldn't find dl"
+
+        if lines[12+add].find('ds:') > -1:
+            substrings = lines[12+add].split(':')
+            dl = float(substrings[1])
+        else:
+            print "Couldn't find ds"
+
+        if lines[13+add].find('hs:') > -1:
+            substrings = lines[13+add].split(':')
+            dl = float(substrings[1])
+        else:
+            print "Couldn't find hs"
+
+        return (dl, ds, hs)
+
 if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
     # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
@@ -1364,8 +1391,8 @@ if __name__ == '__main__':
     # data_analyser.plot_hor_velocities(real_time = True)
     # data_analyser.plot_time_histogram()
     # data_analyser.plot_time_curve()
-    data_analyser.store_formatted_descent(perspective = ACTUAL)
-    # data_analyser.store_formatted_durations()
+    # data_analyser.store_formatted_descent(perspective = ACTUAL)
+    data_analyser.store_formatted_durations()
 
     # use_dir = False
     # use_horizon_vs_performance = False

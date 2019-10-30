@@ -587,7 +587,7 @@ class UAV_simulator():
         info_str += "USV was at altitude: " + str(self.hb) + "\n"
         info_str += "Dropout was used\n" if self.ADD_DROPOUT else "Dropout was NOT used\n"
         if self.ADD_DROPOUT:
-            info_str += "Dropout bounds: " + str(self.dropout_lower_bound) + " to " + str(self.dropout_upper_bound)
+            info_str += "Dropout bounds: " + str(self.dropout_lower_bound) + " to " + str(self.dropout_upper_bound) + "\n"
         info_str += "dl: " + str(self.params.dl) + "\n"
         info_str += "ds: " + str(self.params.ds) + "\n"
         info_str += "hs: " + str(self.params.hs) + "\n"
