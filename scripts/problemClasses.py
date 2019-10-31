@@ -654,18 +654,8 @@ class USVProblem():
                 [np.zeros((T*mUSV+2, 1))]
             ])
         else:
-            x1 = params.v_max_b*self.travel_dir[0, 0]
-            x2 = params.v_min_b*self.travel_dir[0, 0]
-            y1 = params.v_max_b*self.travel_dir[1, 0]
-            y2 = params.v_min_b*self.travel_dir[1, 0]
-            v_max_x_b = max(x1, x2)
-            v_max_y_b = max(y1, y2)
-            v_min_x_b = min(x1, x2)
-            v_min_y_b = min(y1, y2)
-            # print "X:", v_min_x_b, "to", v_max_x_b
-            # print "Y:", v_min_y_b, "to", v_max_y_b
-            v_x_des = 0.9*v_min_x_b + 0.1*v_max_x_b
-            v_y_des = 0.9*v_min_y_b + 0.1*v_max_y_b
+            v_x_des = (0.7*params.v_max_b + 0.3*params.v_min_b)*self.travel_dir[0,0]
+            v_y_des = (0.7*params.v_max_b + 0.3*params.v_min_b)*self.travel_dir[1,0]
             vel_state = np.array([[0], [0], [v_x_des], [v_y_des]])
             vel_vec = np.kron(np.ones((T+1, 1)), vel_state)
             self.vel_cost_vec = np.dot( self.Qb_big_vel, vel_vec)

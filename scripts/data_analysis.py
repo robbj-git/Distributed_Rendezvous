@@ -264,11 +264,13 @@ class DataAnalyser():
                 ax.plot(x_log[0, t], x_log[1, t], 'bx')
                 ax.plot(xb_log[0, t], xb_log[1, t], 'rx')
                 if dtl.nUSV == 6:
+                    # Plots orientation of USV
                     ax.arrow(xb_log[0, t], xb_log[1,t], np.cos(xb_log[4, t]), np.sin(xb_log[4, t]))
-                    speed = np.sqrt(xb_log[2, t]**2 + xb_log[3, t]**2)
-                    ax.arrow(xb_log[0, t], xb_log[1,t], xb_log[2, t]/speed, xb_log[3, t]/speed, color='red')
+                    # speed = np.sqrt(xb_log[2, t]**2 + xb_log[3, t]**2)
+                    # # Plots normalized velocity of USV
+                    # ax.arrow(xb_log[0, t], xb_log[1,t], xb_log[2, t]/speed, xb_log[3, t]/speed, color='red')
                     ub_log = dtl.ub_log
-                    print "Psi_des:", np.rad2deg(ub_log[1,t]), "Psi:", np.rad2deg(xb_log[4, t])
+                    print "Psi_des:", np.rad2deg(ub_log[1,t]), "Psi:", np.rad2deg(xb_log[4, t]), "Vel angle:", np.rad2deg(np.arctan(xb_log[3, t]/xb_log[2, t]))
                     # ax.arrow(xb_log[0, t], xb_log[1,t], np.cos(ub_log[1,t]), np.sin(ub_log[1,t]), color='blue')
                 # Predicted trajectories
                 ax.plot(x_pred_traj, y_pred_traj, 'b.', alpha=0.4)
@@ -296,8 +298,8 @@ class DataAnalyser():
                 # plt.yticks(np.arange(0, 50, 1))
                 # plt.gca().set_aspect('equal', adjustable='box')
                 try:
-                    # ax.set_xlim([2, 6])
-                    # ax.set_ylim([-6, -2])
+                    # ax.set_xlim([0, 16])
+                    # ax.set_ylim([0, 16])
                     # ax.set_xlim([0, 12])
                     # ax.set_ylim([-20, 0])
                     plt.pause(0.05)
@@ -1385,14 +1387,14 @@ if __name__ == '__main__':
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)    # data_analyser.plot_altitude(real_time = False, perspective = ACTUAL)
+    data_analyser.plot_with_constraints(real_time = False, perspective = ACTUAL)    # data_analyser.plot_altitude(real_time = False, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)
     # data_analyser.plot_time_histogram()
     # data_analyser.plot_time_curve()
     # data_analyser.store_formatted_descent(perspective = ACTUAL)
-    data_analyser.store_formatted_durations()
+    # data_analyser.store_formatted_durations()
 
     # use_dir = False
     # use_horizon_vs_performance = False

@@ -4,8 +4,8 @@ from sys import maxint
 USE_HIL = False     # Should the UAV communicate with the HIL setup?
 # SET ONE OF THESE TO TRUE
 CENTRALISED = False
-DISTRIBUTED = False
-PARALLEL = True
+DISTRIBUTED = True
+PARALLEL = False
 
 SAMPLING_RATE = 20              # Dynamics change if this changes
 SAMPLING_TIME = 1.0/SAMPLING_RATE
@@ -14,7 +14,7 @@ ADD_DROPOUT = False # Should a communication loss between the vehicles be simula
 PRED_PARALLEL_TRAJ = True
 
 USE_COMPLETE_HORIZONTAL = False
-USE_COMPLETE_USV = False
+USE_COMPLETE_USV = True
 
 SOLVE_PARALLEL_AT_END = True
 

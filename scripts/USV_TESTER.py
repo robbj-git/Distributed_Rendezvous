@@ -105,7 +105,7 @@ class ProblemParams():
         self.KUAV = KUAV
         self.KUSV = KUSV
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max, psi_max, T_max, T_min)
+            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max, ang_vel_max_b, T_max, T_min)
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
         self.PRED_PARALLEL_TRAJ = PRED_PARALLEL_TRAJ
@@ -117,7 +117,7 @@ class ProblemParams():
 problem_params = ProblemParams()
 
 # -2, 1
-xb_m = np.array([[-6], [6], [np.nan], [np.nan]])
+xb_m = np.array([[3], [3], [np.nan], [np.nan]])
 if USE_COMPLETE_USV and DISTRIBUTED:
     xb_m = np.block([[xb_m], [np.zeros((2, 1))]])
 
@@ -153,7 +153,7 @@ took_too_long_horizon = -1
 # SHOULD BE ABLE TO REMOVE, I INIT NODE ABOVE NOW!
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
-NUM_TESTS = 100
+NUM_TESTS = 1
 if PARALLEL:
     hor_max = 347#170#420#405#100
     hor_min = 347#170#420#300#100
@@ -161,8 +161,8 @@ elif CENTRALISED:
     hor_max = 100#195#150#120
     hor_min = 100#80#120
 elif DISTRIBUTED:
-    hor_max = 100#280#100
-    hor_min = 100
+    hor_max = 40#100#280#100
+    hor_min = 40#100
 
 hor_inner = 60#30#15
 

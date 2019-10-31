@@ -68,6 +68,7 @@ class USV_simulator():
             self.mUSV = self.problemUSV.mUSV
             self.Ab = self.problemUSV.Ab
             self.Bb = self.problemUSV.Bb
+            self.Cb = self.problemUSV.Cb
             mat_temp = np.block([
                 [np.eye(4), np.zeros((4, 2))]
             ])
@@ -298,7 +299,18 @@ class USV_simulator():
             if self.DISTRIBUTED:
                 self.send_traj_to_UAV(self.xb_traj)
 
-            self.xb = np.dot(self.Ab,self.xb) + np.dot(self.Bb,self.uUSV)
+            if self.USE_COMPLETE_USV and self.DISTRIBUTED:
+                self.Ab = self.problemUSV.Ab
+                self.Bb = self.problemUSV.Bb
+                self.Cb = self.problemUSV.Cb
+                # self.uUSV = np.array([[self.uUSV[0,0]], [0.0]])    # DEBUG
+                # print "PSI:", np.rad2deg(self.xb[4, 0])
+                # print "state, input:", self.xb, self.uUSV
+                # print "WHYY", self.Ab
+                # print "Hmm", np.dot(self.Ab,self.xb)[5, 0], np.dot(self.Bb,self.uUSV)[5,0] , self.Cb[5, 0]
+                self.xb = np.dot(self.Ab,self.xb) + np.dot(self.Bb,self.uUSV) + self.Cb
+            else:
+                self.xb = np.dot(self.Ab,self.xb) + np.dot(self.Bb,self.uUSV)
 
             # ------- Sleep --------
             i += 1

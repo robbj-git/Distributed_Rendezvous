@@ -11,7 +11,7 @@ import copy
 class Parameters():
 
     def __init__(self, amin, amax, amin_b, amax_b, hs, ds, dl, wmin, wmax, wmin_land,\
-        kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max, psi_max, T_max, T_min):
+        kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max, ang_vel_max_b, T_max, T_min):
         self.amin = amin
         self.amax = amax
         self.amin_b = amin_b
@@ -28,7 +28,7 @@ class Parameters():
         self.v_min_b = vmin_b
         self.ang_max = ang_max
         self.ang_vel_max = ang_vel_max
-        self.psi_max = psi_max
+        self.ang_vel_max_b = ang_vel_max_b
         self.T_max = T_max
         self.T_min = T_min
 

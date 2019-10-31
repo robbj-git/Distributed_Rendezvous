@@ -103,7 +103,7 @@ class ProblemParams():
         self.KUSV = KUSV
         self.KVert = KVert
         self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max, psi_max, T_max, T_min)
+            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max, ang_vel_max_b, T_max, T_min)
         self.hb = hb
         self.delay_len = delay_len
         self.ADD_DROPOUT = ADD_DROPOUT
@@ -138,7 +138,7 @@ else:
     dir = None
 # -------------- TESTING LOOP ----------------
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 100
+NUM_TESTS = 1
 if PARALLEL:
     hor_max = 347#170#420#405#100
     hor_min = 347#170#420#300#100
@@ -146,8 +146,8 @@ elif CENTRALISED:
     hor_max = 100#195#150#120
     hor_min = 100#80#120
 elif DISTRIBUTED:
-    hor_max = 100#280#100
-    hor_min = 100
+    hor_max = 40#100#280#100
+    hor_min = 40#100
 
 hor_inner = 60#30#15
 cancelled = False

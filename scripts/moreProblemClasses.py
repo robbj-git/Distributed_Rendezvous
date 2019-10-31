@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as sp
+import sympy
 from scipy.linalg import expm
 import osqp
 from scipy.sparse import csc_matrix
@@ -409,9 +410,6 @@ class CompleteCentralisedProblem():
                     # print row, col
                     i += 1
 
-        self.Lambda_data = data
-        self.Lambda_rows = row_inds
-        self.Lambda_cols = col_inds
         return csc_matrix((data, (row_inds, col_inds)), shape=(self.nUAV*(self.T+1),self.mUAV*self.T))
 
     def predict_UAV_traj(self, x0, u_traj):
@@ -444,17 +442,17 @@ class CompleteUSVProblem():
         # self.type = type
         # self.last_solution_duration = np.nan
         self.travel_dir = travel_dir
-        psi_0 = 0
+        psi_0 = 0  # pi/4
         T_0 = 0.5
         self.set_initial_dynamics()
-        self.create_optimisation_matrices(psi_0, T_0)
-        self.create_optimisation_problem()
-
-    def create_optimisation_matrices(self, psi_0, T_0):
-        self.update_linearisation_slow(T_0, psi_0)
         [self.nUSV, self.mUSV] = self.Bb.shape
         self.nUSV_s = 2
+        self.get_symbolic_matrices()
+        self.update_linearisation_numeric(T_0, psi_0)
+        self.create_optimisation_matrices()
+        self.create_optimisation_problem()
 
+    def create_optimisation_matrices(self):
         self.M_vel = np.array([[0, 0, 1, 0, 0, 0],
                                [0, 0, 0, 1, 0, 0]])
         self.M_T = np.array([[1, 0]])
@@ -462,6 +460,7 @@ class CompleteUSVProblem():
         self.vel_extractor = np.kron(np.eye(self.T+1), self.M_vel)
         self.T_extractor = np.kron(np.eye(self.T), self.M_T)
         self.vel_s_extractor = np.kron(np.ones((self.T+1, 1)), np.eye(self.nUSV_s))
+        self.Lambda_indices = self.get_Lambda_indices()
         self.create_cost_matrices()
         self.create_constraint_matrices()
 
@@ -475,6 +474,7 @@ class CompleteUSVProblem():
 
         # Cost Matrices
         Ex = np.block([[np.eye(4), np.zeros((4,nUSV-4))]])
+        self.Ex = Ex    # DEBUG
         # Ex = np.block([[np.eye(4), np.zeros((4,2))]])
         EQE = np.dot(Ex.T, np.dot(self.Qb, Ex))
         EPE = np.dot(Ex.T, np.dot(self.Pb, Ex))
@@ -487,13 +487,13 @@ class CompleteUSVProblem():
 
         self.Qb_big  = 0*np.kron(np.eye(T+1), self.Qb)
         self.Qb_big[-4:(T+1)*4, -4:(T+1)*4] = 0*self.Pb
-        self.Qb_big_vel  = np.kron(np.eye(T+1), self.Qb_vel)
-        self.Qb_big_vel[-4:(T+1)*4, -4:(T+1)*4] = self.Pb_vel
+        self.Qb_big_vel  = 1.0*np.kron(np.eye(T+1), self.Qb_vel)
+        self.Qb_big_vel[-4:(T+1)*4, -4:(T+1)*4] = 1.0*self.Pb_vel
         self.Rb_big  = np.kron(np.eye(T),   self.Rb)
         self.Qb_big_E  = 0*np.kron(np.eye(T+1), EQE)
         self.Qb_big_E[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = 0*EPE
-        self.Qb_big_vel_E  = 0*np.kron(np.eye(T+1), EQE_vel)
-        self.Qb_big_vel_E[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = 0*EPE_vel
+        self.Qb_big_vel_E  = 1.0*np.kron(np.eye(T+1), EQE_vel)
+        self.Qb_big_vel_E[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = 1.0*EPE_vel
         # ------------- OSQP Matrices --------------
         velocity_extractor = np.zeros(( 2*(T+1), nUSV*(T+1) ))
         for i in range(T+1):
@@ -526,25 +526,16 @@ class CompleteUSVProblem():
                 [np.zeros((T*mUSV+nUSV_s, 1))]
             ])
         else:
-            x1 = params.v_max_b*self.travel_dir[0, 0]
-            x2 = params.v_min_b*self.travel_dir[0, 0]
-            y1 = params.v_max_b*self.travel_dir[1, 0]
-            y2 = params.v_min_b*self.travel_dir[1, 0]
-            v_max_x_b = max(x1, x2)
-            v_max_y_b = max(y1, y2)
-            v_min_x_b = min(x1, x2)
-            v_min_y_b = min(y1, y2)
-            # print "X:", v_min_x_b, "to", v_max_x_b
-            # print "Y:", v_min_y_b, "to", v_max_y_b
-            v_x_des = 0.9*v_min_x_b + 0.1*v_max_x_b
-            v_y_des = 0.9*v_min_y_b + 0.1*v_max_y_b
+            v_x_des = (0.7*params.v_max_b + 0.3*params.v_min_b)*self.travel_dir[0,0]
+            v_y_des = (0.7*params.v_max_b + 0.3*params.v_min_b)*self.travel_dir[1,0]
             vel_state = np.zeros((4, 1))
             vel_state[2:4, 0:1] = np.array([[v_x_des], [v_y_des]])
             vel_vec = np.kron(np.ones((T+1, 1)), vel_state)
+            self.vel_vec = vel_vec # DEBUG
             self.vel_cost_vec = np.dot( self.QE_vel.T, vel_vec)
             self.q_OSQP = -2*np.bmat([
-                [0*np.dot( self.QE.T, np.zeros(( (T+1)*self.nUAV, 1 )) ) + \
-                    self.vel_cost_vec],
+                [ 0*np.dot( self.QE.T, np.zeros(( (T+1)*self.nUAV, 1 )) ) + \
+                     1.0*self.vel_cost_vec],
                 [np.zeros((T*mUSV+nUSV_s, 1))]
             ])
             # DEBUG
@@ -571,35 +562,36 @@ class CompleteUSVProblem():
                 self.Xi_b[block_row*nUSV:(block_row+1)*nUSV] += \
                     np.dot(np.linalg.matrix_power(self.Ab, block_row-1-i), self.Cb)
 
+        input_min = np.array([[params.T_min], [-params.ang_vel_max_b]])
+        input_max = np.array([[params.T_max], [ params.ang_vel_max_b]])
         self.l_OSQP = np.block([
             [np.dot(self.Phi_b, np.zeros((nUSV, 1))) + self.Xi_b],      # Dynamics
             [np.full((2*(T+1), 1), -params.v_max_b)],               # Velocity
-            [np.full((T, 1), params.T_min)],                        # Input
+            [np.kron(np.ones((T, 1)), input_min)],                        # Input
         ])
 
         self.u_OSQP = np.block([
             [np.dot(self.Phi_b, np.zeros((nUSV, 1))) + self.Xi_b],  # Dynamics
             [np.full((2*(T+1), 1), params.v_max_b)],                # Velocity
-            [np.full((T, 1), params.T_max)],                        # Input
+            [np.kron(np.ones((T, 1)), input_max)],                        # Input
         ])
 
-        sparse_eye = csc_matrix(np.eye(nUSV*(T+1)))
         Lambda_sparse = self.get_Lambda_sparse(self.Lambda_b)
-        lower_left_sparse = csc_matrix(np.block([
+        self.lower_left_sparse = csc_matrix(np.block([
             [self.vel_extractor],
-            [np.zeros((T, nUSV*(T+1)))]
+            [np.zeros((mUSV*T, nUSV*(T+1)))]
         ]))
-        lower_mid_sparse = csc_matrix(np.block([
+        self.lower_mid_sparse = csc_matrix(np.block([
             [np.zeros((2*(T+1), mUSV*T))],
-            [self.T_extractor]
+            [np.eye(mUSV*T)]
         ]))
-        lower_right_sparse = csc_matrix(np.block([
+        self.lower_right_sparse = csc_matrix(np.block([
             [self.vel_s_extractor],
-            [np.zeros((T, nUSV_s))]
+            [np.zeros((mUSV*T, nUSV_s))]
         ]))
         self.A_OSQP = sp.sparse.bmat([
             [np.eye(nUSV*(T+1)), -Lambda_sparse, None],
-            [lower_left_sparse, lower_mid_sparse, lower_right_sparse]
+            [self.lower_left_sparse, self.lower_mid_sparse, self.lower_right_sparse]
         ]).tocsc()
 
     def create_optimisation_problem(self):
@@ -624,9 +616,15 @@ class CompleteUSVProblem():
             self.ub.value = np.zeros((self.mUSV*self.T, 1))
             self.xb.value = self.predict_trajectory(xb, self.ub.value)
         else:
+            time1 = time()
+            if self.ub.value is not None:
+                self.update_linearisation_symbolic(self.ub.value[0,0], xb[4, 0])      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!
+            time2 = time()
             self.update_OSQP(xb, x_traj)
+            time3 = time()
+            print "t3-t2, t2-t1", time3-time2, time2-time1
             results = self.problemOSQP.solve()
-            print "OBJECTIVE:", results.info.obj_val + self.vel_cost[0,0] + self.state_cost[0,0]
+            # print "OBJECTIVE:", results.info.obj_val + self.vel_cost[0,0] + self.state_cost[0,0], self.vel_cost[0,0], self.state_cost[0,0]
             if not results.x[0] is None:
                 self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
                 self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):-self.nUSV_s], (-1, 1))
@@ -637,84 +635,43 @@ class CompleteUSVProblem():
                 self.xb.value = self.predict_trajectory(xb, self.ub.value)
                 self.s.value = np.zeros((self.nUSV_s,1))
                 self.s.value.fill(np.nan)
+            # temp_del_me = np.kron(np.eye(self.T+1), self.Ex)
+            # print "Mean discrepancy", np.mean(self.vel_vec-np.dot(temp_del_me, self.xb.value))
+            # print self.vel_vec-np.dot(temp_del_me, self.xb.value)
+            # print self.vel_vec
         end = time()
         self.last_solution_duration = end - start
 
     def update_OSQP(self, xb0, x_traj):
-        # T = self.T
-        # mUAV = self.mUAV
-        # mUSV = self.mUSV
-        # nUAV = self.nUAV
-        # nUSV = self.nUSV
-        # nUAV_s = self.nUAV_s
-        #
-        # self.l_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
-        # self.l_OSQP[(T+1)*(nUAV+nUAV_s)+mUAV*T:(T+1)*(nUAV+nUSV+nUAV_s)+mUAV*T] = np.dot(self.Phi_b, xb0)
-        # self.u_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
-        # self.u_OSQP[(T+1)*(nUAV+nUAV_s)+mUAV*T:(T+1)*(nUAV+nUSV+nUAV_s)+mUAV*T] = np.dot(self.Phi_b, xb0)
-        #
-        # self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP)
 
         params = self.params
         T = self.T
-        self.l_OSQP[0:(T+1)*self.nUSV, 0:1] = np.dot(self.Phi_b, xb0)
-        self.u_OSQP[0:(T+1)*self.nUSV, 0:1] = np.dot(self.Phi_b, xb0)
+        self.l_OSQP[0:(T+1)*self.nUSV, 0:1] = np.dot(self.Phi_b, xb0) + self.Xi_b
+        self.u_OSQP[0:(T+1)*self.nUSV, 0:1] = np.dot(self.Phi_b, xb0) + self.Xi_b
         # print "AIGHT", self.q_OSQP[0:(T+1)*self.nUSV, 0:1].shape, np.dot( self.Qb_big, x_traj ).shape, self.vel_cost_vec.shape
-        self.q_OSQP[0:(T+1)*self.nUSV, 0:1] = -2*(0*np.dot( self.QE.T, x_traj ) + self.vel_cost_vec)
-
+        self.q_OSQP[0:(T+1)*self.nUSV, 0:1] = -2*( 0*np.dot( self.QE.T, x_traj ) + 1.0*self.vel_cost_vec)
         self.state_cost = np.dot(x_traj.T, np.dot(self.Qb_big, x_traj))
 
+        Lambda_sparse = self.get_Lambda_sparse(self.Lambda_b)
+
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
+        self.problemOSQP.update(Ax = Lambda_sparse.data, Ax_idx = self.Lambda_indices)
 
-    def update_linearisation(self, T_0, psi_0):
-        a1 = -np.sin(psi_0)*T_0
-        a2 = np.cos(psi_0)*T_0
-        a3 = -1/tau_wb  # TODO: Undefined
-        h = SAMPLING_TIME
-        self.Ab = np.array([
-            [1, 0, a1*h, -a1*h/a3 + a1*(np.exp(a3*h)-1)/a3**2],
-            [0, 1, a2*h, -a2*h/a3 + a2*(np.exp(a3*h)-1)/a3**2],
-            [0, 0, 1, (np.exp(a3*h)-1)/a3],
-            [0, 0, 0, np.exp(a3*h)]
-        ])
-
-        self.Ab = np.block([
-            [np.zeros((2,2)), np.eye(2), np.zeros((2,2))],
-            [np.zeros((4,2)), self.Ab]
-        ])
-
-        integral = np.array([
-            [h, 0, 0.5*a1*(h**2), -0.5*a1*(h**2)/a3 + a1*np.exp(a3*h)*(1-np.exp(-a3*h))/a3**3 - a1*h/a3**2],
-            [0, h, 0.5*a2*(h**2), -0.5*a2*(h**2)/a3 + a2*np.exp(a3*h)*(1-np.exp(-a3*h))/a3**3 - a2*h/a3**2],
-            [0, 0, h, np.exp(a3*h)*(1-np.exp(-a3*h))/a3**2 - h/a3],
-            [0, 0, 0, np.exp(a3*h)*(1-np.exp(-a3*h))/a3]
-        ])
-
-        B_c = np.array([[np.cos(psi_0), 0],
-                        [np.sin(psi_0), 0],
-                        [0, 0],
-                        [0, k_psib/tau_psib]])
-        self.Bb = np.dot(integral, B_c)
-        self.Bb = np.block([
-            [np.zeros((2,2))],
-            [self.Bb]
-        ])
-
-        self.Cb = np.array([[0],
-                            [0],
-                            [np.sin(psi_0)*T_0*psi_0*h],
-                            [-np.cos(psi_0)*T_0*psi_0*h],
-                            [0],
-                            [0]])
+    def update_linearisation_symbolic(self, T_0, psi_0):
+        # print "UPDATING IWHT:", T_0, np.rad2deg(psi_0)
+        self.Phi_b = self.Phi_func(T_0, psi_0)
+        self.Lambda_b = self.Lambda_func(T_0, psi_0)
+        self.Xi_b = self.Xi_func(T_0, psi_0)
+        return
 
     def set_initial_dynamics(self):
         self.A_c = np.array([
             [0, 0, 1,    0,    0, 0],
             [0, 0, 0,    1,    0, 0],
             [0, 0, -ddx, 0,    0, 0],
-            [0, 0, 1,    -ddy, 0, 0],
-            [0, 0, 1,    0,    0, 0],
-            [0, 0, 1,    0,    0, -1/tau_wb]
+            [0, 0, 0,    -ddy, 0, 0],
+            [0, 0, 0,    0,    0, 1],
+            [0, 0, 0,    0,    0, -1/tau_wb]
         ])
 
         self.B_c = np.array([
@@ -728,88 +685,92 @@ class CompleteUSVProblem():
 
         self.C_c = np.zeros((6,1))
 
-    def update_linearisation_slow(self, T_0, psi_0):
-        self.A_c[2:4, 4:5] = np.array([
-            [-T_0*np.sin(psi_0)],
-            [ T_0*np.cos(psi_0)]
-        ])
-
-        self.B_c[2:4, 0:1] = np.array([
-            [np.cos(psi_0)],
-            [np.sin(psi_0)]
-        ])
-
-        self.C_c[2:4, 0:1] = np.array([
-            [T_0*psi_0*np.sin(psi_0)],
-            [-T_0*psi_0*np.cos(psi_0)]
-        ])
-
-        self.Ab = expm(self.A_c*SAMPLING_TIME)
-
-        self.Bb = np.full(self.A_c.shape, np.nan)
-
-        for row in range(self.A_c.shape[0]):
-            for col in range(self.A_c.shape[1]):
-                integrand = lambda tau: expm(self.A_c*(SAMPLING_TIME-tau))[row, col]
-                self.Bb[row, col] = quad(integrand, 0, SAMPLING_TIME)[0]
-        self.Bb = np.dot(self.Bb, self.B_c)
-
+        self.Ab = np.eye(6) + self.A_c*SAMPLING_TIME
+        self.Bb = self.B_c*SAMPLING_TIME
         self.Cb = self.C_c*SAMPLING_TIME
 
-    def actually_update_linearisation(self, x0, xb0):
-    #     T = self.T
-    #     mUAV = self.mUAV
-    #     mUSV = self.mUSV
-    #     nUAV = self.nUAV
-    #     nUSV = self.nUSV
-    #     nUAV_s = self.nUAV_s
-    #     phi = x0[4, 0]
-    #     theta = x0[5, 0]
-    #
-    #     self.A_c[2:4, 4:6] = np.array([
-    #         [0, g/np.cos(theta)**2],
-    #         [-g/( np.cos(theta)*(np.cos(phi)**2) ), -g*np.tan(phi)*np.tan(theta)/np.cos(theta)]
-    #     ])
-    #
-    #     self.A = expm(self.A_c*SAMPLING_TIME)
-    #
-    #     self.B = np.full(self.A_c.shape, np.nan)
-    #     for row in range(self.A_c.shape[0]):
-    #         for col in range(self.A_c.shape[1]):
-    #             integrand = lambda tau: expm(self.A_c*(SAMPLING_TIME-tau))[row, col]
-    #             self.B[row, col] = quad(integrand, 0, SAMPLING_TIME)[0]
-    #     self.B = np.dot(self.B, self.B_c)
-    #
-    #     self.C_c[2:4, 0:1] = np.array([
-    #         [g*( np.tan(theta) - theta/(np.cos(theta))**2 )],
-    #         [(g/np.cos(theta)) * ( -np.tan(phi) + phi/(np.cos(phi)**2) + np.tan(phi)*np.tan(theta)*theta )]
-    #     ])
-    #
-    #     self.C_d = self.C_c*SAMPLING_TIME
-    #
-    #     # Updating Big Matrices
-    #     for j in range(T+1):
-    #         self.Phi[  j*nUAV:(j+1)*nUAV, :] = np.linalg.matrix_power(self.A, j)
-    #         for k in range(j):  # range(0) returns empty list
-    #             self.Lambda[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
-    #                 np.dot(np.linalg.matrix_power(self.A, j-k-1),self.B)
-    #
-    #     for block_row in range(1, self.T+1):
-    #         for i in range(block_row-1):
-    #             self.Xi[block_row*self.nUAV:(block_row+1)*self.nUAV] += \
-    #                 np.dot(np.linalg.matrix_power(self.A, block_row-1-i), self.C_d)
-    #
-    #     # Update OSQP Matrices
-    #
-    #     self.l_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
-    #     self.l_OSQP[(T+1)*(nUAV+nUAV_s)+mUAV*T:(T+1)*(nUAV+nUSV+nUAV_s)+mUAV*T] = np.dot(self.Phi_b, xb0)
-    #     self.u_OSQP[0:(T+1)*nUAV] = np.dot(self.Phi, x0) + self.Xi
-    #     self.u_OSQP[(T+1)*(nUAV+nUAV_s)+mUAV*T:(T+1)*(nUAV+nUSV+nUAV_s)+mUAV*T] = np.dot(self.Phi_b, xb0)
-    #
-    #     self.set_A_OSQP()
-    #     A_data = self.A_OSQP.data
-    #     self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, Ax=A_data)
-        return
+    def get_symbolic_matrices(self):
+        T = self.T
+        nUSV = self.nUSV
+        mUSV = self.mUSV
+        T_0_sym, Psi_0_sym = sympy.symbols('T_0_sym, Psi_0_sym')
+        h = SAMPLING_TIME
+        A = sympy.Matrix([
+            [1, 0, h,     0,  0,                      0],
+            [0, 1, 0,     h,  0,                      0],
+            [0, 0, 1-ddx, 0, -h*sympy.sin(Psi_0_sym)*T_0_sym, 0],
+            [0, 0, 0, 1-ddy,  h*sympy.cos(Psi_0_sym)*T_0_sym, 0],
+            [0, 0, 0,     0,  1,                      h],
+            [0, 0, 0,     0,  0,                    1-h/tau_wb]
+        ])
+        B = sympy.Matrix([
+            [0,            0],
+            [0,            0],
+            [h*sympy.cos(Psi_0_sym), 0],
+            [h*sympy.sin(Psi_0_sym), 0],
+            [0,            0],
+            [0, h*k_psib/tau_psib]
+        ])
+        C = sympy.Matrix([
+            [0],
+            [0],
+            [ h*sympy.sin(Psi_0_sym)*T_0_sym*Psi_0_sym],
+            [-h*sympy.cos(Psi_0_sym)*T_0_sym*Psi_0_sym],
+            [0],
+            [0]
+        ])
+
+        Phi = sympy.zeros((T+1)*nUSV, nUSV)
+        Lambda = sympy.zeros((T+1)*nUSV, T*mUSV )
+        for j in range(T+1):
+            Phi[j*nUSV:(j+1)*nUSV, :] = A**j
+            for k in range(j):  # range(0) returns empty list
+                Lambda[j*nUSV:(j+1)*nUSV, k*mUSV:(k+1)*mUSV] = \
+                    ( A**(j-k-1) )*B
+
+        Xi = sympy.zeros(nUSV*(T+1), 1)
+        for block_row in range(1, T+1):
+            for i in range(block_row-1):
+                Xi[block_row*nUSV:(block_row+1)*nUSV, :] += \
+                    ( A**(block_row-1-i) )*C
+
+        self.Phi_func = sympy.lambdify([T_0_sym, Psi_0_sym], Phi)
+        self.Lambda_func = sympy.lambdify([T_0_sym, Psi_0_sym], Lambda)
+        self.Xi_func = sympy.lambdify([T_0_sym, Psi_0_sym], Xi)
+
+    def update_linearisation_numeric(self, T_0, psi_0):
+        self.Ab[2:4, 4:5] = np.array([
+            [-SAMPLING_TIME*np.sin(psi_0)*T_0],
+            [ SAMPLING_TIME*np.cos(psi_0)*T_0]
+        ])
+
+        self.Bb[2:4, 0:1] = np.array([
+            [SAMPLING_TIME*np.cos(psi_0)],
+            [SAMPLING_TIME*np.sin(psi_0)]
+        ])
+
+        self.Cb[2:4, 0:1] = np.array([
+            [ SAMPLING_TIME*np.sin(psi_0)*T_0*psi_0],
+            [-SAMPLING_TIME*np.cos(psi_0)*T_0*psi_0]
+        ])
+
+        T = self.T
+        nUSV = self.nUSV
+        mUSV = self.mUSV
+
+        self.Phi_b = np.zeros(( (T+1)*nUSV, nUSV ))
+        self.Lambda_b = np.zeros(( (T+1)*nUSV, T*mUSV ))
+        for j in range(T+1):
+            self.Phi_b[j*nUSV:(j+1)*nUSV, :] = np.linalg.matrix_power(self.Ab, j)
+            for k in range(j):  # range(0) returns empty list
+                self.Lambda_b[j*nUSV:(j+1)*nUSV, k*mUSV:(k+1)*mUSV] = \
+                    np.dot(np.linalg.matrix_power(self.Ab, j-k-1),self.Bb)
+
+        self.Xi_b = np.zeros((nUSV*(T+1), 1))
+        for block_row in range(1, T+1):
+            for i in range(block_row-1):
+                self.Xi_b[block_row*nUSV:(block_row+1)*nUSV] += \
+                    np.dot(np.linalg.matrix_power(self.Ab, block_row-1-i), self.Cb)
 
     def get_Lambda_sparse(self, Lambda):
         num_entries = self.nUSV*self.mUSV*self.T*(self.T+1)//2
@@ -827,10 +788,58 @@ class CompleteUSVProblem():
                     # print row, col
                     i += 1
 
-        self.Lambda_data = data
-        self.Lambda_rows = row_inds
-        self.Lambda_cols = col_inds
         return csc_matrix((data, (row_inds, col_inds)), shape=(self.nUSV*(self.T+1),self.mUSV*self.T))
+
+    def get_Lambda_indices(self):
+        # Generate sparse Lambda with 1337 as all elements
+        T = self.T
+        nUSV = self.nUSV
+        mUSV = self.mUSV
+        nUSV_s = self.nUSV_s
+
+        num_entries = self.nUSV*self.mUSV*self.T*(self.T+1)//2
+        data = np.full((num_entries,), np.nan)
+        col_inds = np.full((num_entries,), np.nan)
+        row_inds = np.full((num_entries,), np.nan)
+        i = 0
+        for block_row in range(self.T+1):
+            num_cols = block_row*self.mUSV
+            for col in range(num_cols):
+                for row in range(block_row*self.nUSV, (block_row+1)*self.nUSV):
+                    data[i] = -1337
+                    row_inds[i] = row
+                    col_inds[i] = col
+                    # print row, col
+                    i += 1
+
+        Lambda_csc = csc_matrix((data, (row_inds, col_inds)), shape=(self.nUSV*(self.T+1),self.mUSV*self.T))
+
+        # Generate A_OSQP
+
+        lower_left_sparse = csc_matrix(np.block([
+            [self.vel_extractor],
+            [np.zeros((mUSV*T, nUSV*(T+1)))]
+        ]))
+        lower_mid_sparse = csc_matrix(np.block([
+            [np.zeros((2*(T+1), mUSV*T))],
+            [np.eye(mUSV*T)]
+        ]))
+        lower_right_sparse = csc_matrix(np.block([
+            [self.vel_s_extractor],
+            [np.zeros((mUSV*T, nUSV_s))]
+        ]))
+        A_OSQP = sp.sparse.bmat([
+            [np.eye(nUSV*(T+1)), -Lambda_csc, None],
+            [lower_left_sparse, lower_mid_sparse, lower_right_sparse]
+        ]).tocsc()
+
+        # Get indices of all elements in A_OSQP that are 1337
+        indices = []
+        for (index, element) in enumerate(A_OSQP.data):
+            if element == 1337:
+                indices.append(index)
+
+        return A_OSQP.indices[indices]
 
     def predict_trajectory(self, xb0, ub_traj):
         return np.dot(self.Phi_b, xb0) + np.dot(self.Lambda_b, ub_traj)
