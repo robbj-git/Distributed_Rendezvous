@@ -442,15 +442,20 @@ class CompleteUSVProblem():
         # self.type = type
         # self.last_solution_duration = np.nan
         self.travel_dir = travel_dir
-        psi_0 = 0  # pi/4
-        T_0 = 0.5
+        self.psi_0 = 0#10.734105254385234#0  # pi/4
+        self.T_0 = 0.5#0.8272736282479447#0.5
+        # 0.8272736282479447 10.734105254385234
+        self.should_update_OSQP_matrices = False
+        self.ang_threshold = np.radians(10)
         self.set_initial_dynamics()
         [self.nUSV, self.mUSV] = self.Bb.shape
         self.nUSV_s = 2
         self.get_symbolic_matrices()
-        self.update_linearisation_numeric(T_0, psi_0)
+        self.update_linearisation_numeric(self.T_0, self.psi_0)
+        self.update_linearisation_symbolic(self.T_0, self.psi_0)
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
+        self.has_updated_once = False
 
     def create_optimisation_matrices(self):
         self.M_vel = np.array([[0, 0, 1, 0, 0, 0],
@@ -578,21 +583,22 @@ class CompleteUSVProblem():
 
         Lambda_sparse = self.get_Lambda_sparse(self.Lambda_b)
         self.lower_left_sparse = csc_matrix(np.block([
-            [self.vel_extractor],
-            [np.zeros((mUSV*T, nUSV*(T+1)))]
+            [self.vel_extractor],                           # Velocity
+            [np.zeros((mUSV*T, nUSV*(T+1)))]                # Input
         ]))
         self.lower_mid_sparse = csc_matrix(np.block([
-            [np.zeros((2*(T+1), mUSV*T))],
-            [np.eye(mUSV*T)]
+            [np.zeros((2*(T+1), mUSV*T))],                  # Velocity
+            [np.eye(mUSV*T)]                                # Input
         ]))
         self.lower_right_sparse = csc_matrix(np.block([
-            [self.vel_s_extractor],
-            [np.zeros((mUSV*T, nUSV_s))]
+            [self.vel_s_extractor],                     # Velocity
+            [np.zeros((mUSV*T, nUSV_s))]                # Input
         ]))
         self.A_OSQP = sp.sparse.bmat([
-            [np.eye(nUSV*(T+1)), -Lambda_sparse, None],
+            [np.eye(nUSV*(T+1)), -Lambda_sparse, None],         # Dynamics
             [self.lower_left_sparse, self.lower_mid_sparse, self.lower_right_sparse]
         ]).tocsc()
+        self.should_update_OSQP_matrices
 
     def create_optimisation_problem(self):
         T = self.T
@@ -616,13 +622,20 @@ class CompleteUSVProblem():
             self.ub.value = np.zeros((self.mUSV*self.T, 1))
             self.xb.value = self.predict_trajectory(xb, self.ub.value)
         else:
-            time1 = time()
-            if self.ub.value is not None:
-                self.update_linearisation_symbolic(self.ub.value[0,0], xb[4, 0])      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!
-            time2 = time()
+            # time1 = time()
+            if self.ub.value is not None and abs(xb[4,0]-self.psi_0) > self.ang_threshold:
+                print "WOULD HAVE UPDATED!"
+                self.psi_0 = xb[4, 0]
+                if not self.has_updated_once:
+                    print "UPDATE WHHT:", self.ub.value[0,0], xb[4, 0]
+                    # self.update_linearisation_symbolic(self.ub.value[0,0], xb[4, 0])      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!
+                    # self.update_linearisation_symbolic(0.5, 0)      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!
+            # else:
+            #     print "didn't update"
+            # time2 = time()
             self.update_OSQP(xb, x_traj)
-            time3 = time()
-            print "t3-t2, t2-t1", time3-time2, time2-time1
+            # time3 = time()
+            # print "t3-t2, t2-t1", time3-time2, time2-time1
             results = self.problemOSQP.solve()
             # print "OBJECTIVE:", results.info.obj_val + self.vel_cost[0,0] + self.state_cost[0,0], self.vel_cost[0,0], self.state_cost[0,0]
             if not results.x[0] is None:
@@ -652,17 +665,13 @@ class CompleteUSVProblem():
         self.q_OSQP[0:(T+1)*self.nUSV, 0:1] = -2*( 0*np.dot( self.QE.T, x_traj ) + 1.0*self.vel_cost_vec)
         self.state_cost = np.dot(x_traj.T, np.dot(self.Qb_big, x_traj))
 
-        Lambda_sparse = self.get_Lambda_sparse(self.Lambda_b)
-
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
-        self.problemOSQP.update(Ax = Lambda_sparse.data, Ax_idx = self.Lambda_indices)
 
-    def update_linearisation_symbolic(self, T_0, psi_0):
-        # print "UPDATING IWHT:", T_0, np.rad2deg(psi_0)
-        self.Phi_b = self.Phi_func(T_0, psi_0)
-        self.Lambda_b = self.Lambda_func(T_0, psi_0)
-        self.Xi_b = self.Xi_func(T_0, psi_0)
-        return
+        if self.should_update_OSQP_matrices:
+            print "WHYYY,T HIS HAPPENED!!!"
+            Lambda_sparse = self.get_Lambda_sparse(self.Lambda_b)
+            self.problemOSQP.update(Ax = Lambda_sparse.data, Ax_idx = self.Lambda_indices)
+            self.should_update_OSQP_matrices = False
 
     def set_initial_dynamics(self):
         self.A_c = np.array([
@@ -693,13 +702,16 @@ class CompleteUSVProblem():
         T = self.T
         nUSV = self.nUSV
         mUSV = self.mUSV
+
+        # print "Worst case nonzero elements", nUSV*mUSV*T*(T+1)/2
+
         T_0_sym, Psi_0_sym = sympy.symbols('T_0_sym, Psi_0_sym')
         h = SAMPLING_TIME
         A = sympy.Matrix([
             [1, 0, h,     0,  0,                      0],
             [0, 1, 0,     h,  0,                      0],
-            [0, 0, 1-ddx, 0, -h*sympy.sin(Psi_0_sym)*T_0_sym, 0],
-            [0, 0, 0, 1-ddy,  h*sympy.cos(Psi_0_sym)*T_0_sym, 0],
+            [0, 0, 1-h*ddx, 0, -h*sympy.sin(Psi_0_sym)*T_0_sym, 0],
+            [0, 0, 0, 1-h*ddy,  h*sympy.cos(Psi_0_sym)*T_0_sym, 0],
             [0, 0, 0,     0,  1,                      h],
             [0, 0, 0,     0,  0,                    1-h/tau_wb]
         ])
@@ -738,6 +750,40 @@ class CompleteUSVProblem():
         self.Lambda_func = sympy.lambdify([T_0_sym, Psi_0_sym], Lambda)
         self.Xi_func = sympy.lambdify([T_0_sym, Psi_0_sym], Xi)
 
+        # DEBUG
+
+        # self.A_func = sympy.lambdify([T_0_sym, Psi_0_sym], A)
+        # self.B_func = sympy.lambdify([T_0_sym, Psi_0_sym], B)
+        # self.C_func = sympy.lambdify([T_0_sym, Psi_0_sym], C)
+
+        psi_0 = 0
+        T_0 = 0.5
+
+        self.update_linearisation_numeric(T_0, psi_0)
+
+        print "Phi:", self.Phi_func(T_0, psi_0) - self.Phi_b
+        print "Lambda:", self.Lambda_func(T_0, psi_0) - self.Lambda_b
+        print "Xi:", self.Xi_func(T_0, psi_0) - self.Xi_b
+        # print "A:", self.A_func(T_0, psi_0) - self.Ab
+        # print "B:", self.B_func(T_0, psi_0) - self.Bb
+        # print "C:", self.C_func(T_0, psi_0) - self.Cb
+
+        exit()
+        # DEBUG
+
+    def update_linearisation_symbolic(self, T_0, psi_0):
+        print "UPDATING IWHT:", T_0, np.rad2deg(psi_0)
+        self.T_0 = T_0
+        self.psi_0 = psi_0
+        print "Phi, Lambda, Xi:", np.mean(np.absolute(self.Phi_b-self.Phi_func(T_0, psi_0))), np.mean(np.absolute(self.Lambda_b-self.Lambda_func(T_0, psi_0))), np.mean(np.absolute(self.Xi_b-self.Xi_func(T_0, psi_0)))
+        print "A, B, C:", np.mean(np.absolute(self.Ab-self.A_func(T_0, psi_0))), np.mean(np.absolute(self.Bb-self.B_func(T_0, psi_0))), np.mean(np.absolute(self.Cb-self.C_func(T_0, psi_0)))
+        self.Phi_b = self.Phi_func(T_0, psi_0)
+        self.Lambda_b = self.Lambda_func(T_0, psi_0)
+        self.Xi_b = self.Xi_func(T_0, psi_0)
+        self.should_update_OSQP_matrices = True
+        return
+
+    # TODO: THIS ONE IS NOT KEPT UP TO DATE!!!
     def update_linearisation_numeric(self, T_0, psi_0):
         self.Ab[2:4, 4:5] = np.array([
             [-SAMPLING_TIME*np.sin(psi_0)*T_0],
