@@ -571,8 +571,8 @@ class CompleteUSVProblem():
         input_max = np.array([[params.T_max], [ params.ang_vel_max_b]])
         self.l_OSQP = np.block([
             [np.dot(self.Phi_b, np.zeros((nUSV, 1))) + self.Xi_b],      # Dynamics
-            [np.full((2*(T+1), 1), -params.v_max_b)],               # Velocity
-            [np.kron(np.ones((T, 1)), input_min)],                        # Input
+            [np.full((2*(T+1), 1), -params.v_max_b)],                   # Velocity
+            [np.kron(np.ones((T, 1)), input_min)],                      # Input
         ])
 
         self.u_OSQP = np.block([
@@ -598,7 +598,7 @@ class CompleteUSVProblem():
             [np.eye(nUSV*(T+1)), -Lambda_sparse, None],         # Dynamics
             [self.lower_left_sparse, self.lower_mid_sparse, self.lower_right_sparse]
         ]).tocsc()
-        self.should_update_OSQP_matrices
+        self.should_update_OSQP_matrices = False
 
     def create_optimisation_problem(self):
         T = self.T
@@ -735,48 +735,26 @@ class CompleteUSVProblem():
         Phi = sympy.zeros((T+1)*nUSV, nUSV)
         Lambda = sympy.zeros((T+1)*nUSV, T*mUSV )
         for j in range(T+1):
-            Phi[j*nUSV:(j+1)*nUSV, :] = A**j
+            Phi[j*nUSV:(j+1)*nUSV, :] = np.linalg.matrix_power(A,j)
             for k in range(j):  # range(0) returns empty list
                 Lambda[j*nUSV:(j+1)*nUSV, k*mUSV:(k+1)*mUSV] = \
-                    ( A**(j-k-1) )*B
+                    ( np.linalg.matrix_power(A,j-k-1) )*B
 
         Xi = sympy.zeros(nUSV*(T+1), 1)
         for block_row in range(1, T+1):
             for i in range(block_row-1):
                 Xi[block_row*nUSV:(block_row+1)*nUSV, :] += \
-                    ( A**(block_row-1-i) )*C
+                    ( np.linalg.matrix_power(A,block_row-1-i) )*C
 
         self.Phi_func = sympy.lambdify([T_0_sym, Psi_0_sym], Phi)
         self.Lambda_func = sympy.lambdify([T_0_sym, Psi_0_sym], Lambda)
         self.Xi_func = sympy.lambdify([T_0_sym, Psi_0_sym], Xi)
 
-        # DEBUG
-
-        # self.A_func = sympy.lambdify([T_0_sym, Psi_0_sym], A)
-        # self.B_func = sympy.lambdify([T_0_sym, Psi_0_sym], B)
-        # self.C_func = sympy.lambdify([T_0_sym, Psi_0_sym], C)
-
-        psi_0 = 0
-        T_0 = 0.5
-
-        self.update_linearisation_numeric(T_0, psi_0)
-
-        print "Phi:", self.Phi_func(T_0, psi_0) - self.Phi_b
-        print "Lambda:", self.Lambda_func(T_0, psi_0) - self.Lambda_b
-        print "Xi:", self.Xi_func(T_0, psi_0) - self.Xi_b
-        # print "A:", self.A_func(T_0, psi_0) - self.Ab
-        # print "B:", self.B_func(T_0, psi_0) - self.Bb
-        # print "C:", self.C_func(T_0, psi_0) - self.Cb
-
-        exit()
-        # DEBUG
-
     def update_linearisation_symbolic(self, T_0, psi_0):
         print "UPDATING IWHT:", T_0, np.rad2deg(psi_0)
         self.T_0 = T_0
         self.psi_0 = psi_0
-        print "Phi, Lambda, Xi:", np.mean(np.absolute(self.Phi_b-self.Phi_func(T_0, psi_0))), np.mean(np.absolute(self.Lambda_b-self.Lambda_func(T_0, psi_0))), np.mean(np.absolute(self.Xi_b-self.Xi_func(T_0, psi_0)))
-        print "A, B, C:", np.mean(np.absolute(self.Ab-self.A_func(T_0, psi_0))), np.mean(np.absolute(self.Bb-self.B_func(T_0, psi_0))), np.mean(np.absolute(self.Cb-self.C_func(T_0, psi_0)))
+        print "Phi, Lambda, Xi:", np.mean(self.Phi_b - self.Phi_func(T_0, psi_0)), np.mean(self.Lambda_b - self.Lambda_func(T_0, psi_0)), np.mean(self.Xi_b - self.Xi_func(T_0, psi_0))
         self.Phi_b = self.Phi_func(T_0, psi_0)
         self.Lambda_b = self.Lambda_func(T_0, psi_0)
         self.Xi_b = self.Xi_func(T_0, psi_0)
