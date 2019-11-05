@@ -842,9 +842,14 @@ class DataAnalyser():
             elif file_index == 2:
                 postfix = 'cascading'
             else:
-                post_fix = str(file_index)
+                postfix = str(file_index)
 
             dtl = DataLoader(dir_path+dir, self.file_types[file_index], ['horizontal', 'vertical'], self.p)
+
+            if dtl.used_dropout:
+                postpostfix = '_dropout'
+            else:
+                postpostfix = ''
 
             hs = dtl.hs
 
@@ -882,14 +887,26 @@ class DataAnalyser():
             vert_const_log = np.dot(np.diag(b_log), (hs*dl - hs*dist_log)/(dl - ds)) + np.dot(np.diag(1-b_log), np.full((time_len, ), hs))
             vert_const_log = np.maximum(vert_const_log, np.zeros(vert_const_log.shape))
 
+            # Finds landing time
             has_landed = False
-            for t in range(time_len):
-                if not has_landed and height_log[t] <= 0:
+            for t_land in range(time_len):
+                if not has_landed and height_log[t_land] <= 0:
                     has_landed = True
-                if has_landed and height_log[t] > 0:
+                if has_landed and height_log[t_land] > 0:
                     break
 
-            dist_range = np.arange(min(dist_log[0:t]), max(dist_log[0:t]), step=0.1)
+            # Finds break in communication times
+            if dtl.used_dropout:
+                t_break_start = -1
+                t_break_end = -1
+                for t in range(time_len):
+                    if dtl.new_time_stamps[t] >= dtl.dropout_start and t_break_start == -1:
+                        t_break_start = t
+                    if dtl.new_time_stamps[t] >= dtl.dropout_end and t_break_end == -1:
+                        t_break_end = t
+                        break
+
+            dist_range = np.arange(min(dist_log[0:t_land]), max(dist_log[0:t_land]), step=0.1)
             b_range = (dist_range < ds).astype(int)
             vert_const_range = np.dot(np.diag(b_range), (hs*dl - hs*dist_range)/(dl - ds)) + np.dot(np.diag(1-b_range), np.full((len(dist_range), ), hs))
             vert_const_range = np.maximum(vert_const_range, np.zeros(vert_const_range.shape))
@@ -897,12 +914,34 @@ class DataAnalyser():
             if not os.path.isdir(dir_path+dir+'/Descent_Formated'):
                 os.mkdir(dir_path+dir+'/Descent_Formated')
 
-            new_mat = np.block([[dtl.new_time_stamps[0:t]], [height_log[0:t]], [vert_const_log[0:t]], [dx_log[0:t]], [dy_log[0:t]], [dist_log[0:t]]]).T
+            new_mat = np.block([[dtl.new_time_stamps[0:t_land]], [height_log[0:t_land]],\
+                [vert_const_log[0:t_land]], [dx_log[0:t_land]], [dy_log[0:t_land]], [dist_log[0:t_land]]]).T
             other_mat = np.block([[dist_range], [vert_const_range]]).T
             header = 'time,altitude,vertical constraint,dx,dy,distance'
             other_header = 'distance range,vertical constraint range'
-            np.savetxt(dir_path+dir+'/Descent_Formated/' + postfix + '.csv', new_mat, delimiter=',', header=header, comments='')
-            np.savetxt(dir_path+dir+'/Descent_Formated/' + postfix + '_ranges.csv', other_mat, delimiter=',', header=other_header, comments='')
+            np.savetxt(dir_path+dir+'/Descent_Formated/' + postfix + postpostfix + '.csv', new_mat, delimiter=',', header=header, comments='')
+            np.savetxt(dir_path+dir+'/Descent_Formated/' + postfix + postpostfix + '_ranges.csv', other_mat, delimiter=',', header=other_header, comments='')
+
+            if dtl.used_dropout:
+                pre_mat = np.block([
+                    [dtl.new_time_stamps[0:t_break_start]],
+                    [height_log[0:t_break_start]],
+                    [dist_log[0:t_break_start]]
+                ]).T
+                mat = np.block([
+                    [dtl.new_time_stamps[t_break_start:t_break_end]],
+                    [height_log[t_break_start:t_break_end]],
+                    [dist_log[t_break_start:t_break_end]]
+                ]).T
+                post_mat = np.block([
+                    [dtl.new_time_stamps[t_break_end:t_land]],
+                    [height_log[t_break_end:t_land]],
+                    [dist_log[t_break_end:t_land]]
+                ]).T
+                header = 'time,altitude,distance'
+                np.savetxt(dir_path+dir+'/Descent_Formated/' + postfix + '_predropout.csv', pre_mat, delimiter=',', header=header, comments='')
+                np.savetxt(dir_path+dir+'/Descent_Formated/' + postfix + '_duringdropout.csv', mat, delimiter=',', header=header, comments='')
+                np.savetxt(dir_path+dir+'/Descent_Formated/' + postfix + '_postdropout.csv', post_mat, delimiter=',', header=header, comments='')
 
     def store_formatted_durations(self):
 
@@ -961,25 +1000,28 @@ class DataLoader:
         # self.debug_convert_txt_to_csv(dir_path, problem_type)
         # exit()
         p = params
+        UAV_time_stamps = np.loadtxt(dir_path + '/UAV_time_stamps.csv', delimiter=',')
+        USV_time_stamps = np.loadtxt(dir_path + '/USV_time_stamps.csv', delimiter=',')
+        if USE_TIME_CORRECTION:
+            time_list = np.loadtxt(dir_path + '/TEST/time_diff.txt')
+            time_diff = time_list[0] + time_list[1]*0.000000001
+            UAV_time_stamps = UAV_time_stamps - time_diff
+        t_0 = np.minimum(UAV_time_stamps[0], USV_time_stamps[0])
+        t_f = np.maximum(UAV_time_stamps[-1], USV_time_stamps[-1]) - t_0
+        UAV_time_stamps = UAV_time_stamps - t_0
+        USV_time_stamps = USV_time_stamps - t_0
+        new_time_stamps = np.arange(0, t_f, 0.05)
+        self.new_time_stamps = new_time_stamps
+        print "Time span:", len(new_time_stamps), len(UAV_time_stamps), len(USV_time_stamps)    # DEBUG PRINT
+        print UAV_time_stamps[-1] - UAV_time_stamps[0]
+        print USV_time_stamps[-1] - USV_time_stamps[0]
+        (self.dl, self.ds, self.hs) = self.get_safety_region(dir_path)
+        (self.used_dropout, self.dropout_lower_bound, self.dropout_upper_bound) = self.get_dropout_bounds(dir_path)
+        if self.used_dropout:
+            self.dropout_start = min(UAV_time_stamps[self.dropout_lower_bound], USV_time_stamps[self.dropout_lower_bound])
+            self.dropout_end = min(UAV_time_stamps[self.dropout_upper_bound], USV_time_stamps[self.dropout_upper_bound])
+
         for data_type in data_types:
-
-            UAV_time_stamps = np.loadtxt(dir_path + '/UAV_time_stamps.csv', delimiter=',')
-            USV_time_stamps = np.loadtxt(dir_path + '/USV_time_stamps.csv', delimiter=',')
-            if USE_TIME_CORRECTION:
-                time_list = np.loadtxt(dir_path + '/TEST/time_diff.txt')
-                time_diff = time_list[0] + time_list[1]*0.000000001
-                UAV_time_stamps = UAV_time_stamps - time_diff
-            t_0 = np.minimum(UAV_time_stamps[0], USV_time_stamps[0])
-            t_f = np.maximum(UAV_time_stamps[-1], USV_time_stamps[-1]) - t_0
-            UAV_time_stamps = UAV_time_stamps - t_0
-            USV_time_stamps = USV_time_stamps - t_0
-            new_time_stamps = np.arange(0, t_f, 0.05)
-            self.new_time_stamps = new_time_stamps
-            print "Time span:", len(new_time_stamps), len(UAV_time_stamps), len(USV_time_stamps)    # DEBUG PRINT
-            print UAV_time_stamps[-1] - UAV_time_stamps[0]
-            print USV_time_stamps[-1] - USV_time_stamps[0]
-            (self.dl, self.ds, self.hs) = self.get_safety_region(dir_path)
-
             if data_type == 'horizontal':
                 self.UAV_traj_log_raw = np.loadtxt(dir_path + '/UAV_traj_log.csv', delimiter=',')
                 self.USV_traj_log_raw = np.loadtxt(dir_path + '/USV_traj_log.csv', delimiter=',')
@@ -1378,6 +1420,16 @@ class DataLoader:
 
         return (dl, ds, hs)
 
+    def get_dropout_bounds(self, dir_path):
+        file = open(dir_path + '/info.txt')
+        lines = file.readlines()
+        if lines[11].find('Dropout bounds:') == 0:
+            substrings1 = lines[11].split(':')
+            substrings2 = substrings1[1].split('to')
+            return (True, int(substrings2[0]), int(substrings2[1]))
+        else:
+            return (False, -1, -1)
+
 if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
     # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
@@ -1391,8 +1443,8 @@ if __name__ == '__main__':
     # data_analyser.plot_hor_velocities(real_time = True)
     # data_analyser.plot_time_histogram()
     # data_analyser.plot_time_curve()
-    # data_analyser.store_formatted_descent(perspective = ACTUAL)
-    data_analyser.store_formatted_durations()
+    data_analyser.store_formatted_descent(perspective = ACTUAL) # WARNING: ONLY ACTUAL PERSPECTIVE IS CORRECTLY IMPLEMENTED, TIME STAMPS ARE NOT CORRECT FOR OTHER PERSPECTIVES
+    # data_analyser.store_formatted_durations()
 
     # use_dir = False
     # use_horizon_vs_performance = False
