@@ -451,7 +451,7 @@ class CompleteUSVProblem():
         [self.nUSV, self.mUSV] = self.Bb.shape
         self.nUSV_s = 2
         self.get_symbolic_matrices()
-        self.update_linearisation_numeric(self.T_0, self.psi_0)
+        # self.update_linearisation_numeric(self.T_0, self.psi_0)
         self.update_linearisation_symbolic(self.T_0, self.psi_0)
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
@@ -546,26 +546,13 @@ class CompleteUSVProblem():
             # DEBUG
             self.vel_cost = np.dot(vel_vec.T, np.dot(self.Qb_big_vel, vel_vec))
 
+    # Requires dynamics matrices to already be created
     def create_constraint_matrices(self):
         T = self.T
         nUSV = self.nUSV
         mUSV = self.mUSV
         nUSV_s = self.nUSV_s
         params = self.params
-
-        self.Phi_b = np.zeros(( (T+1)*nUSV, nUSV ))
-        self.Lambda_b = np.zeros(( (T+1)*nUSV, T*mUSV ))
-        for j in range(T+1):
-            self.Phi_b[j*nUSV:(j+1)*nUSV, :] = np.linalg.matrix_power(self.Ab, j)
-            for k in range(j):  # range(0) returns empty list
-                self.Lambda_b[j*nUSV:(j+1)*nUSV, k*mUSV:(k+1)*mUSV] = \
-                    np.dot(np.linalg.matrix_power(self.Ab, j-k-1),self.Bb)
-
-        self.Xi_b = np.zeros((nUSV*(T+1), 1))
-        for block_row in range(1, T+1):
-            for i in range(block_row-1):
-                self.Xi_b[block_row*nUSV:(block_row+1)*nUSV] += \
-                    np.dot(np.linalg.matrix_power(self.Ab, block_row-1-i), self.Cb)
 
         input_min = np.array([[params.T_min], [-params.ang_vel_max_b]])
         input_max = np.array([[params.T_max], [ params.ang_vel_max_b]])
@@ -628,7 +615,7 @@ class CompleteUSVProblem():
                 self.psi_0 = xb[4, 0]
                 if not self.has_updated_once:
                     print "UPDATE WHHT:", self.ub.value[0,0], xb[4, 0]
-                    # self.update_linearisation_symbolic(self.ub.value[0,0], xb[4, 0])      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!
+                    self.update_linearisation_symbolic(self.ub.value[0,0], xb[4, 0])      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!
                     # self.update_linearisation_symbolic(0.5, 0)      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!
             # else:
             #     print "didn't update"
@@ -732,21 +719,41 @@ class CompleteUSVProblem():
             [0]
         ])
 
+
+        # DEBUG !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+        # T_0 = 0.5
+        # psi_0 = 0.0
+        # self.update_linearisation_numeric(T_0, psi_0)
+
         Phi = sympy.zeros((T+1)*nUSV, nUSV)
         Lambda = sympy.zeros((T+1)*nUSV, T*mUSV )
         for j in range(T+1):
             Phi[j*nUSV:(j+1)*nUSV, :] = np.linalg.matrix_power(A,j)
             for k in range(j):  # range(0) returns empty list
                 Lambda[j*nUSV:(j+1)*nUSV, k*mUSV:(k+1)*mUSV] = \
-                    ( np.linalg.matrix_power(A,j-k-1) )*B
+                    np.dot( np.linalg.matrix_power(A,j-k-1), B)
+
+        # print "OKAY:;", np.mean(Phi.subs([(T_0_sym, T_0), (Psi_0_sym, psi_0)]) - self.Phi_b), np.mean(Lambda.subs([(T_0_sym, T_0), (Psi_0_sym, psi_0)]) - self.Lambda_b)
+        # print "OKAY:;", np.max(Phi.subs([(T_0_sym, T_0), (Psi_0_sym, psi_0)]) - self.Phi_b), np.max(Lambda.subs([(T_0_sym, T_0), (Psi_0_sym, psi_0)]) - self.Lambda_b)
+        # print "OKAY:;", np.min(Phi.subs([(T_0_sym, T_0), (Psi_0_sym, psi_0)]) - self.Phi_b), np.min(Lambda.subs([(T_0_sym, T_0), (Psi_0_sym, psi_0)]) - self.Lambda_b)
 
         Xi = sympy.zeros(nUSV*(T+1), 1)
         for block_row in range(1, T+1):
             for i in range(block_row-1):
                 Xi[block_row*nUSV:(block_row+1)*nUSV, :] += \
-                    ( np.linalg.matrix_power(A,block_row-1-i) )*C
+                    np.dot( np.linalg.matrix_power(A,block_row-1-i), C)
+
+
 
         self.Phi_func = sympy.lambdify([T_0_sym, Psi_0_sym], Phi)
+
+        # DEBUG !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+        # temp_func = sympy.lambdify([T_0_sym, Psi_0_sym], np.linalg.matrix_power(A,T)[0:1, :])
+        # print "Not then", np.linalg.matrix_power(self.Ab, T)[0:1, :] - temp_func(T_0, psi_0)
+        # print "And furthermore", np.linalg.matrix_power(self.Ab, T)[0:1, :] - (A**T).evalf(subs={T_0_sym: T_0, Psi_0_sym: psi_0})[0:1, :]
+        # exit()
+        # ENDDEBUG !!!!!!!!!!!!!
+
         self.Lambda_func = sympy.lambdify([T_0_sym, Psi_0_sym], Lambda)
         self.Xi_func = sympy.lambdify([T_0_sym, Psi_0_sym], Xi)
 
@@ -754,7 +761,25 @@ class CompleteUSVProblem():
         print "UPDATING IWHT:", T_0, np.rad2deg(psi_0)
         self.T_0 = T_0
         self.psi_0 = psi_0
-        print "Phi, Lambda, Xi:", np.mean(self.Phi_b - self.Phi_func(T_0, psi_0)), np.mean(self.Lambda_b - self.Lambda_func(T_0, psi_0)), np.mean(self.Xi_b - self.Xi_func(T_0, psi_0))
+
+        # These matrices have to be updated, despite not being used for generating
+        # Phi, Lambda, and Xi. This is because the simulator gets these matrices
+        # to correctly simulate dynamics, so they have to be up to date.
+        self.Ab[2:4, 4:5] = np.array([
+            [-SAMPLING_TIME*np.sin(psi_0)*T_0],
+            [ SAMPLING_TIME*np.cos(psi_0)*T_0]
+        ])
+        self.Bb[2:4, 0:1] = np.array([
+            [SAMPLING_TIME*np.cos(psi_0)],
+            [SAMPLING_TIME*np.sin(psi_0)]
+        ])
+        self.Cb[2:4, 0:1] = np.array([
+            [ SAMPLING_TIME*np.sin(psi_0)*T_0*psi_0],
+            [-SAMPLING_TIME*np.cos(psi_0)*T_0*psi_0]
+        ])
+
+        # print "Phi, Lambda, Xi:", np.max(self.Phi_b - self.Phi_func(T_0, psi_0)), np.max(self.Lambda_b - self.Lambda_func(T_0, psi_0)), np.max(self.Xi_b - self.Xi_func(T_0, psi_0))
+        # print "Phi, Lambda, Xi:", np.min(self.Phi_b - self.Phi_func(T_0, psi_0)), np.min(self.Lambda_b - self.Lambda_func(T_0, psi_0)), np.min(self.Xi_b - self.Xi_func(T_0, psi_0))
         self.Phi_b = self.Phi_func(T_0, psi_0)
         self.Lambda_b = self.Lambda_func(T_0, psi_0)
         self.Xi_b = self.Xi_func(T_0, psi_0)
