@@ -298,8 +298,8 @@ class DataAnalyser():
                 # plt.yticks(np.arange(0, 50, 1))
                 # plt.gca().set_aspect('equal', adjustable='box')
                 try:
-                    # ax.set_xlim([0, 16])
-                    # ax.set_ylim([0, 16])
+                    # ax.set_xlim([5, 20])
+                    # ax.set_ylim([0, 15])
                     # ax.set_xlim([0, 12])
                     # ax.set_ylim([-20, 0])
                     plt.pause(0.05)

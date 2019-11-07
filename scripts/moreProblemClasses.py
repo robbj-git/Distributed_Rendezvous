@@ -446,7 +446,7 @@ class CompleteUSVProblem():
         self.T_0 = 0.5#0.8272736282479447#0.5
         # 0.8272736282479447 10.734105254385234
         self.should_update_OSQP_matrices = False
-        self.ang_threshold = np.radians(10)
+        self.ang_threshold = np.radians(0)
         self.set_initial_dynamics()
         [self.nUSV, self.mUSV] = self.Bb.shape
         self.nUSV_s = 2
@@ -610,12 +610,10 @@ class CompleteUSVProblem():
             self.xb.value = self.predict_trajectory(xb, self.ub.value)
         else:
             # time1 = time()
-            if self.ub.value is not None and abs(xb[4,0]-self.psi_0) > self.ang_threshold:
-                print "WOULD HAVE UPDATED!"
+            if self.ub.value is not None and abs(xb[4,0]-self.psi_0) >= self.ang_threshold:
                 self.psi_0 = xb[4, 0]
                 if not self.has_updated_once:
-                    print "UPDATE WHHT:", self.ub.value[0,0], xb[4, 0]
-                    self.update_linearisation_symbolic(self.ub.value[0,0], xb[4, 0])      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!
+                    self.update_linearisation_symbolic(self.ub.value[0,0], xb[4, 0])      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!?
                     # self.update_linearisation_symbolic(0.5, 0)      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!
             # else:
             #     print "didn't update"
@@ -655,9 +653,14 @@ class CompleteUSVProblem():
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
 
         if self.should_update_OSQP_matrices:
-            print "WHYYY,T HIS HAPPENED!!!"
             Lambda_sparse = self.get_Lambda_sparse(self.Lambda_b)
-            self.problemOSQP.update(Ax = Lambda_sparse.data, Ax_idx = self.Lambda_indices)
+            # self.problemOSQP.update(Ax = Lambda_sparse.data, Ax_idx = self.Lambda_indices)    # DIDN'T WORK!
+            self.A_OSQP = sp.sparse.bmat([
+                [np.eye(self.nUSV*(self.T+1)), -Lambda_sparse, None],         # Dynamics
+                [self.lower_left_sparse, self.lower_mid_sparse, self.lower_right_sparse]
+            ]).tocsc()
+            # self.problemOSQP.update(Ax = self.A_OSQP.data)
+            self.problemOSQP.update(Ax = self.A_OSQP.data, Ax_idx = np.array(range(self.A_OSQP.data.shape[0])) )
             self.should_update_OSQP_matrices = False
 
     def set_initial_dynamics(self):
@@ -762,6 +765,7 @@ class CompleteUSVProblem():
         self.T_0 = T_0
         self.psi_0 = psi_0
 
+        # time1 = time()
         # These matrices have to be updated, despite not being used for generating
         # Phi, Lambda, and Xi. This is because the simulator gets these matrices
         # to correctly simulate dynamics, so they have to be up to date.
@@ -778,11 +782,17 @@ class CompleteUSVProblem():
             [-SAMPLING_TIME*np.cos(psi_0)*T_0*psi_0]
         ])
 
+        # time2 = time()
         # print "Phi, Lambda, Xi:", np.max(self.Phi_b - self.Phi_func(T_0, psi_0)), np.max(self.Lambda_b - self.Lambda_func(T_0, psi_0)), np.max(self.Xi_b - self.Xi_func(T_0, psi_0))
         # print "Phi, Lambda, Xi:", np.min(self.Phi_b - self.Phi_func(T_0, psi_0)), np.min(self.Lambda_b - self.Lambda_func(T_0, psi_0)), np.min(self.Xi_b - self.Xi_func(T_0, psi_0))
         self.Phi_b = self.Phi_func(T_0, psi_0)
+        # time3 = time()
         self.Lambda_b = self.Lambda_func(T_0, psi_0)
+        # print self.Lambda_b
+        # time4 = time()
         self.Xi_b = self.Xi_func(T_0, psi_0)
+        # time5 = time()
+        # print "times:", time2-time1, time3-time2, time4-time3, time5-time4
         self.should_update_OSQP_matrices = True
         return
 
@@ -888,7 +898,14 @@ class CompleteUSVProblem():
             if element == 1337:
                 indices.append(index)
 
-        return A_OSQP.indices[indices]
+        # return A_OSQP.indices[indices]
+        # print indices
+        # print "COMO:", len(indices), Lambda_csc.data.shape
+        print "MEAN:", np.mean([A_OSQP.data[i] for i in indices])
+        # TODO: FIND SOME WAY TO SEE IF IT REALLY IS THE RIGHT INDICES IN THAT YOU'RE UPDATING. I KNOW!
+        # GET THESE INDICES, UPDATE NOMINAL A_OSQP USING OSQP_UPDATE AND SEND IN 1337 AS ALL DATA. THEN
+        # ITERATE OVER A_OSQP DATA AND SEE IF 1337 APPEARS IN CORRECT PLACES!""
+        return np.array(indices)
 
     def predict_trajectory(self, xb0, ub_traj):
         return np.dot(self.Phi_b, xb0) + np.dot(self.Lambda_b, ub_traj)

@@ -308,9 +308,12 @@ class USV_simulator():
                 # print "state, input:", self.xb, self.uUSV
                 # print "WHYY", self.Ab
                 # print "Hmm", np.dot(self.Ab,self.xb)[5, 0], np.dot(self.Bb,self.uUSV)[5,0] , self.Cb[5, 0]
+                # print "Control:", self.uUSV[0, 0], self.uUSV[1, 0]
                 self.xb = np.dot(self.Ab,self.xb) + np.dot(self.Bb,self.uUSV) + self.Cb
             else:
                 self.xb = np.dot(self.Ab,self.xb) + np.dot(self.Bb,self.uUSV)
+
+            # print "SPEED:", np.sqrt(self.xb[2, 0]**2 + self.xb[3, 0]**2)#self.xb[2, 0], self.xb[3,0]#np.sqrt(self.xb[2, 0]**2 + self.xb[3, 0]**2)
 
             # ------- Sleep --------
             i += 1
@@ -318,6 +321,7 @@ class USV_simulator():
                 break
             end = time.time()
             self.iteration_durations.append(end-start)
+            print "DUR:",end-start
             # start0 = time.time()
             # print "sleep start"
             self.rate.sleep()

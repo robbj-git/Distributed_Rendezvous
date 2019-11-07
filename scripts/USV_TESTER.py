@@ -161,8 +161,8 @@ elif CENTRALISED:
     hor_max = 100#195#150#120
     hor_min = 100#80#120
 elif DISTRIBUTED:
-    hor_max = 40#100#280#100
-    hor_min = 40#100
+    hor_max = 10#100#280#100
+    hor_min = 10#100
 
 hor_inner = 60#30#15
 
