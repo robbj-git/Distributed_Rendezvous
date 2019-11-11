@@ -63,7 +63,7 @@ class USV_simulator():
 
         if self.USE_COMPLETE_USV and self.DISTRIBUTED:
             self.problemUSV = CompleteUSVProblem(pp.T, pp.Q, pp.P, pp.R,\
-                pp.Qb_vel, pp.Pb_vel, self.nUAV, self.params, travel_dir = travel_dir)
+                pp.Qb_vel, pp.Pb_vel, self.nUAV, self.params, travel_dir = travel_dir, USE_PICKLED_SYMBOLIC_VALUES = pp.USE_PICKLED_SYMBOLIC_VALUES)
             self.nUSV = self.problemUSV.nUSV
             self.mUSV = self.problemUSV.mUSV
             self.Ab = self.problemUSV.Ab

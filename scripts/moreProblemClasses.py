@@ -9,6 +9,7 @@ from scipy.integrate import quad
 from multiprocessing import Process, Pipe
 from IMPORT_ME import SAMPLING_TIME
 from time import time
+import pickle
 
 # DEBUG
 from matrices_and_parameters import g, k_phi, k_theta, w_phi, w_theta, xi_phi, xi_theta, kdx, kdy, ddx, ddy, k_psib, tau_psib
@@ -429,7 +430,8 @@ class CompleteCentralisedProblem():
 class CompleteUSVProblem():
 
     # def __init__(self, T, A, B, Ab, Bb, Q, P, R, Q_vel, P_vel, Qb_vel, Pb_vel, type, params, travel_dir = None):
-    def __init__(self, T, Qb, Pb, Rb, Qb_vel, Pb_vel, nUAV, params, travel_dir = None):
+    def __init__(self, T, Qb, Pb, Rb, Qb_vel, Pb_vel, nUAV, params, travel_dir = None, USE_PICKLED_SYMBOLIC_VALUES = False):
+        self.USE_PICKLED_SYMBOLIC_VALUES = USE_PICKLED_SYMBOLIC_VALUES
         self.T = T
         self.Qb = Q
         self.Pb = P
@@ -626,15 +628,15 @@ class CompleteUSVProblem():
             if self.ub.value is not None and abs(xb[4,0]-self.psi_0) >= self.ang_threshold:
                 self.psi_0 = xb[4, 0]
                 self.update_linearisation_symbolic(self.ub.value[0,0], xb[4, 0])      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!?
-                time2 = time()
+                # time2 = time()
                 self.update_OSQP(xb, x_traj, self.ub.value[0,0], xb[4, 0])
-                time3 = time()
+                # time3 = time()
             else:
                 self.update_OSQP(xb, x_traj)
-                time2 = time()
-                time3 = time()
+                # time2 = time()
+                # time3 = time()
             results = self.problemOSQP.solve()
-            time4 = time()
+            # time4 = time()
             # print "Duraitons:", time2-time1, time3-time2, time4-time3
             if not results.x[0] is None:
                 self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
@@ -651,6 +653,7 @@ class CompleteUSVProblem():
 
     def update_OSQP(self, xb0, x_traj, T_0=None, psi_0=None):
 
+        # time1 = time()
         params = self.params
         T = self.T
         self.l_OSQP[0:(T+1)*self.nUSV, 0:1] = np.dot(self.Phi_b, xb0) + self.Xi_b
@@ -661,11 +664,14 @@ class CompleteUSVProblem():
 
         self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
 
+        # time2 = time()
         if self.should_update_OSQP_matrices:
             # Lambda_sparse = self.get_Lambda_sparse(self.Lambda_b)
             # self.problemOSQP.update(Ax = -Lambda_sparse.data, Ax_idx = self.Lambda_indices)
             self.problemOSQP.update(Ax = np.array(self.data_to_update(T_0, psi_0)), Ax_idx = self.indices_to_update)
             self.should_update_OSQP_matrices = False
+        # time3 = time()
+        # print "TIMMS_", time3-time2, time2-time1
 
     def set_initial_dynamics(self):
         self.A_c = np.array([
@@ -697,7 +703,6 @@ class CompleteUSVProblem():
         nUSV = self.nUSV
         mUSV = self.mUSV
         nUSV_s = self.nUSV_s
-
         # print "Worst case nonzero elements", nUSV*mUSV*T*(T+1)/2
 
         T_0_sym, Psi_0_sym = sympy.symbols('T_0_sym, Psi_0_sym')
@@ -754,19 +759,41 @@ class CompleteUSVProblem():
             [sympy.Matrix(self.vel_s_extractor)],        # Velocity
             [sympy.zeros(mUSV*T, nUSV_s)]                # Input
         ])
-        A_mat = sympy.BlockMatrix([
-            [sympy.eye(nUSV*(T+1)), -Lambda, sympy.zeros(nUSV*(T+1), nUSV_s)],
-            [lower_left, lower_mid, lower_right]
-        ])
-        A_mat_sparse = SparseMatrix(A_mat)
+
+        generate_anew = True
+        if self.USE_PICKLED_SYMBOLIC_VALUES:
+            try:
+                pickle_in = open('robbj_experiment_results/A_mat_sparse.pickle', "rb")
+                A_mat_sparse = pickle.load(pickle_in)
+                generate_anew = False
+
+            except Exception as e:
+                print "Failed loading A_mat:", e
+                pass
+        if generate_anew:
+            A_mat = sympy.BlockMatrix([
+                [sympy.eye(nUSV*(T+1)), -Lambda, sympy.zeros(nUSV*(T+1), nUSV_s)],
+                [lower_left, lower_mid, lower_right]
+            ])
+            A_mat_sparse = SparseMatrix(A_mat)
 
         (data_all, indices_all, indptr_all)  = self.get_csc_arguments(A_mat_sparse)
 
-        # Find indices of all elements that are variables and might therefore change
-        variable_indices = []
-        for (index, element) in enumerate(data_all):
-            if not element.is_constant():
-                variable_indices.append(index)
+        generate_anew = True
+        if self.USE_PICKLED_SYMBOLIC_VALUES:
+            try:
+                pickle_in = open('robbj_experiment_results/variable_indices.pickle', "rb")
+                variable_indices = pickle.load(pickle_in)
+                generate_anew = False
+            except Exception as e:
+                print "Failed loading variable indices:", e
+                pass
+        if generate_anew:
+            # Find indices of all elements that are variables and might therefore change
+            variable_indices = []
+            for (index, element) in enumerate(data_all):
+                if not element.is_constant():
+                    variable_indices.append(index)
 
         self.data_all = sympy.lambdify([T_0_sym, Psi_0_sym], data_all)
         self.indices_all = np.array(indices_all)
@@ -775,11 +802,19 @@ class CompleteUSVProblem():
         self.indices_to_update = np.array(variable_indices)
         self.data_to_update = sympy.lambdify([T_0_sym, Psi_0_sym], variable_data)
         self.Phi_func = sympy.lambdify([T_0_sym, Psi_0_sym], Phi)
-        self.Lambda_func = sympy.lambdify([T_0_sym, Psi_0_sym], Lambda)
+        # self.Lambda_func = sympy.lambdify([T_0_sym, Psi_0_sym], Lambda)
         self.Xi_func = sympy.lambdify([T_0_sym, Psi_0_sym], Xi)
 
+        # Pickles A_mat and variable_indices since they take ages to generate
+        pickle_out_A_mat = open("robbj_experiment_results/A_mat_sparse.pickle", "wb")
+        pickle_out_variable_indices = open("robbj_experiment_results/variable_indices.pickle", "wb")
+        pickle.dump(A_mat_sparse, pickle_out_A_mat)
+        pickle.dump(variable_indices, pickle_out_variable_indices)
+        pickle_out_A_mat.close()
+        pickle_out_variable_indices.close()
+
     def update_linearisation_symbolic(self, T_0, psi_0):
-        print "UPDATING IWHT:", T_0, np.rad2deg(psi_0)
+        # print "UPDATING IWHT:", T_0, np.rad2deg(psi_0)
         self.T_0 = T_0
         self.psi_0 = psi_0
 
@@ -800,12 +835,12 @@ class CompleteUSVProblem():
             [-SAMPLING_TIME*np.cos(psi_0)*T_0*psi_0]
         ])
 
-        time1 = time()
+        # time1 = time()
         self.Phi_b = self.Phi_func(T_0, psi_0)
-        time2 = time()
+        # time2 = time()
         # self.Lambda_b = self.Lambda_func(T_0, psi_0)
         self.Xi_b = self.Xi_func(T_0, psi_0)
-        time3 = time()
+        # time3 = time()
         # print "TIEMS:", time2 - time1, time3- time2
         self.should_update_OSQP_matrices = True
         return

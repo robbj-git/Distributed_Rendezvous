@@ -1,6 +1,13 @@
 from math import ceil
 from sys import maxint
 
+# ONLY FOR DEGUG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+USE_PICKLED_SYMBOLIC_VALUES = True
+# Only usable for complete USV problem, allows user to avoid re-generating
+# symbolic matrices which can take ages, but if this option is accicentally
+# left on when settings have changed, outdated matrices will be loaded and
+# the new setting will not be used!
+
 USE_HIL = False     # Should the UAV communicate with the HIL setup?
 # SET ONE OF THESE TO TRUE
 CENTRALISED = False
@@ -14,7 +21,7 @@ ADD_DROPOUT = False # Should a communication loss between the vehicles be simula
 PRED_PARALLEL_TRAJ = True
 
 USE_COMPLETE_HORIZONTAL = False
-USE_COMPLETE_USV = True
+USE_COMPLETE_USV = False
 
 SOLVE_PARALLEL_AT_END = True
 
