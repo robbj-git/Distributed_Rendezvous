@@ -121,7 +121,7 @@ class USV_simulator():
 
         # Initial predicted trajectory assumes no control signal applied
         self.ub_traj = np.zeros( (self.mUSV*self.T, 1) )
-        self.xb_traj = self.problemUSV.predict_trajectory(xb_0, self.ub_traj)
+        self.xb_traj = self.problemUSV.predict_zero_trajectory(xb_0)
         self.problemUSV.xb.value = self.xb_traj
 
         if self.PARALLEL:
@@ -321,7 +321,6 @@ class USV_simulator():
                 break
             end = time.time()
             self.iteration_durations.append(end-start)
-            print "DUR:",end-start
             # start0 = time.time()
             # print "sleep start"
             self.rate.sleep()

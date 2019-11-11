@@ -580,23 +580,24 @@ class CompleteUSVProblem():
             [np.kron(np.ones((T, 1)), input_max)],                        # Input
         ])
 
-        Lambda_sparse = self.get_Lambda_sparse(self.Lambda_b)
-        self.lower_left_sparse = csc_matrix(np.block([
-            [self.vel_extractor],                           # Velocity
-            [np.zeros((mUSV*T, nUSV*(T+1)))]                # Input
-        ]))
-        self.lower_mid_sparse = csc_matrix(np.block([
-            [np.zeros((2*(T+1), mUSV*T))],                  # Velocity
-            [np.eye(mUSV*T)]                                # Input
-        ]))
-        self.lower_right_sparse = csc_matrix(np.block([
-            [self.vel_s_extractor],                     # Velocity
-            [np.zeros((mUSV*T, nUSV_s))]                # Input
-        ]))
-        self.A_OSQP = sp.sparse.bmat([
-            [np.eye(nUSV*(T+1)), -Lambda_sparse, None],         # Dynamics
-            [self.lower_left_sparse, self.lower_mid_sparse, self.lower_right_sparse]
-        ]).tocsc()
+        # Lambda_sparse = self.get_Lambda_sparse(self.Lambda_b)
+        # self.lower_left_sparse = csc_matrix(np.block([
+        #     [self.vel_extractor],                           # Velocity
+        #     [np.zeros((mUSV*T, nUSV*(T+1)))]                # Input
+        # ]))
+        # self.lower_mid_sparse = csc_matrix(np.block([
+        #     [np.zeros((2*(T+1), mUSV*T))],                  # Velocity
+        #     [np.eye(mUSV*T)]                                # Input
+        # ]))
+        # self.lower_right_sparse = csc_matrix(np.block([
+        #     [self.vel_s_extractor],                     # Velocity
+        #     [np.zeros((mUSV*T, nUSV_s))]                # Input
+        # ]))
+        # self.A_OSQP = sp.sparse.bmat([
+        #     [np.eye(nUSV*(T+1)), -Lambda_sparse, None],         # Dynamics
+        #     [self.lower_left_sparse, self.lower_mid_sparse, self.lower_right_sparse]
+        # ]).tocsc()
+        self.A_OSQP = csc_matrix((self.data_all(0,0), self.indices_all, self.indptr_all), shape=((nUSV+2)*(T+1)+mUSV*T, nUSV*(T+1)+mUSV*T+nUSV_s))
         self.should_update_OSQP_matrices = False
 
     def create_optimisation_problem(self):
@@ -619,16 +620,22 @@ class CompleteUSVProblem():
         # print xb_m[-2:]
         if USV_should_stop:
             self.ub.value = np.zeros((self.mUSV*self.T, 1))
-            self.xb.value = self.predict_trajectory(xb, self.ub.value)
+            self.xb.value = self.predict_zero_trajectory(xb)
         else:
-            # time1 = time()
+            time1 = time()
             if self.ub.value is not None and abs(xb[4,0]-self.psi_0) >= self.ang_threshold:
                 self.psi_0 = xb[4, 0]
                 self.update_linearisation_symbolic(self.ub.value[0,0], xb[4, 0])      # TODO: SEND IN VALUE FOR T_0 INSTEAD!!!!?
+                time2 = time()
                 self.update_OSQP(xb, x_traj, self.ub.value[0,0], xb[4, 0])
+                time3 = time()
             else:
                 self.update_OSQP(xb, x_traj)
+                time2 = time()
+                time3 = time()
             results = self.problemOSQP.solve()
+            time4 = time()
+            # print "Duraitons:", time2-time1, time3-time2, time4-time3
             if not results.x[0] is None:
                 self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
                 self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):-self.nUSV_s], (-1, 1))
@@ -636,13 +643,9 @@ class CompleteUSVProblem():
             else:
                 print "USV problem failed:", results.info.status
                 self.ub.value = np.zeros((self.mUSV*self.T, 1))
-                self.xb.value = self.predict_trajectory(xb, self.ub.value)
+                self.xb.value = self.predict_zero_trajectory(xb)
                 self.s.value = np.zeros((self.nUSV_s,1))
                 self.s.value.fill(np.nan)
-            # temp_del_me = np.kron(np.eye(self.T+1), self.Ex)
-            # print "Mean discrepancy", np.mean(self.vel_vec-np.dot(temp_del_me, self.xb.value))
-            # print self.vel_vec-np.dot(temp_del_me, self.xb.value)
-            # print self.vel_vec
         end = time()
         self.last_solution_duration = end - start
 
@@ -756,23 +759,20 @@ class CompleteUSVProblem():
             [lower_left, lower_mid, lower_right]
         ])
         A_mat_sparse = SparseMatrix(A_mat)
-        col_list = A_mat_sparse.col_list()
-        # Extracts all from A_mat
-        data_all = A_mat_sparse.nnz()*[0]
-        for (i, tuple) in enumerate(col_list):
-            data_all[i] = tuple[2]
 
-        # variable_indices = []
-        # for (index, element) in enumerate(data_all):
-        #     if not element.is_constant():
-        #         variable_indices.append(index)
-        #
-        # print "VARIND:",variable_indices
+        (data_all, indices_all, indptr_all)  = self.get_csc_arguments(A_mat_sparse)
 
-        # variable_data = [data_all[i] for i in variable_indices]
-        # self.indices_to_update = np.array(variable_indices)
-        variable_data = data_all
-        self.indices_to_update = np.array(range(len(data_all)))
+        # Find indices of all elements that are variables and might therefore change
+        variable_indices = []
+        for (index, element) in enumerate(data_all):
+            if not element.is_constant():
+                variable_indices.append(index)
+
+        self.data_all = sympy.lambdify([T_0_sym, Psi_0_sym], data_all)
+        self.indices_all = np.array(indices_all)
+        self.indptr_all = np.array(indptr_all)
+        variable_data = [data_all[i] for i in variable_indices]
+        self.indices_to_update = np.array(variable_indices)
         self.data_to_update = sympy.lambdify([T_0_sym, Psi_0_sym], variable_data)
         self.Phi_func = sympy.lambdify([T_0_sym, Psi_0_sym], Phi)
         self.Lambda_func = sympy.lambdify([T_0_sym, Psi_0_sym], Lambda)
@@ -800,19 +800,49 @@ class CompleteUSVProblem():
             [-SAMPLING_TIME*np.cos(psi_0)*T_0*psi_0]
         ])
 
-        # time2 = time()
-        # print "Phi, Lambda, Xi:", np.max(self.Phi_b - self.Phi_func(T_0, psi_0)), np.max(self.Lambda_b - self.Lambda_func(T_0, psi_0)), np.max(self.Xi_b - self.Xi_func(T_0, psi_0))
-        # print "Phi, Lambda, Xi:", np.min(self.Phi_b - self.Phi_func(T_0, psi_0)), np.min(self.Lambda_b - self.Lambda_func(T_0, psi_0)), np.min(self.Xi_b - self.Xi_func(T_0, psi_0))
+        time1 = time()
         self.Phi_b = self.Phi_func(T_0, psi_0)
-        # time3 = time()
-        self.Lambda_b = self.Lambda_func(T_0, psi_0)
-        # print self.Lambda_b
-        # time4 = time()
+        time2 = time()
+        # self.Lambda_b = self.Lambda_func(T_0, psi_0)
         self.Xi_b = self.Xi_func(T_0, psi_0)
-        # time5 = time()
-        # print "times:", time2-time1, time3-time2, time4-time3, time5-time4
+        time3 = time()
+        # print "TIEMS:", time2 - time1, time3- time2
         self.should_update_OSQP_matrices = True
         return
+
+    # Extracts arguments from sympy sparse matrix that can be used for
+    # constructing scipy csc_matrix. Returns (data, indices, indptr)
+    def get_csc_arguments(self, sympy_mat):
+        col_list = sympy_mat.col_list()
+        # Extracts data and indices
+        data = sympy_mat.nnz()*[0]
+        indices = sympy_mat.nnz()*[0]    # Indices used for constructing scipy csc_matrix
+        for (i, tuple) in enumerate(col_list):
+            data[i] = tuple[2]
+            indices[i] = tuple[0]
+
+        # Creates indptr
+        indptr = [0]
+        col = 0
+        for (index, tuple) in enumerate(col_list):
+            if tuple[1] > col:
+                # The column of the currently considered data point is higher than
+                # the value stored in the col-variable.
+                col += 1
+                indptr.append(index)
+                while col != tuple[1]:
+                    col += 1
+                    indptr.append(index)
+        indptr.append(index+1)
+        len_indptr = len(indptr)
+        # indptr should have one more element than the number of columns in the matrix
+        # If this is not the case at this point, it is because some of the ending
+        # columns contain only zeros. This loop fills out indptr with remaining elements
+        while len_indptr < sympy_mat.shape[1]+1:
+            indptr.append(indptr[-1])
+            len_indptr += 1
+
+        return (data, indices, indptr)
 
     # TODO: THIS ONE IS NOT KEPT UP TO DATE!!!
     def update_linearisation_numeric(self, T_0, psi_0):
@@ -938,7 +968,11 @@ class CompleteUSVProblem():
         return np.array(indices)
 
     def predict_trajectory(self, xb0, ub_traj):
-        return np.dot(self.Phi_b, xb0) + np.dot(self.Lambda_b, ub_traj)
+        return np.dot(self.Phi_b, xb0) + np.dot(self.Lambda_b, ub_traj) + self.Xi_b
+
+    def predict_zero_trajectory(self, xb0):
+        # Returns predicted trajectory assuming no control input
+        return np.dot(self.Phi_b, xb0) + self.Xi_b
 
 # if __name__ == '__main__':
 #     params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \

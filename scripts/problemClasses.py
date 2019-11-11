@@ -814,6 +814,10 @@ class USVProblem():
     def predict_trajectory( self, xb_0, ub_traj):
         return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
 
+    def predict_zero_trajectory(self, xb0):
+        # Returns predicted trajectory assuming no control input
+        return np.dot(self.Phi_b, xb0)
+
     def update_OSQP(self, xb0, x_traj):
         params = self.params
         T = self.T
@@ -1522,6 +1526,10 @@ class FastUSVProblem():
 
     def predict_trajectory( self, xb_0, ub_traj):
         return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
+
+    def predict_zero_trajectory(self, xb0):
+        # Returns predicted trajectory assuming no control input
+        return np.dot(self.Phi_b, xb0)
 
     def update_OSQP(self, xb0, xb_des, ub_des):
         self.l_OSQP = np.dot(self.Phi_b, xb0)
