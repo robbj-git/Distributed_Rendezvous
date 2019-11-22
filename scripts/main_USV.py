@@ -24,12 +24,6 @@ def experiment_index_callback(msg):
     global exp_index
     exp_index = msg.data
 
-# TODO: ADD STORING AT THE END!!!!!!!!!!!!!!!!!!!!!!!
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-
 problem_params = ProblemParams()
 problem_params.settings = settings
 problem_params.params = dynamics_parameters

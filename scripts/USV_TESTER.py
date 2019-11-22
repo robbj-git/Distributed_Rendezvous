@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
-from matrices_and_parameters import *              # THESE ARE SUPER NECESSARY
-from IMPORT_ME import *
+from IMPORT_ME import settings, NEXT_HORIZON
+from matrices_and_parameters import dynamics_parameters
 from helper_classes import Parameters
 from helper_functions import mat_to_multiarray_stamped, get_dist_traj, get_travel_dir
 import Queue
@@ -76,50 +76,15 @@ has_sent_time = False
 
 class ProblemParams():
     def __init__(self):
-        self.CENTRALISED = CENTRALISED
-        self.DISTRIBUTED = DISTRIBUTED
-        self.PARALLEL = PARALLEL
-        self.SAMPLING_RATE = SAMPLING_RATE
-        self.SAMPLING_TIME = SAMPLING_TIME
-        self.USE_HIL = USE_HIL
-        self.INTER_ITS = INTER_ITS
-        self.USE_COMPLETE_USV = USE_COMPLETE_USV
-        self.A = A
-        self.B = B
-        self.Ab = Ab
-        self.Bb = Bb
-        self.Q = Q
-        self.P = P
-        self.R = R
-        self.Av = Av
-        self.Bv = Bv
-        self.Qv = Qv
-        self.Pv = Pv
-        self.Rv = Rv
-        self.Qb_vel = Qb_vel
-        self.Pb_vel = Pb_vel
-        self.Q_vel = Q_vel
-        self.P_vel = P_vel
-        self.used_solver = used_hor_solver
-        self.lookahead = lookahead
-        self.KUAV = KUAV
-        self.KUSV = KUSV
-        self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max, psi_max, T_max, T_min)
-        self.delay_len = delay_len
-        self.ADD_DROPOUT = ADD_DROPOUT
-        self.PRED_PARALLEL_TRAJ = PRED_PARALLEL_TRAJ
-        self.SOLVE_PARALLEL_AT_END = SOLVE_PARALLEL_AT_END
-        self.SHOULD_SHIFT_MESSAGES = SHOULD_SHIFT_MESSAGES
-        self.dropout_lower_bound = dropout_lower_bound
-        self.dropout_upper_bound = dropout_upper_bound
+        self.settings = settings
+        self.params = dynamics_parameters
+        self.T = 0
+        self.T_inner = 0
 
 problem_params = ProblemParams()
 
 # -2, 1
 xb_m = np.array([[-6], [6], [np.nan], [np.nan]])
-if USE_COMPLETE_USV and DISTRIBUTED:
-    xb_m = np.block([[xb_m], [np.zeros((2, 1))]])
 
 reverse_dir = False
 dir = get_travel_dir(xb_m, reverse_dir)
@@ -153,14 +118,14 @@ took_too_long_horizon = -1
 # SHOULD BE ABLE TO REMOVE, I INIT NODE ABOVE NOW!
 # my_usv_simulator = USV_simulator(problem_params)
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
-NUM_TESTS = 100
-if PARALLEL:
+NUM_TESTS = 1
+if settings.PARALLEL:
     hor_max = 347#170#420#405#100
     hor_min = 347#170#420#300#100
-elif CENTRALISED:
+elif settings.CENTRALISED:
     hor_max = 100#195#150#120
     hor_min = 100#80#120
-elif DISTRIBUTED:
+elif settings.DISTRIBUTED:
     hor_max = 100#280#100
     hor_min = 100
 
@@ -175,10 +140,10 @@ for N in range(hor_max, hor_min-1, -1):
 
     it_mean_list = np.full((NUM_TESTS, 1), np.nan)
     it_median_list = np.full((NUM_TESTS, 1), np.nan)
-    if not CENTRALISED:
+    if not settings.CENTRALISED:
         hor_mean_list = np.full((NUM_TESTS, 1), np.nan)
         hor_median_list = np.full((NUM_TESTS, 1), np.nan)
-    if PARALLEL:
+    if settings.PARALLEL:
         hor_inner_mean_list = np.full((NUM_TESTS, 1), np.nan)
         hor_inner_median_list = np.full((NUM_TESTS, 1), np.nan)
 
@@ -237,7 +202,7 @@ for N in range(hor_max, hor_min-1, -1):
             print "Asked to change horizon"
             break
 
-        my_usv_simulator.simulate_problem(sim_len, xb_m)
+        my_usv_simulator.simulate_problem(settings.sim_len, xb_m)
         # time.sleep(20)
         # my_usv_simulator.store_data()
         # try:
@@ -248,29 +213,29 @@ for N in range(hor_max, hor_min-1, -1):
 
         it_mean_list[i] = np.mean(my_usv_simulator.iteration_durations)
         it_median_list[i] = np.median(my_usv_simulator.iteration_durations)
-        if not CENTRALISED:
+        if not settings.CENTRALISED:
             hor_mean_list[i] = np.mean(my_usv_simulator.hor_solution_durations)
             hor_median_list[i] = np.median(my_usv_simulator.hor_solution_durations)
-        if PARALLEL:
+        if settings.PARALLEL:
             hor_inner_mean_list[i] = np.mean(my_usv_simulator.hor_inner_solution_durations)
             hor_inner_median_list[i] = np.median(my_usv_simulator.hor_inner_solution_durations)
 
         print "Finished simulation round", i, "with horizon", N
         print "Mean iteration:", np.mean(my_usv_simulator.iteration_durations)
-        if not CENTRALISED:
+        if not settings.CENTRALISED:
             print "Mean solution:", np.mean(my_usv_simulator.hor_solution_durations)
-        if PARALLEL:
+        if settings.PARALLEL:
             print "Mean inner solution", np.mean(my_usv_simulator.hor_inner_solution_durations)
         if np.mean(my_usv_simulator.iteration_durations) > SAMPLING_TIME and \
             np.median(my_usv_simulator.iteration_durations) > SAMPLING_TIME:
             print "ITERATION TOOK TOO LONG"
             took_too_long = True
         # ------------- FOR PARALLEL ------------
-        if PARALLEL and \
+        if settings.PARALLEL and \
             np.mean(my_usv_simulator.hor_solution_durations) > \
-                INTER_ITS*SAMPLING_TIME and\
+                settings.INTER_ITS*SAMPLING_TIME and\
             np.median(my_usv_simulator.hor_solution_durations) > \
-                INTER_ITS*SAMPLING_TIME:
+                settings.INTER_ITS*SAMPLING_TIME:
             print "SOLUTION TOOK TOO LONG"
             took_too_long = True
     if took_too_long:
@@ -281,21 +246,6 @@ for N in range(hor_max, hor_min-1, -1):
         should_finish = False
         print "Still asked to finish"
         break
-
-# print "started sleeping"
-# if not quit_horizon >= 0:
-#     # Sleep for a while, give UAV-tester a chance to finish
-#     time.sleep(20)
-#
-# print "stopped sleeping"
-
-# try:
-#     my_usv_simulator.plot_results(True)
-# except Exception as e:
-#     # Sometimes exception is thrown when plotting window is closed
-#     print "Error while plotting:"
-#     print e
-#     pass
 
 while exp_index == -1:
     if rospy.is_shutdown():
@@ -324,10 +274,10 @@ if quit_horizon >= 0 and exp_index != -2:
     # TODO: Why and when is UAV notified about that the USV has finished storing?
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEAN_USV.csv', it_mean_list, delimiter=',')
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/MEDIAN_USV.csv', it_median_list, delimiter=',')
-    if not CENTRALISED:
+    if not settings.CENTRALISED:
         np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEAN_USV.csv', hor_mean_list, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_MEDIAN_USV.csv', hor_median_list, delimiter=',')
-    if PARALLEL:
+    if settings.PARALLEL:
         np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEAN_USV.csv', hor_inner_mean_list, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEDIAN_USV.csv', hor_inner_median_list, delimiter=',')
 

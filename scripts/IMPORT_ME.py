@@ -9,8 +9,8 @@ sim_len = 500
 USE_HIL = False
 # SET ONE OF THESE TO TRUE
 CENTRALISED = False
-DISTRIBUTED = True
-PARALLEL = False
+DISTRIBUTED = False
+PARALLEL = True
 
 SAMPLING_RATE = 20              # Dynamics change if this changes
 SAMPLING_TIME = 1.0/SAMPLING_RATE
@@ -31,6 +31,9 @@ if CENTRALISED + DISTRIBUTED + PARALLEL != 1:
 
 INTER_ITS = 5  # Number of iteration between each solution of the parallel optimisaion problem
 ADD_USV_SECOND_OBJECTIVE = True
+
+# Macros for testing scripts UAV_TESTER.py and USV_TESTER.py
+NEXT_HORIZON = 0
 
 # Simulated minimum delay between a sent and received message
 delay_time = 0.75   # Measured in seconds

@@ -26,13 +26,6 @@ def USV_time_callback(msg):
     USV_time = msg.data
     UAV_time = rospy.Time.now()
 
-
-# TODO: ADD STORING AT THE END!!!!!!!!!!!!!!!!!!!!!!!
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-
 problem_params = ProblemParams()
 problem_params.settings = settings
 problem_params.params = dynamics_parameters

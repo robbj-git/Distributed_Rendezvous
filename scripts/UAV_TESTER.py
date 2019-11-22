@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import rospy
-from matrices_and_parameters import *              # THESE ARE SUPER NECESSARY
-from IMPORT_ME import *
+from IMPORT_ME import settings, NEXT_HORIZON
+from matrices_and_parameters import dynamics_parameters
 from helper_classes import Parameters
-from helper_functions import mat_to_multiarray_stamped, get_dist_traj
+from helper_functions import mat_to_multiarray_stamped, get_dist_traj, get_travel_dir
 import Queue
 import os
 # from callbacks import *
@@ -66,60 +66,16 @@ rospy.Subscriber('USV_time', Time, USV_time_callback)
 
 time.sleep(0.5) # Give time for subscribers to be created properly
 
-# Altitude of the USV, currently assumed constant, which is why it is set here
-hb = 2
-
 class ProblemParams():
     def __init__(self):
-        self.CENTRALISED = CENTRALISED
-        self.DISTRIBUTED = DISTRIBUTED
-        self.PARALLEL = PARALLEL
-        self.SAMPLING_RATE = SAMPLING_RATE
-        self.SAMPLING_TIME = SAMPLING_TIME
-        self.USE_HIL = USE_HIL
-        self.INTER_ITS = INTER_ITS
-        self.USE_COMPLETE_HORIZONTAL = USE_COMPLETE_HORIZONTAL
-        self.USE_COMPLETE_USV = USE_COMPLETE_USV
-        self.A = A
-        self.B = B
-        self.Ab = Ab
-        self.Bb = Bb
-        self.Q = Q
-        self.P = P
-        self.R = R
-        self.Qb_vel = Qb_vel
-        self.Pb_vel = Pb_vel
-        self.Q_vel = Q_vel
-        self.P_vel = P_vel
-        self.Av = Av
-        self.Bv = Bv
-        self.Qv = Qv
-        self.Pv = Pv
-        self.Rv = Rv
-        self.used_solver = used_hor_solver
-        self.vert_used_solver = used_vert_solver
-        self.lookahead = lookahead
-        self.KUAV = KUAV
-        self.KUSV = KUSV
-        self.KVert = KVert
-        self.params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-            wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max, psi_max, T_max, T_min)
-        self.hb = hb
-        self.delay_len = delay_len
-        self.ADD_DROPOUT = ADD_DROPOUT
-        self.PRED_PARALLEL_TRAJ = PRED_PARALLEL_TRAJ
-        self.SHOULD_SHIFT_MESSAGES = SHOULD_SHIFT_MESSAGES
-        self.SOLVE_PARALLEL_AT_END = SOLVE_PARALLEL_AT_END
-        self.dropout_lower_bound = dropout_lower_bound
-        self.dropout_upper_bound = dropout_upper_bound
+        self.settings = settings
+        self.params = dynamics_parameters
+        self.T = 0
+        self.T_inner = 0
 
 problem_params = ProblemParams()
 
-if USE_COMPLETE_HORIZONTAL:
-    nUAV = 8
-else:
-    nUAV = 4
-
+nUAV = dynamics_parameters.A.shape[0]
 x_m = np.zeros((nUAV, 1))
 xv_m = np.array([[7.0], [0.0]])#np.matrix([[12.0], [0.0]])
 prev_simulator = None
@@ -131,33 +87,26 @@ my_uav_simulator =  None
 # xb = None
 #-2, 1
 xb = np.array([[-6], [6], [np.nan], [np.nan]])
-if xb is not None and CENTRALISED:
+if xb is not None and settings.CENTRALISED:
     reverse_dir = False
     dir = get_travel_dir(xb, reverse_dir)
 else:
     dir = None
 # -------------- TESTING LOOP ----------------
 # NUM_TESTS = 1 DOESN'T ALWAYS WORK, THE TESTERS FAIL WAITING FOR EACH OTHER
-NUM_TESTS = 100
-if PARALLEL:
+NUM_TESTS = 1
+if settings.PARALLEL:
     hor_max = 347#170#420#405#100
     hor_min = 347#170#420#300#100
-elif CENTRALISED:
+elif settings.CENTRALISED:
     hor_max = 100#195#150#120
     hor_min = 100#80#120
-elif DISTRIBUTED:
+elif settings.DISTRIBUTED:
     hor_max = 100#280#100
     hor_min = 100
 
 hor_inner = 60#30#15
 cancelled = False
-
-# Need to create a simulator, because simulators call rospy.node_init(), and
-# that function must be called before anything can be published, but it also
-# can only be called once, so I can't call it here myself
-# SHOULD BE ABLE TO REMOVE, I INIT NODE ABOVE NOW!
-# my_uav_simulator = UAV_simulator(problem_params)
-# my_uav_simulator.deinitialise() # We don't want it to receive callbacks
 
 for N in range(hor_max, hor_min-1, -1):
     took_too_long = False
@@ -173,7 +122,7 @@ for N in range(hor_max, hor_min-1, -1):
     vert_mean_list = np.full((NUM_TESTS, 1), np.nan)
     vert_median_list = np.full((NUM_TESTS, 1), np.nan)
     landing_list = np.full((NUM_TESTS, 1), np.nan)
-    if PARALLEL:
+    if settings.PARALLEL:
         hor_inner_mean_list = np.full((NUM_TESTS, 1), np.nan)
         hor_inner_median_list = np.full((NUM_TESTS, 1), np.nan)
         vert_inner_mean_list = np.full((NUM_TESTS, 1), np.nan)
@@ -184,7 +133,7 @@ for N in range(hor_max, hor_min-1, -1):
     # some of the callbacks between them will mess up
     round_pub.publish(Int32(-1))
     # Sometimes other tester had time to switch to round 0 too quickly and round -1 was never registered
-    # while USV_test_round > 0:
+    # while USV_test_round > 0:CETNR
     while USV_test_round != -1:
         if rospy.is_shutdown():
             break
@@ -199,13 +148,6 @@ for N in range(hor_max, hor_min-1, -1):
         # We deinitialise here because hopefully old messages have stopped arriving by now
         my_uav_simulator.deinitialise()
     prev_simulator = my_uav_simulator
-
-    # while UAV_time is None:
-    #     if rospy.is_shutdown():
-    #         break
-    #     if random.randint(1, 101) == 100:
-    #         print "Waiting in time loop"
-    #     time.sleep(0.01)
 
     my_uav_simulator = UAV_simulator(problem_params, travel_dir = dir)
 
@@ -230,23 +172,16 @@ for N in range(hor_max, hor_min-1, -1):
             cancelled = True
             break
 
-        my_uav_simulator.simulate_problem(sim_len, x_m, xv_m)
+        my_uav_simulator.simulate_problem(settings.sim_len, x_m, xv_m)
         print "FINISHED SIMULATING!"
         print "Mean iteration:", np.mean(my_uav_simulator.iteration_durations)
         print "Mean horizontal:", np.mean(my_uav_simulator.hor_solution_durations)
         print "Mean vertical", np.mean(my_uav_simulator.vert_solution_durations)
-        if PARALLEL:
+        if settings.PARALLEL:
             print "Mean horizontal inner:", np.mean(my_uav_simulator.hor_inner_solution_durations)
             print "Median horizontal inner:", np.median(my_uav_simulator.hor_inner_solution_durations)
             print "Mean vertical inner:", np.mean(my_uav_simulator.vert_inner_solution_durations)
-        # # DEBUG storing
-        # my_uav_simulator.store_data()
-        # DEBUG plotting
-        # try:
-        #     my_uav_simulator.plot_results(True)
-        # except Exception as e:
-        #     print "Failed plotting:"
-        #     print e
+
         xv_log = my_uav_simulator.xv_log
         z_traj = xv_log[0,:]
         # Calculate landing time
@@ -266,7 +201,7 @@ for N in range(hor_max, hor_min-1, -1):
         hor_median_list[i] = np.median(my_uav_simulator.hor_solution_durations)
         vert_mean_list[i] = np.mean(my_uav_simulator.vert_solution_durations)
         vert_median_list[i] = np.median(my_uav_simulator.vert_solution_durations)
-        if PARALLEL:
+        if settings.PARALLEL:
             hor_inner_mean_list[i] = np.mean(my_uav_simulator.hor_inner_solution_durations)
             hor_inner_median_list[i] = np.median(my_uav_simulator.hor_inner_solution_durations)
             vert_inner_mean_list[i] = np.mean(my_uav_simulator.vert_inner_solution_durations)
@@ -278,16 +213,16 @@ for N in range(hor_max, hor_min-1, -1):
         # print vert_median_list[i]
         print mean_list[i]
         print mean_list[i] - hor_mean_list[i] - vert_mean_list[i]
-        if PARALLEL and (hor_mean_list[i] > SAMPLING_TIME*INTER_ITS \
-            or hor_median_list[i] > SAMPLING_TIME*INTER_ITS\
-            or vert_mean_list[i] > SAMPLING_TIME*INTER_ITS \
-            or vert_median_list[i] > SAMPLING_TIME*INTER_ITS):
+        if settings.PARALLEL and (hor_mean_list[i] > settings.SAMPLING_TIME*settings.INTER_ITS \
+            or hor_median_list[i] > settings.SAMPLING_TIME*settings.INTER_ITS\
+            or vert_mean_list[i] > settings.SAMPLING_TIME*settings.INTER_ITS \
+            or vert_median_list[i] > settings.SAMPLING_TIME*settings.INTER_ITS):
             took_too_long = True
             print "TOOK TO LONG!"
             instruct_pub.publish(Int32(NEXT_HORIZON))
             break
-        if (np.mean(my_uav_simulator.iteration_durations) > SAMPLING_TIME\
-            or np.median(my_uav_simulator.iteration_durations) > SAMPLING_TIME):
+        if (np.mean(my_uav_simulator.iteration_durations) > settings.SAMPLING_TIME\
+            or np.median(my_uav_simulator.iteration_durations) > settings.SAMPLING_TIME):
             print "Uh-oh, took too long!"
             took_too_long = True
             instruct_pub.publish(Int32(NEXT_HORIZON))
@@ -339,7 +274,7 @@ if not cancelled:
         time_str = "nan\nnan"
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/time_diff.txt', [time_str], fmt="%s")
 
-    if PARALLEL:
+    if settings.PARALLEL:
         np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEAN.csv', hor_inner_mean_list, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/HOR_INNER_MEDIAN.csv', hor_inner_median_list, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/VERT_INNER_MEAN.csv', vert_inner_mean_list, delimiter=',')
