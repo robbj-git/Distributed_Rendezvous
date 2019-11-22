@@ -2,6 +2,8 @@ import numpy as np
 
 # ------------------- PARAMETERS -------------------
 
+hb = 0 # Altitude of USV, assumed constant for entire simulation
+
 tau_wb = 0.4
 k_psib = 0.5
 tau_psib = 0.5  # TODO: SET THESE TO SOMETHING REASONABLE!!!
@@ -143,18 +145,43 @@ Pv = np.matrix([
     [0.0, 0.0]
 ])
 
+class DynamicsParameters():
+    def __init__(self):
+        self.A = A
+        self.B = B
+        self.Ab = Ab
+        self.Bb = Bb
+        self.Q = Q
+        self.P = P
+        self.R = R
+        self.Qb_vel = Qb_vel
+        self.Pb_vel = Pb_vel
+        self.Q_vel = Q_vel
+        self.P_vel = P_vel
+        self.Av = Av
+        self.Bv = Bv
+        self.Qv = Qv
+        self.Pv = Pv
+        self.Rv = Rv
+        self.amin = amin
+        self.amax = amax
+        self.amin_b = amin_b
+        self.amax_b = amax_b
+        self.hs = hs
+        self.ds = ds
+        self.dl = dl
+        self.wmin = wmin
+        self.wmax = wmax
+        self.wmin_land = wmin_land
+        self.kl = kl
+        self.v_max = vmax
+        self.v_max_b = vmax_b
+        self.v_min_b = vmin_b
+        self.ang_max = ang_max
+        self.ang_vel_max = ang_vel_max
+        self.psi_max = psi_max
+        self.T_max = T_max
+        self.T_min = T_min
+        self.hb = hb
 
-# ------------- INNER CONTROLLERS ----------------
-KUAV = np.matrix([
-    [300.7506,         0.0,   32.4751,         0.0],
-    [     0.0,    300.7506,       0.0,     32.4751]
-])
-
-KUSV = np.matrix([
-    [303.7656,         0.0,   32.3763,         0.0],
-    [     0.0,    303.7656,       0.0,     32.3763]
-])
-
-KVert = np.matrix([
-    [127.6562,      12.7630]
-])
+dynamics_parameters = DynamicsParameters()

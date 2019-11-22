@@ -1,4 +1,0 @@
-<launch>
-	<node pkg="rendezvous_problem" type="UAV_main.py" name="UAV_main"/>
-	<node pkg="rendezvous_problem" type="USV_main.py" name="USV_main"/>
-</launch>

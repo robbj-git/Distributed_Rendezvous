@@ -1327,8 +1327,8 @@ class DataLoader:
 
         file = open(dir_path + '/info.txt')
         lines = file.readlines()
-        if lines[9].find('altitude:') > 0:
-            substrings = lines[9].split(':')
+        if lines[7].find('altitude:') > 0:
+            substrings = lines[7].split(':')
             return float(substrings[1])
         else:
             print "Couldn't find USV altitude"
@@ -1395,25 +1395,25 @@ class DataLoader:
     def get_safety_region(self, dir_path):
         file = open(dir_path + '/info.txt')
         lines = file.readlines()
-        if lines[11].find('dl:') == -1:
+        if lines[9].find('dl:') == -1:
             add = 1
         else:
             add = 0
 
-        if lines[11+add].find('dl:') > -1:
-            substrings = lines[11+add].split(':')
+        if lines[9+add].find('dl:') > -1:
+            substrings = lines[9+add].split(':')
             dl = float(substrings[1])
         else:
             print "Couldn't find dl"
 
-        if lines[12+add].find('ds:') > -1:
-            substrings = lines[12+add].split(':')
+        if lines[10+add].find('ds:') > -1:
+            substrings = lines[10+add].split(':')
             dl = float(substrings[1])
         else:
             print "Couldn't find ds"
 
-        if lines[13+add].find('hs:') > -1:
-            substrings = lines[13+add].split(':')
+        if lines[11+add].find('hs:') > -1:
+            substrings = lines[11+add].split(':')
             dl = float(substrings[1])
         else:
             print "Couldn't find hs"
@@ -1423,8 +1423,8 @@ class DataLoader:
     def get_dropout_bounds(self, dir_path):
         file = open(dir_path + '/info.txt')
         lines = file.readlines()
-        if lines[11].find('Dropout bounds:') == 0:
-            substrings1 = lines[11].split(':')
+        if lines[9].find('Dropout bounds:') == 0:
+            substrings1 = lines[9].split(':')
             substrings2 = substrings1[1].split('to')
             return (True, int(substrings2[0]), int(substrings2[1]))
         else:
@@ -1437,13 +1437,13 @@ if __name__ == '__main__':
     # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)    # data_analyser.plot_altitude(real_time = False, perspective = ACTUAL)
+    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)    # data_analyser.plot_altitude(real_time = False, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_obj_val(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)
     # data_analyser.plot_time_histogram()
     # data_analyser.plot_time_curve()
-    data_analyser.store_formatted_descent(perspective = ACTUAL) # WARNING: ONLY ACTUAL PERSPECTIVE IS CORRECTLY IMPLEMENTED, TIME STAMPS ARE NOT CORRECT FOR OTHER PERSPECTIVES
+    # data_analyser.store_formatted_descent(perspective = ACTUAL) # WARNING: ONLY ACTUAL PERSPECTIVE IS CORRECTLY IMPLEMENTED, TIME STAMPS ARE NOT CORRECT FOR OTHER PERSPECTIVES
     # data_analyser.store_formatted_durations()
 
     # use_dir = False

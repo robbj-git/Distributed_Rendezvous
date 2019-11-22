@@ -6,7 +6,7 @@ from rendezvous_problem.msg import Float32MultiArrayStamped
 from std_msgs.msg import MultiArrayDimension
 import rendezvous_problem       # For ROS srv
 from helper_functions import shift_traj_msg, shift_trajectory, get_traj_dir, \
-    get_cos_angle_between, get_travel_dir
+    get_cos_angle_between
 
 import cvxpy as cp
 import numpy as np
@@ -29,7 +29,7 @@ np.seterr(divide='ignore', invalid='ignore')
 
 class CentralisedProblem():
 
-    def __init__(self, T, A, B, Ab, Bb, Q, P, R, Q_vel, P_vel, Qb_vel, Pb_vel, type, params, travel_dir = None):
+    def __init__(self, T, A, B, Ab, Bb, Q, P, R, Q_vel, P_vel, Qb_vel, Pb_vel, params, travel_dir = None):
         self.T = T
         self.A = A
         self.B = B
@@ -43,7 +43,6 @@ class CentralisedProblem():
         self.Q_vel = Q_vel
         self.P_vel = P_vel
         self.params = params
-        self.type = type
         [self.nUAV, self.mUAV] = B.shape
         [self.nUSV, self.mUSV] = Bb.shape
         self.nUAV_s = 2
@@ -52,8 +51,6 @@ class CentralisedProblem():
         self.travel_dir = travel_dir
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
-        if self.type == 'CVXGEN':
-            self.ROS_init()
 
     def create_optimisation_matrices(self):
         # DEBUG
@@ -266,36 +263,19 @@ class CentralisedProblem():
         start = time.time()
         self.x_0.value = x_m
         self.xb_0.value = xb_m
-        # print "STARTED SOLVING WITH:", xb_m[0,0], ",", xb_m[1,0]  # DEBUG PRINT
-        if self.type == 'CVXGEN':
-            self.x_0_msg.array.data = np.asarray(x_m).flatten(order='F')   # TODO: Send in ndarray, then flatten will be enough
-            self.xb_0_msg.array.data = np.asarray(xb_m).flatten(order='F') # TODO: Send in ndarray, then flatten will be enough
-            self.req.x_0 = self.x_0_msg
-            self.req.xb_0 = self.xb_0_msg
-            resp = self.service(self.req)
-            self.x.value = np.reshape(resp.x_traj.array.data,\
-                (self.nUAV*(self.T+1), 1), order='F')
-            self.xb.value = np.reshape(resp.xb_traj.array.data,\
-                (self.nUSV*(self.T+1), 1), order='F')
-            self.u.value = np.reshape(resp.u_traj.array.data,\
-                (self.mUAV*self.T, 1), order='F')
-            self.ub.value = np.reshape(resp.ub_traj.array.data,\
-                (self.mUSV*self.T, 1), order='F')
-        elif self.type == 'OSQP':
-            self.update_OSQP(x_m, xb_m)
-            results = self.problemOSQP.solve()
-            T = self.T
-            nUAV = self.nUAV
-            mUAV = self.mUAV
-            # print results.info.status, results.info.iter #DEBUG PRINT
-            self.x.value = np.reshape(results.x[0:nUAV*(T+1)], (-1, 1))
-            self.u.value = np.reshape(results.x[nUAV*(T+1):nUAV*(T+1)+mUAV*T], (-1, 1))
-            self.s_UAV.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T:nUAV*(T+1)+mUAV*T+2], (-1, 1))
-            self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T+2:2*nUAV*(T+1)+mUAV*T+2], (-1, 1))
-            self.ub.value = np.reshape(results.x[2*nUAV*(T+1)+mUAV*T+2:-2], (-1, 1))
-            self.s_USV.value = np.reshape(results.x[-2:], (-1, 1))
-        else:
-            self.problemCent.solve(solver=cp.OSQP, warm_start=True, verbose=False)
+
+        self.update_OSQP(x_m, xb_m)
+        results = self.problemOSQP.solve()
+        T = self.T
+        nUAV = self.nUAV
+        mUAV = self.mUAV
+        # print results.info.status, results.info.iter #DEBUG PRINT
+        self.x.value = np.reshape(results.x[0:nUAV*(T+1)], (-1, 1))
+        self.u.value = np.reshape(results.x[nUAV*(T+1):nUAV*(T+1)+mUAV*T], (-1, 1))
+        self.s_UAV.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T:nUAV*(T+1)+mUAV*T+2], (-1, 1))
+        self.xb.value = np.reshape(results.x[nUAV*(T+1)+mUAV*T+2:2*nUAV*(T+1)+mUAV*T+2], (-1, 1))
+        self.ub.value = np.reshape(results.x[2*nUAV*(T+1)+mUAV*T+2:-2], (-1, 1))
+        self.s_USV.value = np.reshape(results.x[-2:], (-1, 1))
         end = time.time()
         self.last_solution_duration = end - start
 
@@ -372,7 +352,7 @@ class CentralisedProblem():
 
 class UAVProblem():
 
-    def __init__(self, T, A, B, Q, P, R, Q_vel, P_vel, nUSV, type, params):
+    def __init__(self, T, A, B, Q, P, R, Q_vel, P_vel, nUSV, params):
         self.T = T
         self.A = A
         self.B = B
@@ -382,15 +362,12 @@ class UAVProblem():
         self.Q_vel = Q_vel
         self.P_vel = P_vel
         self.nUSV = nUSV
-        self.type = type
         self.params = params
         # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
         [self.nUAV, self.mUAV] = B.shape
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
-        if self.type == 'CVXGEN':
-            self.ROS_init()
 
     def create_optimisation_matrices(self):
         T = self.T
@@ -511,29 +488,11 @@ class UAVProblem():
         # print xbhat_m.shape
         self.xb_hat.value = xbhat_m
 
-        if self.type == 'CVXGEN':
-            self.x_0_msg.array.data = np.asarray(x_m).flatten(order='F')  # TODO: Send in ndarray, then flatten will be enough
-            self.xb_traj_msg.array.data = xbhat_m.flatten(order='F')
-            self.req.x_0 = self.x_0_msg
-            self.req.xb_traj = self.xb_traj_msg
-            resp = self.service(self.req)
-            self.u.value = np.reshape(resp.u_traj.array.data, (-1, 1), order='F')
-            self.x.value = np.reshape(resp.x_traj.array.data, (-1, 1), order='F' )
-        elif self.type == 'OSQP':
-            self.update_OSQP(x_m, xbhat_m)
-            results = self.problemOSQP.solve()
-            self.x.value = np.reshape(results.x[0:self.nUAV*(self.T+1)], (-1, 1))
-            self.u.value = np.reshape(results.x[self.nUAV*(self.T+1):-2], (-1, 1))
-            self.s.value = np.reshape(results.x[-2:], (-1, 1))
-        else:   # self.type == 'CVXPy'
-            self.problemUAV.solve(solver=cp.OSQP, warm_start=True, verbose=False)
-            if self.x.value is None:
-                print "x was None, u was", self.u.value #DEBUG
-                # Sometimes a bug occurs where the solution returns only None
-                # In that case, apply no control input
-                self.u.value = np.zeros((self.mUAV*self.T, 1))
-                self.x.value = self.predict_trajectory(x_m, self.u.value)
-            # print 'Solve exit'  #DEBUG
+        self.update_OSQP(x_m, xbhat_m)
+        results = self.problemOSQP.solve()
+        self.x.value = np.reshape(results.x[0:self.nUAV*(self.T+1)], (-1, 1))
+        self.u.value = np.reshape(results.x[self.nUAV*(self.T+1):-2], (-1, 1))
+        self.s.value = np.reshape(results.x[-2:], (-1, 1))
 
         end = time.time()
         self.last_solution_duration = end - start
@@ -575,7 +534,7 @@ class UAVProblem():
 
 class USVProblem():
 
-    def __init__(self, T, Ab, Bb, Q, P, R, Qb_vel, Pb_vel, nUAV, type, params, travel_dir = None):
+    def __init__(self, T, Ab, Bb, Q, P, R, Qb_vel, Pb_vel, nUAV, params, travel_dir = None):
         self.T = T
         self.Ab = Ab
         self.Bb = Bb
@@ -585,7 +544,6 @@ class USVProblem():
         self.Qb_vel = Qb_vel
         self.Pb_vel = Pb_vel
         self.nUAV = nUAV
-        self.type = type
         self.params = params
         # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
@@ -751,17 +709,7 @@ class USVProblem():
         if USV_should_stop:
             self.ub.value = np.zeros((self.mUSV*self.T, 1))
             self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
-        elif self.type == 'CVXGEN':
-            self.xb_0_msg.array.data = np.asarray(xb_m).flatten(order='F') # TODO: Send in ndarray, then flatten will be enough
-            self.x_traj_msg.array.data = xhat_m.flatten(order='F')
-            self.req.xb_0 = self.xb_0_msg
-            self.req.x_traj = self.x_traj_msg
-            resp = self.service(self.req)
-            self.ub.value = np.reshape(resp.ub_traj.array.data, (-1, 1),\
-                order='F')
-            self.xb.value = np.reshape(resp.xb_traj.array.data, (-1, 1),\
-                order='F' )
-        elif self.type == 'OSQP':
+        else:
             self.update_OSQP(xb_m, xhat_m)
             results = self.problemOSQP.solve()
             if not results.x[0] is None:
@@ -775,13 +723,6 @@ class USVProblem():
                 self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
                 self.s.value = np.zeros((1,1))
                 self.s.value.fill(np.nan)
-        else:
-            self.problemUSV.solve(solver=cp.OSQP, warm_start=True, verbose=False)
-            if self.xb.value is None:
-                # Sometimes a bug occurs where the solution returns only None
-                # In that case, apply no control input
-                self.ub.value = np.zeros((self.mUSV*self.T, 1))
-                self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
         end = time.time()
         self.last_solution_duration = end - start
 
@@ -835,14 +776,13 @@ class USVProblem():
 
 class VerticalProblem():
 
-    def __init__(self, T, Av, Bv, Qv, Pv, Rv, type, params, hb = 0, use_many_its = False):
+    def __init__(self, T, Av, Bv, Qv, Pv, Rv, params, hb = 0, use_many_its = False):
         self.T = T
         self.Av = Av
         self.Bv = Bv
         self.Qv = Qv
         self.Pv = Pv
         self.Rv = Rv
-        self.type = type
         self.params = params
         self.nv = 2
         self.mv = 1
@@ -1101,44 +1041,14 @@ class VerticalProblem():
         # since the vertical state has dimension 2. It is stored as an 1D-array
         # so that it can be used with cp.diag later on
         self.b2.value =  np.ravel( np.kron( self.b.value, np.ones((2, 1)))  )
-        if self.type == 'CVXGEN':
-            self.xv_0_msg.array.data = np.asarray(xv_m).flatten(order='F')  # TODO: Send in ndarray, then remove asarray
-            self.xbv_msg.array.data = [xbv_m, 0.0]#*self.T  # For some reason I only send in a scalar for xbv_m...
-            self.dist_traj_msg.array.data = dist.flatten(order='F')
-            self.req.xv_0 = self.xv_0_msg
-            self.req.xbv = self.xbv_msg
-            self.req.dist_traj = self.dist_traj_msg
-            resp = self.service(self.req)
-            self.wdes.value = np.reshape(resp.wdes_traj.array.data, (self.T, 1),\
-                order='F')
-            self.xv.value = np.reshape(resp.xv_traj.array.data, \
-                (self.nv*(self.T+1), 1), order='F')
-        elif self.type == 'OSQP':
-            start = time.time()
-            self.update_OSQP(xv_m, dist, self.b.value, self.xb_v)
-            results = self.problemOSQP.solve()
-            if results.x[0] is not None and results.info.status != 'maximum iterations reached':
-                self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
-                self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):-1], (-1, 1))
-                self.s.value  = np.full((1,1), results.x[-1])
-                self.obj_val = results.info.obj_val
-                # print self.s.value[0,0], self.obj_val
-                # print results.info.iter # DEBUG PRINT
-                # print self.xv.value[-2]
-                # #DEBUG
-                # print "CONSTRAINT SATISFACTION:"
-                # self.print_constraints_satisfied(self.xv.value, self.wdes.value)
-            else:
-                # Optimisation failed
-                print "VERTICAL STATUS:", results.info.status
-                # Using np.full() doesn't seem to work, since "variables must be
-                # real". Using this approach seems to circumvent that limitation
-                # np.zeros() is used instead of np.empty() since np.empty()
-                # sometimes contains non-real values, causing an exception
-                self.wdes.value = np.zeros((self.T, 1))
-                self.wdes.value.fill(np.nan)
-                self.xv.value = np.zeros(((self.T+1)*self.nv, 1))
-                self.xv.value.fill(np.nan)
+        self.update_OSQP(xv_m, dist, self.b.value, self.xb_v)
+        results = self.problemOSQP.solve()
+        if results.x[0] is not None and results.info.status != 'maximum iterations reached':
+            self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
+            self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):-1], (-1, 1))
+            self.s.value  = np.full((1,1), results.x[-1])
+            self.obj_val = results.info.obj_val
+
             duration = time.time() - start
             self.num_iters_log.append(results.info.iter)
             self.durations.append(duration)
@@ -1285,14 +1195,13 @@ class VerticalProblem():
 # (no safety constraints).
 class FastUAVProblem():
 
-    def __init__(self, T, A, B, Q, P, R, type, params):
+    def __init__(self, T, A, B, Q, P, R, params):
         self.T = T
         self.A = A
         self.B = B
         self.Q = Q
         self.P = P
         self.R = R
-        self.type = type
         self.params = params
         self.last_solution_duration = np.nan
         [self.nUAV, self.mUAV] = B.shape
@@ -1381,13 +1290,10 @@ class FastUAVProblem():
         self.x_0.value = x_m
         self.x_des.value = x_des_m
 
-        if self.type == 'CVXPy':
-            self.problemUAV.solve(solver=cp.OSQP, warm_start=True, verbose=False)
-        elif self.type == 'OSQP':
-            self.update_OSQP(x_m, x_des_m, u_des)
-            results = self.problemOSQP.solve()
-            self.x.value = np.reshape(results.x[0:self.nUAV*(self.T+1)], (-1, 1))
-            self.u.value = np.reshape(results.x[self.nUAV*(self.T+1):], (-1, 1))
+        self.update_OSQP(x_m, x_des_m, u_des)
+        results = self.problemOSQP.solve()
+        self.x.value = np.reshape(results.x[0:self.nUAV*(self.T+1)], (-1, 1))
+        self.u.value = np.reshape(results.x[self.nUAV*(self.T+1):], (-1, 1))
 
         # EDIT: I'm not sure this ever happens anymore
         if self.x.value is None:
@@ -1413,14 +1319,13 @@ class FastUAVProblem():
 
 class FastUSVProblem():
 
-    def __init__(self, T, Ab, Bb, Q, P, R, type, params):
+    def __init__(self, T, Ab, Bb, Q, P, R, params):
         self.T = T
         self.Ab = Ab
         self.Bb = Bb
         self.Q = Q
         self.P = P
         self.R = R
-        self.type = type
         self.params = params
         self.last_solution_duration = np.nan # Most recent time taken to solve problem
         [self.nUSV, self.mUSV] = Bb.shape
@@ -1510,12 +1415,8 @@ class FastUSVProblem():
         if USV_should_stop:
             self.ub.value = np.zeros((self.mUSV*self.T, 1))
             self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
-        elif self.type == 'CVXPy':
-            self.problemUSV.solve(solver=cp.OSQP, warm_start=True, verbose=False)
-        elif self.type == 'OSQP':
-            # start1 = time.time()
+        else:
             self.update_OSQP(xb_m, xb_des_m, ub_des)
-            # start2 = time.time()
             results = self.problemOSQP.solve()
             self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
             self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):], (-1, 1))
@@ -1547,14 +1448,13 @@ class FastUSVProblem():
 
 class FastVerticalProblem():
 
-    def __init__(self, T, Av, Bv, Qv, Pv, Rv, type, params):
+    def __init__(self, T, Av, Bv, Qv, Pv, Rv, params):
         self.T = T
         self.Av = Av
         self.Bv = Bv
         self.Qv = Qv
         self.Pv = Pv
         self.Rv = Rv
-        self.type = type
         self.params = params
         self.nv = 2
         self.mv = 1
@@ -1671,40 +1571,27 @@ class FastVerticalProblem():
         nv = self.nv
         self.xv_0.value = xv_m
         self.xv_des.value = xv_des_m
-        if self.type == 'OSQP':
-            start = time.time()
-            self.update_OSQP(xv_m, xv_des_m, wdes_des)
-            results = self.problemOSQP.solve()
 
-            if results.x[0] is not None:
-                self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
-                self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):], (-1, 1))
-            else:
-                # Optimisation failed
-                # Using np.full() doesn't seem to work, since "variables must be
-                # real". Using this approach seems to circumvent that limitation
-                # np.zeros() is used instead of np.empty() since np.empty()
-                # sometimes contains non-real values, causing an exception
-                self.wdes.value = np.zeros((self.T, 1))
-                self.wdes.value.fill(np.nan)
-                self.xv.value = np.zeros(((self.T+1)*self.nv, 1))
-                self.xv.value.fill(np.nan)
-            duration = time.time() - start
-            self.num_iters_log.append(results.info.iter)
-            self.durations.append(duration)
-        else:   # self.type == 'CVXPY'
-            try:
-                start = time.time()
-                self.problemVert.solve(solver=cp.OSQP, warm_start=False, verbose=False, max_iter = 5000)
-                duration = time.time() - start
-                stats = self.problemVert.solver_stats
-                self.num_iters_log.append(stats.num_iters)
-                self.durations.append(duration)
-            except cp.error.SolverError as e:
-                print "Vertical problem:"
-                print e
-                self.wdes.value = np.zeros((self.T, 1))
-                self.wdes.value.fill(np.nan)
+        self.update_OSQP(xv_m, xv_des_m, wdes_des)
+        results = self.problemOSQP.solve()
+
+        if results.x[0] is not None:
+            self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
+            self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):], (-1, 1))
+        else:
+            # Optimisation failed
+            # Using np.full() doesn't seem to work, since "variables must be
+            # real". Using this approach seems to circumvent that limitation
+            # np.zeros() is used instead of np.empty() since np.empty()
+            # sometimes contains non-real values, causing an exception
+            self.wdes.value = np.zeros((self.T, 1))
+            self.wdes.value.fill(np.nan)
+            self.xv.value = np.zeros(((self.T+1)*self.nv, 1))
+            self.xv.value.fill(np.nan)
+
+        duration = time.time() - start
+        self.num_iters_log.append(results.info.iter)
+        self.durations.append(duration)
         end = time.time()
         self.last_solution_duration = end - start
 

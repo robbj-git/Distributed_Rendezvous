@@ -58,13 +58,9 @@ add_message_files(
 )
 
 # Generate services in the 'srv' folder
-add_service_files(
-  FILES
-  USV_problem.srv
-  UAV_problem.srv
-  centralised_problem.srv
-  vertical_problem.srv
-)
+# add_service_files(
+#   FILES
+# )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -219,30 +215,6 @@ include_directories(
 #
 #add_executable(util src/util.c)
 #
-
-add_executable(solve_centralised_problem_server src/solve_centralised_problem_server.cpp src/Centralised/ldl.c src/Centralised/matrix_support.c src/Centralised/solver.c src/Centralised/util.c)
-target_link_libraries(solve_centralised_problem_server ${catkin_LIBRARIES})
-add_dependencies(solve_centralised_problem_server rendezvous_problem_gencpp)
-
-add_executable(solve_USV_problem_server src/solve_USV_problem_server.cpp src/USV/ldl.c src/USV/matrix_support.c src/USV/solver.c src/USV/util.c)
-target_link_libraries(solve_USV_problem_server ${catkin_LIBRARIES})
-add_dependencies(solve_USV_problem_server rendezvous_problem_gencpp)
-
-add_executable(solve_UAV_problem_server src/solve_UAV_problem_server.cpp src/UAV/ldl.c src/UAV/matrix_support.c src/UAV/solver.c src/UAV/util.c)
-target_link_libraries(solve_UAV_problem_server ${catkin_LIBRARIES})
-add_dependencies(solve_UAV_problem_server rendezvous_problem_gencpp)
-
-add_executable(solve_vertical_problem_server src/solve_vertical_problem_server.cpp src/Vertical/ldl.c src/Vertical/matrix_support.c src/Vertical/solver.c src/Vertical/util.c)
-target_link_libraries(solve_vertical_problem_server ${catkin_LIBRARIES})
-add_dependencies(solve_vertical_problem_server rendezvous_problem_gencpp)
-
-add_executable(solve_vertical_problem_server_long src/solve_vertical_problem_server_long.cpp src/VerticalLong/ldl.c src/VerticalLong/matrix_support.c src/VerticalLong/solver.c src/VerticalLong/util.c)
-target_link_libraries(solve_vertical_problem_server_long ${catkin_LIBRARIES})
-add_dependencies(solve_vertical_problem_server_long rendezvous_problem_gencpp)
-
-add_executable(solve_vertical_problem_server_ulong src/solve_vertical_problem_server_ulong.cpp src/VerticalUltraLong/ldl.c src/VerticalUltraLong/matrix_support.c src/VerticalUltraLong/solver.c src/VerticalUltraLong/util.c)
-target_link_libraries(solve_vertical_problem_server_ulong ${catkin_LIBRARIES})
-add_dependencies(solve_vertical_problem_server_ulong rendezvous_problem_gencpp)
 
 #add_executable(solve_USV_problem_client src/solve_USV_problem_client.cpp)
 #target_link_libraries(solve_USV_problem_client ${catkin_LIBRARIES})

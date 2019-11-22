@@ -1,6 +1,0 @@
-Float32MultiArrayStamped xv_0
-Float32MultiArrayStamped xbv
-Float32MultiArrayStamped dist_traj
----
-Float32MultiArrayStamped wdes_traj
-Float32MultiArrayStamped xv_traj

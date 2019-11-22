@@ -21,63 +21,31 @@ class USV_simulator():
         # self.experiment_index = -1  # Used in store_data()
         self.T = pp.T
         self.T_inner = pp.T_inner
-        self.Ab = pp.Ab
-        self.Bb = pp.Bb
-        self.used_solver = pp.used_solver
+        self.Ab = pp.params.Ab
+        self.Bb = pp.params.Bb
         self.params = pp.params
-        self.delay_len = pp.delay_len
-        [self.nUAV, self.mUAV] = pp.B.shape
-        [self.nUSV, self.mUSV] = pp.Bb.shape
-
-        self.T = problem_params.T
-        self.T_inner = problem_params.T_inner
-        B = problem_params.B
-        self.Ab = problem_params.Ab
-        self.Bb = problem_params.Bb
-        Q = problem_params.Q
-        P = problem_params.P
-        R = problem_params.R
-        self.lookahead = problem_params.lookahead
-        self.used_solver = problem_params.used_solver
-        self.params = problem_params.params
-        self.ds = self.params.ds
-        self.delay_len = problem_params.delay_len
-        [self.nUAV, self.mUAV] = B.shape
+        self.delay_len = pp.settings.delay_len
+        [self.nUAV, self.mUAV] = pp.params.B.shape
         [self.nUSV, self.mUSV] = self.Bb.shape
-        self.CENTRALISED = pp.CENTRALISED
-        self.DISTRIBUTED = pp.DISTRIBUTED
-        self.PARALLEL = pp.PARALLEL
-        self.SAMPLING_RATE = pp.SAMPLING_RATE
-        self.USE_HIL = pp.USE_HIL
-        self.INTER_ITS = pp.INTER_ITS
-        self.KUSV = pp.KUSV
-        self.ADD_DROPOUT = pp.ADD_DROPOUT
-        self.PRED_PARALLEL_TRAJ = pp.PRED_PARALLEL_TRAJ
-        self.SHOULD_SHIFT_MESSAGES = pp.SHOULD_SHIFT_MESSAGES
-        self.USE_COMPLETE_USV = pp.USE_COMPLETE_USV
-        self.SOLVE_PARALLEL_AT_END = pp.SOLVE_PARALLEL_AT_END
-        self.dropout_lower_bound = pp.dropout_lower_bound
-        self.dropout_upper_bound = pp.dropout_upper_bound
-        self.USV_stopped_at_iter = np.nan
 
+        self.CENTRALISED = pp.settings.CENTRALISED
+        self.DISTRIBUTED = pp.settings.DISTRIBUTED
+        self.PARALLEL = pp.settings.PARALLEL
+        self.SAMPLING_RATE = pp.settings.SAMPLING_RATE
+        self.USE_HIL = pp.settings.USE_HIL
+        self.INTER_ITS = pp.settings.INTER_ITS
+        self.ADD_DROPOUT = pp.settings.ADD_DROPOUT
+        self.PRED_PARALLEL_TRAJ = pp.settings.PRED_PARALLEL_TRAJ
+        self.SHOULD_SHIFT_MESSAGES = pp.settings.SHOULD_SHIFT_MESSAGES
+        self.dropout_lower_bound = pp.settings.dropout_lower_bound
+        self.dropout_upper_bound = pp.settings.dropout_upper_bound
 
-        if self.USE_COMPLETE_USV and self.DISTRIBUTED:
-            self.problemUSV = CompleteUSVProblem(pp.T, pp.Q, pp.P, pp.R,\
-                pp.Qb_vel, pp.Pb_vel, self.nUAV, self.params, travel_dir = travel_dir)
-            self.nUSV = self.problemUSV.nUSV
-            self.mUSV = self.problemUSV.mUSV
-            self.Ab = self.problemUSV.Ab
-            self.Bb = self.problemUSV.Bb
-            mat_temp = np.block([
-                [np.eye(4), np.zeros((4, 2))]
-            ])
-            self.state_converter = np.kron(np.eye(self.T+1), mat_temp)
-        else:
-            self.problemUSV = USVProblem(pp.T, pp.Ab, pp.Bb,  pp.Q, pp.P, pp.R,\
-                pp.Qb_vel, pp.Pb_vel, self.nUAV, self.used_solver, self.params, travel_dir = travel_dir)
+        self.problemUSV = USVProblem(self.T, self.Ab, self.Bb, pp.params.Q, pp.params.P, pp.params.R,\
+            pp.params.Qb_vel, pp.params.Pb_vel, self.nUAV, self.params, travel_dir = travel_dir)
 
-        self.problemUSVFast = FastUSVProblem(pp.T_inner, pp.Ab, pp.Bb,\
-            pp.Q, pp.P, pp.R, self.used_solver, pp.params)
+        if self.PARALLEL:
+            self.problemUSVFast = FastUSVProblem(self.T_inner, self.Ab, self.Bb,\
+                pp.params.Q, pp.params.P, pp.params.R, pp.params)
 
         # --------------------------- ROS SETUP ----------------------------------
         # rospy.init_node('USV_main')
@@ -207,46 +175,9 @@ class USV_simulator():
                 self.send_traj_to_UAV(self.xb_traj)
                 # print i, "xb0", self.xb_traj[0, 0]
 
-            # TODO: Make this togglable from IMPORT_ME
-            # # Make the USV stop once the vehicles are within safe landing distance
-            # if not self.CENTRALISED and not self.USV_should_stop:
-            #     self.dist = np.sqrt(np.square( self.xb[0,0] - self.x_traj[0,0])\
-            #         + np.square( self.xb[1,0] - self.x_traj[1,0] ))
-            #     self.USV_should_stop = False if self.dist > self.ds else True
-            #     if self.USV_should_stop:
-            #         self.USV_stopped_at_iter = self.i
-
             # ------- Solving Problem --------
             if self.DISTRIBUTED:
                 self.problemUSV.solve(self.xb, self.x_traj, self.USV_should_stop)
-            elif self.PARALLEL and not self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
-                if self.PRED_PARALLEL_TRAJ:
-                    if i <= self.INTER_ITS:
-                        # Up until and including i == INTER_ITS, the inner trajectory
-                        # will here only track the initial outer trajectory,
-                        # which is stationary at the origin. We know for a fact
-                        # that the UAV will NOT stay at the origin
-                        # for the iterations after i == INTER_ITS, so using the inner
-                        # trajectory for prediction at this point would be wrong.
-                        # We use instead the outer prediction, which at iteration
-                        # i == INTER_ITS will finally predict that the USV will actually move
-                        xb0 = self.xb_traj[self.INTER_ITS*self.nUSV:\
-                            (self.INTER_ITS+1)*self.nUSV]
-                    else:
-                        # We need to take elements from (self.INTER_ITS+1)*self.nUAV
-                        # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
-                        # is at this point still from iteration i-1. Since we want to predict
-                        # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
-                        # steps into the future
-                        xb0 = self.xb_traj_inner[(self.INTER_ITS+1)*self.nUSV\
-                            :(self.INTER_ITS+2)*self.nUSV]
-                    # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
-                    traj = shift_trajectory(self.x_traj, self.nUAV, self.INTER_ITS)
-                else:
-                    xb0 = self.xb
-                    traj = self.x_traj
-                self.problemUSV.solve_in_parallel(xb0, traj,\
-                    self.USV_should_stop)
 
             if not self.CENTRALISED:
                 # Update values in xb_traj and x_traj
@@ -258,7 +189,7 @@ class USV_simulator():
                     self.ub_traj[0:self.T_inner*self.mUSV])
                 self.xb_traj_inner = self.problemUSVFast.xb.value
 
-            if self.PARALLEL and self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
+            if self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
                     if i <= self.INTER_ITS:
                         # Up until and including i == INTER_ITS, the inner trajectory
@@ -371,11 +302,7 @@ class USV_simulator():
             self.hor_inner_solution_durations.append(self.problemUSVFast.last_solution_duration)
 
     def send_traj_to_UAV(self, xb_traj):
-        if self.USE_COMPLETE_USV:
-            traj_msg = mat_to_multiarray_stamped(\
-                np.dot(self.state_converter, xb_traj), self.T+1, self.nUSV)
-        else:
-            traj_msg = mat_to_multiarray_stamped(xb_traj, self.T+1, self.nUSV)
+        traj_msg = mat_to_multiarray_stamped(xb_traj, self.T+1, self.nUSV)
         traj_msg.header.stamp = rospy.Time.now()
         if self.ADD_DROPOUT and (self.i >= self.dropout_lower_bound and \
             self.i <= self.dropout_upper_bound):
@@ -417,15 +344,6 @@ class USV_simulator():
         else:
             os.mkdir(dir_path + 'Experiment_' + str(i))
 
-        info_str = 'USV used solver: ' + self.used_solver + '\n'
-        info_str += 'USV stopped at iteration: ' + str(self.USV_stopped_at_iter)
-        # try:
-        #     info_str += 'USV stopped at iteration: ' + str(self.USV_stopped_at_iter)
-        # except Exception as e:
-        #     print e
-        #     print 'For some reason it still says that USV_stopped_at_iter is undefined...'
-
-        np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_info.txt', [info_str], fmt="%s")
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/xb_log.csv', self.xb_log, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/uUSV_log.csv', self.uUSV_log, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/USV_iteration_durations.csv', self.iteration_durations, delimiter=',')

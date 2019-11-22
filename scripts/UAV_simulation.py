@@ -28,57 +28,46 @@ class UAV_simulator():
         pp = problem_params
         self.T = pp.T
         self.T_inner = pp.T_inner
-        self.A = pp.A
-        self.B = pp.B
-        self.Av = pp.Av
-        self.Bv = pp.Bv
-        self.used_solver = pp.used_solver
-        self.vert_used_solver = pp.vert_used_solver
-        self.delay_len = pp.delay_len
-        [self.nUAV, self.mUAV] = pp.B.shape
-        [self.nUSV, self.mUSV] = pp.Bb.shape
-        [self.nv, self.mv] = pp.Bv.shape
-        self.KUAV = pp.KUAV
-        self.KVert = pp.KVert
-        self.lookahead = pp.lookahead
+        self.A = pp.params.A
+        self.B = pp.params.B
+        self.Av = pp.params.Av
+        self.Bv = pp.params.Bv
+        [self.nUAV, self.mUAV] = pp.params.B.shape
+        [self.nUSV, self.mUSV] = pp.params.Bb.shape
+        [self.nv, self.mv] = pp.params.Bv.shape
+        self.hb = pp.params.hb
         self.params = pp.params
-        self.CENTRALISED = pp.CENTRALISED
-        self.DISTRIBUTED = pp.DISTRIBUTED
-        self.PARALLEL = pp.PARALLEL
-        self.SAMPLING_RATE = pp.SAMPLING_RATE
-        self.SAMPLING_TIME = pp.SAMPLING_TIME
-        self.USE_HIL = pp.USE_HIL
-        self.INTER_ITS = pp.INTER_ITS
-        self.USE_COMPLETE_HORIZONTAL = pp.USE_COMPLETE_HORIZONTAL
-        self.ADD_DROPOUT = pp.ADD_DROPOUT
-        self.PRED_PARALLEL_TRAJ = pp.PRED_PARALLEL_TRAJ
-        self.SHOULD_SHIFT_MESSAGES = pp.SHOULD_SHIFT_MESSAGES
-        self.SOLVE_PARALLEL_AT_END = pp.SOLVE_PARALLEL_AT_END
-        self.dropout_lower_bound = pp.dropout_lower_bound
-        self.dropout_upper_bound = pp.dropout_upper_bound
+        self.CENTRALISED = pp.settings.CENTRALISED
+        self.DISTRIBUTED = pp.settings.DISTRIBUTED
+        self.PARALLEL = pp.settings.PARALLEL
+        self.SAMPLING_RATE = pp.settings.SAMPLING_RATE
+        self.SAMPLING_TIME = pp.settings.SAMPLING_TIME
+        self.SHOULD_SHIFT_MESSAGES = pp.settings.SHOULD_SHIFT_MESSAGES
+        self.USE_HIL = pp.settings.USE_HIL
+        self.INTER_ITS = pp.settings.INTER_ITS
+        self.ADD_DROPOUT = pp.settings.ADD_DROPOUT
+        self.PRED_PARALLEL_TRAJ = pp.settings.PRED_PARALLEL_TRAJ
+        self.dropout_lower_bound = pp.settings.dropout_lower_bound
+        self.dropout_upper_bound = pp.settings.dropout_upper_bound
+        self.delay_len = pp.settings.delay_len
         self.long_ref = None
         self.lat_ref = None
-        self.hb = pp.hb
 
-        self.problemCent = CentralisedProblem(pp.T, pp.A, pp.B, pp.Ab, pp.Bb,\
-            pp.Q, pp.P, pp.R, pp.Q_vel, pp.P_vel, pp.Qb_vel, pp.Pb_vel, pp.used_solver, pp.params, travel_dir = travel_dir)
-        self.problemUAV = UAVProblem(pp.T, pp.A,  pp.B,  pp.Q, pp.P, pp.R,\
-            pp.Q_vel, pp.P_vel, self.nUSV, pp.used_solver, pp.params)
-        self.problemVert = VerticalProblem(pp.T, pp.Av, pp.Bv, pp.Qv, pp.Pv,\
-            pp.Rv, pp.vert_used_solver, pp.params, self.hb, self.PARALLEL)
-
-        self.problemUAVFast = FastUAVProblem(pp.T_inner, pp.A, pp.B, pp.Q, pp.P,\
-            pp.R, self.used_solver, pp.params)
-        self.problemVertFast = FastVerticalProblem(pp.T_inner, pp.Av, pp.Bv,\
-            pp.Qv, pp.Pv, pp.Rv, pp.vert_used_solver, pp.params)
-
-        if self.USE_COMPLETE_HORIZONTAL and self.CENTRALISED:
-            self.problemCent = CompleteCentralisedProblem(pp.T, pp.Ab, pp.Bb,\
-                pp.Q, pp.P, pp.R, pp.R, pp.Qb_vel, pp.Pb_vel, pp.params)
-            self.nUAV = self.problemCent.nUAV
-            self.mUAV = self.problemCent.mUAV
-            self.A = self.problemCent.A
-            self.B = self.problemCent.B
+        self.problemVert = VerticalProblem(self.T, self.Av, self.Bv, pp.params.Qv,\
+            pp.params.Pv, pp.params.Rv, pp.params, self.params.hb, self.PARALLEL)
+        if self.CENTRALISED:
+            self.problemCent = CentralisedProblem(self.T, self.A, self.B,\
+                pp.params.Ab, pp.params.Bb, pp.params.Q, pp.params.P, \
+                pp.params.R, pp.params.Q_vel, pp.params.P_vel, pp.params.Qb_vel,\
+                pp.params.Pb_vel, pp.params, travel_dir = travel_dir)
+        if not self.CENTRALISED:
+            self.problemUAV = UAVProblem(self.T, self.A,  self.B,  pp.params.Q, pp.params.P, pp.params.R,\
+                pp.params.Q_vel, pp.params.P_vel, self.nUSV, pp.params)
+        if self.PARALLEL:
+            self.problemUAVFast = FastUAVProblem(self.T_inner, self.A, self.B,  pp.params.Q, pp.params.P,\
+                pp.params.R, pp.params)
+            self.problemVertFast = FastVerticalProblem(self.T_inner, self.Av, self.Bv,\
+                pp.params.Qv, pp.params.Pv, pp.params.Rv, pp.params)
 
         self.i = 0
         # These must be created already in the constructor since they are used in ROS callbacks
@@ -137,10 +126,11 @@ class UAV_simulator():
         self.wdes_log = np.full((self.mv,   sim_len), np.nan)
         self.UAV_traj_log = np.full((self.nUAV*(self.T+1), sim_len), np.nan)
         self.vert_traj_log = np.full((self.nv *(self.T+1), sim_len), np.nan)
-        self.UAV_inner_traj_log = np.full((self.nUAV*(self.T_inner+1), sim_len)\
-            , np.nan)
-        self.vert_inner_traj_log = np.full((self.nv *(self.T_inner+1), sim_len)\
-            , np.nan)
+        if self.PARALLEL:
+            self.UAV_inner_traj_log = np.full((self.nUAV*(self.T_inner+1), sim_len)\
+                , np.nan)
+            self.vert_inner_traj_log = np.full((self.nv *(self.T_inner+1), sim_len)\
+                , np.nan)
         self.USV_traj_log = np.full((self.nUSV*(self.T+1), sim_len), np.nan)
         self.s_vert_log = np.full((1, sim_len), np.nan)
         self.obj_val_log = np.full((1, sim_len), np.nan)
@@ -259,33 +249,6 @@ class UAV_simulator():
             elif self.DISTRIBUTED:
                 # TODO: Make xb_traj naturally an array instead of a matrix
                 self.problemUAV.solve(self.x, np.asarray(self.xb_traj))
-            elif self.PARALLEL and i % self.INTER_ITS == 0 and not self.SOLVE_PARALLEL_AT_END:
-                if self.PRED_PARALLEL_TRAJ:
-                    if i <= self.INTER_ITS:
-                        # Up until and including i == INTER_ITS, the inner trajectory
-                        # will here only track the initial outer trajectory,
-                        # which is stationary at the origin. We know for a fact
-                        # that the UAV will NOT stay at the origin
-                        # for the iterations after i == INTER_ITS, so using the inner
-                        # trajectory for prediction at this point would be wrong.
-                        # We use instead the outer prediction, which at iteration
-                        # i == INTER_ITS will finally predict that the UAV will actually move
-                        x0 = self.x_traj[self.INTER_ITS*self.nUAV\
-                            :(self.INTER_ITS+1)*self.nUAV]
-                    else:
-                        # We need to take elements from (self.INTER_ITS+1)*self.nUAV
-                        # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
-                        # is at this point still from iteration i-1. Since we want to predict
-                        # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
-                        # steps into the future
-                        x0 = self.x_traj_inner[(self.INTER_ITS+1)*self.nUAV\
-                            :(self.INTER_ITS+2)*self.nUAV]
-                    # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
-                    traj = shift_trajectory(self.xb_traj, self.nUSV, self.INTER_ITS)
-                else:
-                    x0 = self.x
-                    traj = self.xb_traj
-                self.problemUAV.solve_in_parallel(x0, traj)
 
             self.update_hor_trajectories(i)
 
@@ -295,7 +258,7 @@ class UAV_simulator():
                     self.u_traj[0:self.T_inner*self.mUAV])
                 self.x_traj_inner = self.problemUAVFast.x.value
 
-            if self.PARALLEL and self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
+            if self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
                     if i <= self.INTER_ITS:
                         x0 = self.x_traj[self.INTER_ITS*self.nUAV\
@@ -316,35 +279,6 @@ class UAV_simulator():
                 if not self.PARALLEL:
                     # TODO: Make dist_traj naturally be an array instead of a matrix
                     self.problemVert.solve(self.xv, 0.0, np.asarray(self.dist_traj))
-                elif self.PARALLEL and not self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
-                    if self.PRED_PARALLEL_TRAJ:
-                        if i <= self.INTER_ITS:
-                            # Up until and including i == INTER_ITS, the inner trajectory
-                            # will here only track the initial outer trajectory,
-                            # which is stationary at the origin. We know for a fact
-                            # that the UAV will NOT stay at the origin
-                            # for the iterations after i == INTER_ITS, so using the inner
-                            # trajectory for prediction at this point would be wrong.
-                            # We use instead the outer prediction, which at iteration
-                            # i == INTER_ITS will finally predict that the UAV will actually move
-                            xv0 = self.xv_traj[self.INTER_ITS*self.nv:\
-                                (self.INTER_ITS+1)*self.nv]
-                        else:
-                            # We need to take elements from (self.INTER_ITS+1)*self.nUAV
-                            # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
-                            # is at this point still from iteration i-1. Since we want to predict
-                            # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
-                            # steps into the future
-                            xv0 = self.xv_traj_inner[(self.INTER_ITS+1)*self.nv:\
-                                (self.INTER_ITS+2)*self.nv]
-                        dist_traj = shift_trajectory(np.asarray(self.dist_traj),\
-                            1, self.INTER_ITS)
-                    else:
-                        xv0 = self.xv
-                        dist_traj = np.asarray(self.dist_traj)
-                    # TODO: Make dist_traj nartually an array instead of matrix
-                    self.problemVert.solve_in_parallel(xv0, 0.0,\
-                        dist_traj)
 
             self.update_vert_trajectories()
 
@@ -354,7 +288,7 @@ class UAV_simulator():
                     self.wdes_traj[0:self.T_inner*self.mv, 0:1])
                 self.xv_traj_inner = self.problemVertFast.xv.value
 
-            if self.PARALLEL and self.SOLVE_PARALLEL_AT_END and i % self.INTER_ITS == 0:
+            if self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
                     if i <= self.INTER_ITS:
                         xv0 = self.xv_traj[self.INTER_ITS*self.nv:\
@@ -387,8 +321,6 @@ class UAV_simulator():
                 # self.x  =  self.A*self.x  +  self.B*self.uUAV
                 # self.xv = self.Av*self.xv + self.Bv*self.wdes
                 self.x = np.dot(self.A,self.x)  +  np.dot(self.B,self.uUAV)
-                if self.USE_COMPLETE_HORIZONTAL:
-                    self.x += self.problemCent.C_d
                 self.xv = np.dot(self.Av,self.xv) + np.dot(self.Bv,self.wdes)
             else:
                 self.publish_HIL_control(self.uUAV, self.wdes)
@@ -551,7 +483,6 @@ class UAV_simulator():
         PARALLEL = self.PARALLEL
         T = self.T
         SAMPLING_RATE = self.SAMPLING_RATE
-        used_solver = self.used_solver
 
         [_, sim_len] = self.x_log.shape
         sim_len -= 1
@@ -580,8 +511,6 @@ class UAV_simulator():
         info_str += 'simulation length: ' + str(sim_len) + '\n'
         info_str += 'horizon: ' + str(T) + '\n'
         info_str += 'sampling rate: ' + str(SAMPLING_RATE) + '\n'
-        info_str += 'UAV used horizontal solver: ' + used_solver + '\n'
-        info_str += 'and vertical solver: ' + self.vert_used_solver + '\n'
         info_str += 'Delay length [iterations]: ' + str(self.delay_len) + '\n'
         info_str += ("HIL setup" if self.USE_HIL else "Local setup") + " was used\n"
         info_str += "USV was at altitude: " + str(self.hb) + "\n"
