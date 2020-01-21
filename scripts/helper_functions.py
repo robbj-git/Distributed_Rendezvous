@@ -1,5 +1,6 @@
 import rospy
 import numpy as np
+from scipy.linalg import solve, solve_discrete_are
 from rendezvous_problem.msg import Float32MultiArrayStamped
 from std_msgs.msg import MultiArrayDimension
 from math import sin, cos, atan, atan2, asin, pi, sqrt
@@ -109,6 +110,10 @@ def fill_lost_values(matrix):
             non_nan_val = matrix[:, col:col+1]
 
     return matrix
+
+def get_feedback_matrix(A, B, Q, R):
+    P = solve_discrete_are(A, B, Q, R)
+    return solve(R+np.dot(B.T, np.dot(P, B)), -np.dot(B.T, np.dot(P, A)) )
 
 def get_cmd_angle(u, wdes, xv):
     # The angles that we want now, not to be confused with angle_cmd

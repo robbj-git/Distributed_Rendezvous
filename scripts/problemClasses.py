@@ -303,6 +303,38 @@ class CentralisedProblem():
     def predict_USV_traj(self, xb_0, ub_traj):
         return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
 
+    def get_Z(self, AK, W):
+        vals, V = np.linalg.eig(AK)
+        D = np.diag(vals)   # The eigenvalue decomposition of AK is now V*D*V.T
+
+        if not V.shape[1] == AK.shape[1]:
+            print "Not enough eigenvectors for diagonalisation of A_K"
+            return
+
+        s = 1
+        alpha = 1
+        run = True
+        broke = False
+        while run:
+            print "DEBUG: Trying s =", s
+            As = np.linalg.matrix_power(AK, s)
+            for i in range(W.I):
+                c = n.dot(As.T, W.f[:, i])
+                A_ub = W.f.T
+                b_ub = W.g
+                result = sp.optimize.linprog(c, A_ub, b_ub)
+                if result.fun > W.g[i, 0]:
+                    # No feasible alpha exists for this s
+                    broke = True
+                    break
+            if broke:
+                s += 1
+            else:
+                run = False
+
+        # s FOUND, NOW FIND OPTIMAL alpha!!!!
+
+
     # DEBUG
     def set_UAV_dynamics(self):
 
@@ -1190,6 +1222,7 @@ class VerticalProblem():
         print "Violated", safety_violations_l, "lower and", safety_violations_u, "upper safety constraints"
         # print sum( lower ), 'of', self.A_temp.shape[0], 'satisfied'
         # print sum( upper ), 'of', self.A_temp.shape[0], 'satisfied'
+        return
 
 # Problem where only constraints are dynamics and input saturation (maybe)
 # (no safety constraints).
