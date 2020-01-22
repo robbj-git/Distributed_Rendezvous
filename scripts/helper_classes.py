@@ -3,6 +3,7 @@ from helper_functions import shift_trajectory, get_traj_dir, get_cos_angle_betwe
 from IMPORT_ME import SAMPLING_TIME, USE_COMPLETE_HORIZONTAL, USE_COMPLETE_USV
 from matrices_and_parameters import n_UAV, n_USV, nv, wmax, wmin, wmin_land, kl, vmax, vmax_b
 import numpy as np
+from scipy.optimize import linprog
 import Queue
 import rospy
 import time # for DEBUG, remove later
@@ -184,3 +185,16 @@ class Polytope():
         self.f = f
         self.g = g
         I = f.shape[2]
+
+    def AW_is_subset(self, A, alpha):
+        # Let this polytope (self) be called W
+        # Then this function returns true if A*W is a subset of alpha*W
+        # False otherwise
+        for i in range(self.I):
+            c = n.dot(As.T, self.f[:, i])
+            A_ub = self.f.T
+            b_ub = self.g
+            result = linprog(c, A_ub, b_ub)
+            if result.fun > alpha*self.g[i, 0]:
+                return False
+        return True

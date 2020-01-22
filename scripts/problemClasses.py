@@ -312,28 +312,34 @@ class CentralisedProblem():
             return
 
         s = 1
-        alpha = 1
         run = True
         broke = False
         while run:
             print "DEBUG: Trying s =", s
             As = np.linalg.matrix_power(AK, s)
-            for i in range(W.I):
-                c = n.dot(As.T, W.f[:, i])
-                A_ub = W.f.T
-                b_ub = W.g
-                result = sp.optimize.linprog(c, A_ub, b_ub)
-                if result.fun > W.g[i, 0]:
-                    # No feasible alpha exists for this s
-                    broke = True
-                    break
-            if broke:
-                s += 1
-            else:
+            if W.AW_is_subset(As, 1):
+                # As*W is a subset of W, finish search
                 run = False
+            else:
+                s += 1
 
-        # s FOUND, NOW FIND OPTIMAL alpha!!!!
+        alpha = 1
+        d = 0.01    # Stepsize for decreasing alpha from 1
+        alpha = alpha-d
+        while W.AW_is_subset(As, alpha):
+            alpha = alpha-d
 
+        if alpha == 1-d:
+            # Step size was too large, no feasible alpha<1 was found
+            k = 0.5
+            while not W.AW_is_subset(As, 1-k*d):
+                k = k*0.5
+            alpha = 1-k*d   # Feasible alpha found
+        else:
+            # The previous alpha was the last feasible one
+            alpha = alpha+d
+
+        # TODO: FINSIH. Figure out what has to be done now that s and alpha are found
 
     # DEBUG
     def set_UAV_dynamics(self):
