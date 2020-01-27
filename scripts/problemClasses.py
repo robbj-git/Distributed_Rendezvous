@@ -1234,127 +1234,127 @@ class VerticalProblem():
 # (no safety constraints).
 class FastUAVProblem():
 
-    def __init__(self, T, A, B, Q, P, R, params):
+    def __init__(self, T, A, B, Q, R, Z, params):
         self.T = T
         self.A = A
         self.B = B
         self.Q = Q
-        self.P = P
+        self.P = np.solve_discrete_are(A, B, Q, R)
         self.R = R
+        self.Z = Z
+        BPB = np.dot(B.T, np.dot(self.P, B))
+        BPA = np.dot(B.T, np.dot(self.P, A))
+        self.L = -np.linalg.solve(R+BPB, BPA)
         self.params = params
         self.last_solution_duration = np.nan
         [self.nUAV, self.mUAV] = B.shape
-        self.create_optimisation_matrices()
+        # self.create_optimisation_matrices()
         self.create_optimisation_problem()
 
-    def create_optimisation_matrices(self):
-        T = self.T
-        nUAV = self.nUAV
-        mUAV = self.mUAV
-
-        # Cost Matrices
-        self.Q_big  = np.kron(np.eye(T+1), self.Q)
-        self.Q_big[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P  # Not double-checked
-        self.R_big  = 1*np.kron(np.eye(T),   self.R)
-
-        # Dynamics Matrices
-        self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
-        self.Lambda = np.zeros(( (T+1)*nUAV, T*mUAV ))
-
-        for j in range(T+1):
-            self.Phi[  j*nUAV:(j+1)*nUAV, :] = np.linalg.matrix_power(self.A, j)
-            for k in range(j):  # range(0) returns empty list
-                self.Lambda[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
-                    np.linalg.matrix_power(self.A, j-k-1)*self.B
-
-        # ------------------ OSQP Matrices ------------------
-        P_temp = 2*np.bmat([[self.Q_big, np.zeros(((T+1)*nUAV, T*mUAV))],
-            [np.zeros((T*mUAV, (T+1)*nUAV,)), self.R_big]
-        ])
-
-        P_data = np.diagonal(P_temp)
-        P_row = range(nUAV*(T+1) + mUAV*T)
-        P_col = range(nUAV*(T+1) + mUAV*T)
-        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
-        self.q_OSQP = -2*np.bmat([
-            [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUAV, 1 )) )],
-            [np.dot( self.R_big, np.zeros(( T*self.mUAV, 1)))]
-        ])
-        self.l_OSQP = np.dot(self.Phi, np.zeros((nUAV, 1)))
-        self.u_OSQP = np.dot(self.Phi, np.zeros((nUAV, 1)))
-        self.A_temp = np.bmat([[np.eye(nUAV*(T+1)), -self.Lambda]])
-        # self.l_OSQP = np.bmat([
-        #     [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # Dynamics
-        #     [np.full((T*mUAV, 1), self.params.amin)],          # Input constraints
-        # ])
-        # self.u_OSQP = np.bmat([
-        #     [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # Dynamics
-        #     [np.full((T*mUAV, 1), self.params.amax)],          # Input constraints
-        # ])
-        # self.A_temp = np.bmat([
-        #     [np.eye(nUAV*(T+1)),            -self.Lambda], # Dynamics
-        #     [np.zeros((T*mUAV, nUAV*(T+1))), np.eye(T*mUAV)]     # Input constraints
-        # ])
-        self.A_OSQP = csc_matrix(self.A_temp)
+    # def create_optimisation_matrices(self):
+    #     T = self.T
+    #     nUAV = self.nUAV
+    #     mUAV = self.mUAV
+    #
+    #     # Cost Matrices
+    #     self.Q_big  = np.kron(np.eye(T+1), self.Q)
+    #     self.Q_big[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P  # Not double-checked
+    #     self.R_big  = 1*np.kron(np.eye(T),   self.R)
+    #
+    #     # Dynamics Matrices
+    #     self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
+    #     self.Lambda = np.zeros(( (T+1)*nUAV, T*mUAV ))
+    #
+    #     for j in range(T+1):
+    #         self.Phi[  j*nUAV:(j+1)*nUAV, :] = np.linalg.matrix_power(self.A, j)
+    #         for k in range(j):  # range(0) returns empty list
+    #             self.Lambda[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
+    #                 np.linalg.matrix_power(self.A, j-k-1)*self.B
+    #
+    #     # ------------------ OSQP Matrices ------------------
+    #     P_temp = 2*np.bmat([[self.Q_big, np.zeros(((T+1)*nUAV, T*mUAV))],
+    #         [np.zeros((T*mUAV, (T+1)*nUAV,)), self.R_big]
+    #     ])
+    #
+    #     P_data = np.diagonal(P_temp)
+    #     P_row = range(nUAV*(T+1) + mUAV*T)
+    #     P_col = range(nUAV*(T+1) + mUAV*T)
+    #     self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
+    #     self.q_OSQP = -2*np.bmat([
+    #         [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUAV, 1 )) )],
+    #         [np.dot( self.R_big, np.zeros(( T*self.mUAV, 1)))]
+    #     ])
+    #     self.l_OSQP = np.dot(self.Phi, np.zeros((nUAV, 1)))
+    #     self.u_OSQP = np.dot(self.Phi, np.zeros((nUAV, 1)))
+    #     self.A_temp = np.bmat([[np.eye(nUAV*(T+1)), -self.Lambda]])
+    #     # self.l_OSQP = np.bmat([
+    #     #     [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # Dynamics
+    #     #     [np.full((T*mUAV, 1), self.params.amin)],          # Input constraints
+    #     # ])
+    #     # self.u_OSQP = np.bmat([
+    #     #     [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # Dynamics
+    #     #     [np.full((T*mUAV, 1), self.params.amax)],          # Input constraints
+    #     # ])
+    #     # self.A_temp = np.bmat([
+    #     #     [np.eye(nUAV*(T+1)),            -self.Lambda], # Dynamics
+    #     #     [np.zeros((T*mUAV, nUAV*(T+1))), np.eye(T*mUAV)]     # Input constraints
+    #     # ])
+    #     self.A_OSQP = csc_matrix(self.A_temp)
 
     def create_optimisation_problem(self):
         T = self.T
         nUAV = self.nUAV
-        mUAV = self.mUAV
-        self.x  = cp.Variable(( nUAV*(T+1), 1 ))
-        self.u  = cp.Variable(( mUAV*T, 1 ))
-        self.x_0  = cp.Parameter((nUAV, 1))
-        self.x_des = cp.Parameter(( nUAV*(T+1), 1 ))
+        self.u = np.zeros((self.mUAV, 1))
+        # self.x  = cp.Variable(( nUAV*(T+1), 1 ))
+        # self.u  = cp.Variable(( mUAV*T, 1 ))
+        # self.x_0  = cp.Parameter((nUAV, 1))
+        # self.x_des = cp.Parameter(( nUAV*(T+1), 1 ))
+        #
+        # objectiveUAV = cp.quad_form(self.x-self.x_des, self.Q_big) \
+        #     + cp.quad_form(self.u, self.R_big)
+        # constraintsUAV  = [ self.x  ==  self.Phi*self.x_0 \
+        #     + self.Lambda*self.u ]
+        #
+        # # TODO: Do we really need saturation constraints? Can't we expect the
+        # # optimal control inputs to be feasible, since the desired trajectory
+        # # was designed using feasible control inputs?
+        # # Try it out, I guess
+        # temp_matrix = np.bmat([[np.eye(mUAV*T)], [-np.eye(mUAV*T)]])
+        # constraintsUAV += [temp_matrix*self.u <= self.params.amax]
+        # # constraintsUAV += [self.u  <= self.params.amax]
+        # # constraintsUAV += [self.u  >= self.params.amin]
+        #
+        # self.problemUAV = cp.Problem(cp.Minimize(objectiveUAV), constraintsUAV)
+        # self.problemOSQP = osqp.OSQP()
+        # self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 500)
 
-        objectiveUAV = cp.quad_form(self.x-self.x_des, self.Q_big) \
-            + cp.quad_form(self.u, self.R_big)
-        constraintsUAV  = [ self.x  ==  self.Phi*self.x_0 \
-            + self.Lambda*self.u ]
+        # Create problem for solving for initial nominal state
+        self.problemInit = osqp.OSQP()
+        u_init = self.Z.b - np.dot(self.Z.A, np.zeros(nUAV, 1))
+        self.problemInit.setup(P=self.P, l=np.full((nUAV, 1), np.inf), u=u_init)
 
-        # TODO: Do we really need saturation constraints? Can't we expect the
-        # optimal control inputs to be feasible, since the desired trajectory
-        # was designed using feasible control inputs?
-        # Try it out, I guess
-        temp_matrix = np.bmat([[np.eye(mUAV*T)], [-np.eye(mUAV*T)]])
-        constraintsUAV += [temp_matrix*self.u <= self.params.amax]
-        # constraintsUAV += [self.u  <= self.params.amax]
-        # constraintsUAV += [self.u  >= self.params.amin]
-
-        self.problemUAV = cp.Problem(cp.Minimize(objectiveUAV), constraintsUAV)
-        self.problemOSQP = osqp.OSQP()
-        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 500)
-
-    def solve(self, x_m, x_des_m, u_des):
+    def solve(self, x_m):
         start = time.time()
-        self.x_0.value = x_m
-        self.x_des.value = x_des_m
-
-        self.update_OSQP(x_m, x_des_m, u_des)
-        results = self.problemOSQP.solve()
-        self.x.value = np.reshape(results.x[0:self.nUAV*(self.T+1)], (-1, 1))
-        self.u.value = np.reshape(results.x[self.nUAV*(self.T+1):], (-1, 1))
-
-        # EDIT: I'm not sure this ever happens anymore
-        if self.x.value is None:
-            print "x was None, u was", self.u.value #DEBUG
-            # Sometimes a bug occurs where the solution returns only None
-            # In that case, apply no control input
-            self.u.value = np.zeros((self.mUAV*self.T, 1))
-            self.x.value = self.predict_trajectory(x_m, self.u.value)
+        self.update_OSQP(x_m)
+        results = self.problemInit.solve()
+        x0 = results.x
+        self.u = np.dot(self.L, x0) # TODO: This is not a cvxpy-variable anymore! Make sure to treat it correctly
 
         end = time.time()
         self.last_solution_duration = end - start
 
-    def update_OSQP(self, x0, x_des, u_des):
-        self.l_OSQP = np.dot(self.Phi, x0)
-        self.u_OSQP = np.dot(self.Phi, x0)
-        # self.l_OSQP[0:(self.T+1)*self.nUAV, 0] = np.dot(self.Phi, x0)
-        # self.u_OSQP[0:(self.T+1)*self.nUAV, 0] = np.dot(self.Phi, x0)
-        self.q_OSQP = -2*np.block([
-            [np.dot( self.Q_big, x_des )],
-            [np.dot( self.R_big, u_des )]
-        ])
-        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
+    def update_OSQP(self, x0):
+        # self.l_OSQP = np.dot(self.Phi, x0)
+        # self.u_OSQP = np.dot(self.Phi, x0)
+        # # self.l_OSQP[0:(self.T+1)*self.nUAV, 0] = np.dot(self.Phi, x0)
+        # # self.u_OSQP[0:(self.T+1)*self.nUAV, 0] = np.dot(self.Phi, x0)
+        # self.q_OSQP = -2*np.block([
+        #     [np.dot( self.Q_big, x_des )],
+        #     [np.dot( self.R_big, u_des )]
+        # ])
+        # self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
+        u_init = self.Z.b - np.dot(self.Z.A, x0)
+        self.problemInit.update(u = u_init)
 
 class FastUSVProblem():
 
