@@ -64,8 +64,9 @@ class UAV_simulator():
             self.problemUAV = UAVProblem(self.T, self.A,  self.B,  pp.params.Q, pp.params.P, pp.params.R,\
                 pp.params.Q_vel, pp.params.P_vel, self.nUSV, pp.params)
         if self.PARALLEL:
-            self.problemUAVFast = FastUAVProblem(self.T_inner, self.A, self.B,  pp.params.Q, pp.params.P,\
-                pp.params.R, pp.params)
+            Z_UAV = self.problemUAV.get_Z(None)
+            self.problemUAVFast = FastUAVProblem(self.T_inner, self.A, self.B,  pp.params.Q,\
+                pp.params.R, Z_UAV, pp.params)
             self.problemVertFast = FastVerticalProblem(self.T_inner, self.Av, self.Bv,\
                 pp.params.Qv, pp.params.Pv, pp.params.Rv, pp.params)
 
@@ -173,6 +174,11 @@ class UAV_simulator():
     def simulate_problem(self, sim_len, x_val, xv_val):
         self.reset(sim_len, x_val, xv_val)
 
+        # TODO: REWRITE THIS WHOLE FUNCTION, REGARDLESS OF IT IT'S CASCADING OR NOT...?
+        # MAYBE NOT, BUT SOLUTION OF OUTER PROBLEM CAN NOT BE STARTED AT THE BEGGINING
+        # OF THE FUNCTION SINCE IT USES LAST CANDIDATE TRAJECTORY FOR PREDICTION!!!
+        # SO YOU FOR SURE NEED TO IMPLEMENT CANDIDATE REFERENCE VARIABLE!!!
+
         self.x = x_val
         self.xv = xv_val
 
@@ -238,25 +244,10 @@ class UAV_simulator():
 
 
             # The outer parallel problems will be solved anew this iteration
-            # Update using the previous solution
+            # Update using the previous solution that was just finished
             if self.PARALLEL and i%self.INTER_ITS == 0 and i > 0:
                 self.update_parallel_trajectories()
                 self.send_traj_to_USV(self.x_traj)
-
-            # ------- Horizontal Problem --------
-            if self.CENTRALISED:
-                self.problemCent.solve(self.x, self.xb)
-            elif self.DISTRIBUTED:
-                # TODO: Make xb_traj naturally an array instead of a matrix
-                self.problemUAV.solve(self.x, np.asarray(self.xb_traj))
-
-            self.update_hor_trajectories(i)
-
-            if self.PARALLEL:
-                self.problemUAVFast.solve(self.x,\
-                    self.x_traj[0:(self.T_inner+1)*self.nUAV],
-                    self.u_traj[0:self.T_inner*self.mUAV])
-                self.x_traj_inner = self.problemUAVFast.x.value
 
             if self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
@@ -272,6 +263,20 @@ class UAV_simulator():
                     x0 = self.x
                     traj = self.xb_traj
                 self.problemUAV.solve_in_parallel(x0, traj)
+
+            # ------- Horizontal Problem --------
+            if self.CENTRALISED:
+                self.problemCent.solve(self.x, self.xb)
+            elif self.DISTRIBUTED:
+                # TODO: Make xb_traj naturally an array instead of a matrix
+                self.problemUAV.solve(self.x, np.asarray(self.xb_traj))
+
+            self.update_hor_trajectories(i)
+
+            if self.PARALLEL:
+                self.problemUAVFast.solve(self.x,\
+                    self.x_traj[0:(self.T_inner+1)*self.nUAV])
+                self.x_traj_inner = self.problemUAVFast.x.value
 
             (self.uUAV, self.uUSV) = self.get_horizontal_control()
             # ------- Vertical Problem --------
@@ -346,7 +351,7 @@ class UAV_simulator():
         elif self.DISTRIBUTED:
             return (self.problemUAV.u[0:self.mUAV, 0:1].value, None)
         elif self.PARALLEL:
-            return (self.problemUAVFast.u[0:self.mUAV, 0:1].value, None)
+            return (self.problemUAVFast.v, None)
 
     def get_vertical_control(self):
         if self.CENTRALISED or self.DISTRIBUTED:

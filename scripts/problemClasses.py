@@ -7,7 +7,7 @@ from std_msgs.msg import MultiArrayDimension
 import rendezvous_problem       # For ROS srv
 from helper_functions import shift_traj_msg, shift_trajectory, get_traj_dir, \
     get_cos_angle_between
-
+from helper_classes import Polytope
 import cvxpy as cp
 import numpy as np
 import scipy as sp
@@ -303,44 +303,6 @@ class CentralisedProblem():
     def predict_USV_traj(self, xb_0, ub_traj):
         return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
 
-    def get_Z(self, AK, W):
-        vals, V = np.linalg.eig(AK)
-        D = np.diag(vals)   # The eigenvalue decomposition of AK is now V*D*V.T
-
-        if not V.shape[1] == AK.shape[1]:
-            print "Not enough eigenvectors for diagonalisation of A_K"
-            return
-
-        s = 1
-        run = True
-        broke = False
-        while run:
-            print "DEBUG: Trying s =", s
-            As = np.linalg.matrix_power(AK, s)
-            if W.AW_is_subset(As, 1):
-                # As*W is a subset of W, finish search
-                run = False
-            else:
-                s += 1
-
-        alpha = 1
-        d = 0.01    # Stepsize for decreasing alpha from 1
-        alpha = alpha-d
-        while W.AW_is_subset(As, alpha):
-            alpha = alpha-d
-
-        if alpha == 1-d:
-            # Step size was too large, no feasible alpha<1 was found
-            k = 0.5
-            while not W.AW_is_subset(As, 1-k*d):
-                k = k*0.5
-            alpha = 1-k*d   # Feasible alpha found
-        else:
-            # The previous alpha was the last feasible one
-            alpha = alpha+d
-
-        # TODO: FINSIH. Figure out what has to be done now that s and alpha are found
-
     # DEBUG
     def set_UAV_dynamics(self):
 
@@ -397,6 +359,10 @@ class UAVProblem():
         self.Q = Q
         self.P = P
         self.R = R
+        P_inf = sp.linalg.solve_discrete_are(A, B, Q, R)
+        BPB = np.dot(B.T, np.dot(P_inf, B))
+        BPA = np.dot(B.T, np.dot(P_inf, A))
+        self.K = -np.linalg.solve(R+BPB, BPA)
         self.Q_vel = Q_vel
         self.P_vel = P_vel
         self.nUSV = nUSV
@@ -558,6 +524,46 @@ class UAVProblem():
 
     # def solve_threaded(self, x_m, xb_m):
         # thread.start_new_thread(self.solve, (x_m, xb_m))
+
+    def get_Z(self, W):
+        # AK = self.A+np.dot(self.B, self.K)
+        # vals, V = np.linalg.eig(AK)
+        # D = np.diag(vals)   # The eigenvalue decomposition of AK is now V*D*V.T
+        #
+        # if not V.shape[1] == AK.shape[1]:
+        #     print "Not enough eigenvectors for diagonalisation of A_K"
+        #     return
+        #
+        # s = 1
+        # run = True
+        # broke = False
+        # while run:
+        #     print "DEBUG: Trying s =", s
+        #     As = np.linalg.matrix_power(AK, s)
+        #     if W.AW_is_subset(As, 1):
+        #         # As*W is a subset of W, finish search
+        #         run = False
+        #     else:
+        #         s += 1
+        #
+        # alpha = 1
+        # d = 0.01    # Stepsize for decreasing alpha from 1
+        # alpha = alpha-d
+        # while W.AW_is_subset(As, alpha):
+        #     alpha = alpha-d
+        #
+        # if alpha == 1-d:
+        #     # Step size was too large, no feasible alpha<1 was found
+        #     k = 0.5
+        #     while not W.AW_is_subset(As, 1-k*d):
+        #         k = k*0.5
+        #     alpha = 1-k*d   # Feasible alpha found
+        # else:
+        #     # The previous alpha was the last feasible one
+        #     alpha = alpha+d
+        #
+        # # TODO: FINSIH. Figure out what has to be done now that s and alpha are found
+        return Polytope(np.zeros((self.nUAV, 1)), np.zeros((1,1)))
 
     def predict_trajectory(self, x_0, u_traj):
         return np.dot(self.Phi, x_0) + np.dot(self.Lambda, u_traj)
@@ -1239,8 +1245,8 @@ class FastUAVProblem():
         self.A = A
         self.B = B
         self.Q = Q
-        self.P = np.solve_discrete_are(A, B, Q, R)
         self.R = R
+        self.P = sp.linalg.solve_discrete_are(A, B, Q, R)
         self.Z = Z
         BPB = np.dot(B.T, np.dot(self.P, B))
         BPA = np.dot(B.T, np.dot(self.P, A))
@@ -1248,64 +1254,26 @@ class FastUAVProblem():
         self.params = params
         self.last_solution_duration = np.nan
         [self.nUAV, self.mUAV] = B.shape
-        # self.create_optimisation_matrices()
+        self.create_optimisation_matrices() # Used only for prediction in cascading case
         self.create_optimisation_problem()
 
-    # def create_optimisation_matrices(self):
-    #     T = self.T
-    #     nUAV = self.nUAV
-    #     mUAV = self.mUAV
-    #
-    #     # Cost Matrices
-    #     self.Q_big  = np.kron(np.eye(T+1), self.Q)
-    #     self.Q_big[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P  # Not double-checked
-    #     self.R_big  = 1*np.kron(np.eye(T),   self.R)
-    #
-    #     # Dynamics Matrices
-    #     self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
-    #     self.Lambda = np.zeros(( (T+1)*nUAV, T*mUAV ))
-    #
-    #     for j in range(T+1):
-    #         self.Phi[  j*nUAV:(j+1)*nUAV, :] = np.linalg.matrix_power(self.A, j)
-    #         for k in range(j):  # range(0) returns empty list
-    #             self.Lambda[j*nUAV:(j+1)*nUAV, k*mUAV:(k+1)*mUAV] = \
-    #                 np.linalg.matrix_power(self.A, j-k-1)*self.B
-    #
-    #     # ------------------ OSQP Matrices ------------------
-    #     P_temp = 2*np.bmat([[self.Q_big, np.zeros(((T+1)*nUAV, T*mUAV))],
-    #         [np.zeros((T*mUAV, (T+1)*nUAV,)), self.R_big]
-    #     ])
-    #
-    #     P_data = np.diagonal(P_temp)
-    #     P_row = range(nUAV*(T+1) + mUAV*T)
-    #     P_col = range(nUAV*(T+1) + mUAV*T)
-    #     self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
-    #     self.q_OSQP = -2*np.bmat([
-    #         [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUAV, 1 )) )],
-    #         [np.dot( self.R_big, np.zeros(( T*self.mUAV, 1)))]
-    #     ])
-    #     self.l_OSQP = np.dot(self.Phi, np.zeros((nUAV, 1)))
-    #     self.u_OSQP = np.dot(self.Phi, np.zeros((nUAV, 1)))
-    #     self.A_temp = np.bmat([[np.eye(nUAV*(T+1)), -self.Lambda]])
-    #     # self.l_OSQP = np.bmat([
-    #     #     [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # Dynamics
-    #     #     [np.full((T*mUAV, 1), self.params.amin)],          # Input constraints
-    #     # ])
-    #     # self.u_OSQP = np.bmat([
-    #     #     [np.dot(self.Phi, np.zeros((nUAV, 1)))],      # Dynamics
-    #     #     [np.full((T*mUAV, 1), self.params.amax)],          # Input constraints
-    #     # ])
-    #     # self.A_temp = np.bmat([
-    #     #     [np.eye(nUAV*(T+1)),            -self.Lambda], # Dynamics
-    #     #     [np.zeros((T*mUAV, nUAV*(T+1))), np.eye(T*mUAV)]     # Input constraints
-    #     # ])
-    #     self.A_OSQP = csc_matrix(self.A_temp)
+    def create_optimisation_matrices(self):
+        T = self.T
+        nUAV = self.nUAV
+        mUAV = self.mUAV
+
+        self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
+
+        for j in range(T+1):
+            self.Phi[  j*nUAV:(j+1)*nUAV, :] = np.linalg.matrix_power(self.A, j)
+
+        return
 
     def create_optimisation_problem(self):
         T = self.T
         nUAV = self.nUAV
-        self.u = np.zeros((self.mUAV, 1))
-        # self.x  = cp.Variable(( nUAV*(T+1), 1 ))
+        self.v = np.zeros((self.mUAV, 1))
+        self.x  = cp.Variable(( nUAV*(T+1), 1 ))
         # self.u  = cp.Variable(( mUAV*T, 1 ))
         # self.x_0  = cp.Parameter((nUAV, 1))
         # self.x_des = cp.Parameter(( nUAV*(T+1), 1 ))
@@ -1330,20 +1298,23 @@ class FastUAVProblem():
 
         # Create problem for solving for initial nominal state
         self.problemInit = osqp.OSQP()
-        u_init = self.Z.b - np.dot(self.Z.A, np.zeros(nUAV, 1))
-        self.problemInit.setup(P=self.P, l=np.full((nUAV, 1), np.inf), u=u_init)
+        u_init = self.Z.b + np.dot(self.Z.A, np.zeros(nUAV, 1))
+        self.problemInit.setup(P=self.P, A=-self.Z.A, u=u_init, l=np.full((nUAV, 1), np.inf))
 
-    def solve(self, x_m):
+    def solve(self, x, r):
         start = time.time()
-        self.update_OSQP(x_m)
+        self.update_OSQP(x, r[0:self.nUAV])
         results = self.problemInit.solve()
         x0 = results.x
-        self.u = np.dot(self.L, x0) # TODO: This is not a cvxpy-variable anymore! Make sure to treat it correctly
-
+        self.v = np.dot(self.L, x0-r)
+        self.x.value = self.predict_trajectory(x0, r)
         end = time.time()
         self.last_solution_duration = end - start
 
-    def update_OSQP(self, x0):
+    def predict_trajectory(self, x_0, r):
+        return np.dot(self.Phi, x_0-r[0:self.nUAV]) + r
+
+    def update_OSQP(self, x0, r0):
         # self.l_OSQP = np.dot(self.Phi, x0)
         # self.u_OSQP = np.dot(self.Phi, x0)
         # # self.l_OSQP[0:(self.T+1)*self.nUAV, 0] = np.dot(self.Phi, x0)
@@ -1353,7 +1324,7 @@ class FastUAVProblem():
         #     [np.dot( self.R_big, u_des )]
         # ])
         # self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
-        u_init = self.Z.b - np.dot(self.Z.A, x0)
+        u_init = self.Z.b + np.dot(self.Z.A, r0-x0)
         self.problemInit.update(u = u_init)
 
 class FastUSVProblem():

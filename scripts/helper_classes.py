@@ -180,6 +180,7 @@ class DataAnalysisParams():
         self.vmax_b = vmax_b
 
 class Polytope():
+    # Polytope, region of all vectors x satisfying f.T x <= g 
 
     def __init__(self, f, g):
         self.f = f
