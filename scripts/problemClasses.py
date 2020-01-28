@@ -563,7 +563,7 @@ class UAVProblem():
         #     alpha = alpha+d
         #
         # # TODO: FINSIH. Figure out what has to be done now that s and alpha are found
-        return Polytope(np.zeros((self.nUAV, 1)), np.zeros((1,1)))
+        return Polytope(np.zeros((1, self.nUAV)), np.zeros((1,1)))
 
     def predict_trajectory(self, x_0, u_traj):
         return np.dot(self.Phi, x_0) + np.dot(self.Lambda, u_traj)
@@ -1250,7 +1250,7 @@ class FastUAVProblem():
         self.Z = Z
         BPB = np.dot(B.T, np.dot(self.P, B))
         BPA = np.dot(B.T, np.dot(self.P, A))
-        self.L = -np.linalg.solve(R+BPB, BPA)
+        self.L = -np.linalg.solve(R+BPB, BPA)   # Infinite-horizon LQR state feedback gain
         self.params = params
         self.last_solution_duration = np.nan
         [self.nUAV, self.mUAV] = B.shape
@@ -1261,11 +1261,12 @@ class FastUAVProblem():
         T = self.T
         nUAV = self.nUAV
         mUAV = self.mUAV
+        AL = self.A + np.dot(self.B, self.L)
 
         self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
 
         for j in range(T+1):
-            self.Phi[  j*nUAV:(j+1)*nUAV, :] = np.linalg.matrix_power(self.A, j)
+            self.Phi[  j*nUAV:(j+1)*nUAV, :] = np.linalg.matrix_power(AL, j)
 
         return
 
@@ -1298,15 +1299,16 @@ class FastUAVProblem():
 
         # Create problem for solving for initial nominal state
         self.problemInit = osqp.OSQP()
-        u_init = self.Z.b + np.dot(self.Z.A, np.zeros(nUAV, 1))
-        self.problemInit.setup(P=self.P, A=-self.Z.A, u=u_init, l=np.full((nUAV, 1), np.inf))
+        u_init = self.Z.g + np.dot(self.Z.f, np.zeros((nUAV, 1)))
+        self.problemInit.setup(P=csc_matrix(self.P), A=csc_matrix(-self.Z.f),\
+            u=u_init, l=np.full((1, 1), -np.inf))
 
     def solve(self, x, r):
         start = time.time()
         self.update_OSQP(x, r[0:self.nUAV])
         results = self.problemInit.solve()
-        x0 = results.x
-        self.v = np.dot(self.L, x0-r)
+        x0 = np.reshape(results.x, (-1, 1))
+        self.v = np.dot(self.L, x0-r[0:self.nUAV])
         self.x.value = self.predict_trajectory(x0, r)
         end = time.time()
         self.last_solution_duration = end - start
@@ -1324,7 +1326,7 @@ class FastUAVProblem():
         #     [np.dot( self.R_big, u_des )]
         # ])
         # self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
-        u_init = self.Z.b + np.dot(self.Z.A, r0-x0)
+        u_init = self.Z.g + np.dot(self.Z.f, r0-x0)
         self.problemInit.update(u = u_init)
 
 class FastUSVProblem():

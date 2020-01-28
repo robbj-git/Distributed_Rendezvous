@@ -180,12 +180,12 @@ class DataAnalysisParams():
         self.vmax_b = vmax_b
 
 class Polytope():
-    # Polytope, region of all vectors x satisfying f.T x <= g 
+    # Polytope, region of all vectors x satisfying f.T x <= g
 
     def __init__(self, f, g):
         self.f = f
         self.g = g
-        I = f.shape[2]
+        I = f.shape[1]
 
     def AW_is_subset(self, A, alpha):
         # Let this polytope (self) be called W

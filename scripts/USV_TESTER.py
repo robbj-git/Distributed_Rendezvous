@@ -120,8 +120,8 @@ took_too_long_horizon = -1
 # my_usv_simulator.deinitialise() # We don't want it to receive callbacks
 NUM_TESTS = 1
 if settings.PARALLEL:
-    hor_max = 347#170#420#405#100
-    hor_min = 347#170#420#300#100
+    hor_max = 120#347#170#420#405#100
+    hor_min = 120#347#170#420#300#100
 elif settings.CENTRALISED:
     hor_max = 100#195#150#120
     hor_min = 100#80#120
