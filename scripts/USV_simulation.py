@@ -175,6 +175,18 @@ class USV_simulator():
                 self.send_traj_to_UAV(self.xb_traj)
                 # print i, "xb0", self.xb_traj[0, 0]
 
+            if self.PARALLEL and i % self.INTER_ITS == 0:
+                if self.PRED_PARALLEL_TRAJ:
+                    xb0 = self.xb_traj[self.INTER_ITS*self.nUSV:\
+                        (self.INTER_ITS+1)*self.nUSV]
+                    # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
+                    traj = shift_trajectory(self.x_traj, self.nUAV, self.INTER_ITS)
+                else:
+                    xb0 = self.xb
+                    traj = self.x_traj
+                self.problemUSV.solve_in_parallel(xb0, traj,\
+                    self.USV_should_stop)
+
             # ------- Solving Problem --------
             if self.DISTRIBUTED:
                 self.problemUSV.solve(self.xb, self.x_traj, self.USV_should_stop)
@@ -185,38 +197,8 @@ class USV_simulator():
 
             if self.PARALLEL:
                 self.problemUSVFast.solve(self.xb,
-                    self.xb_traj[0:(self.T_inner+1)*self.nUSV],
-                    self.ub_traj[0:self.T_inner*self.mUSV])
+                    self.xb_traj[0:(self.T_inner+1)*self.nUSV])
                 self.xb_traj_inner = self.problemUSVFast.xb.value
-
-            if self.PARALLEL and i % self.INTER_ITS == 0:
-                if self.PRED_PARALLEL_TRAJ:
-                    if i <= self.INTER_ITS:
-                        # Up until and including i == INTER_ITS, the inner trajectory
-                        # will here only track the initial outer trajectory,
-                        # which is stationary at the origin. We know for a fact
-                        # that the UAV will NOT stay at the origin
-                        # for the iterations after i == INTER_ITS, so using the inner
-                        # trajectory for prediction at this point would be wrong.
-                        # We use instead the outer prediction, which at iteration
-                        # i == INTER_ITS will finally predict that the USV will actually move
-                        xb0 = self.xb_traj[self.INTER_ITS*self.nUSV:\
-                            (self.INTER_ITS+1)*self.nUSV]
-                    else:
-                        # We need to take elements from (self.INTER_ITS+1)*self.nUAV
-                        # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
-                        # is at this point still from iteration i-1. Since we want to predict
-                        # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
-                        # steps into the future
-                        xb0 = self.xb_traj_inner[self.INTER_ITS*self.nUSV\
-                            :(self.INTER_ITS+1)*self.nUSV]
-                    # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
-                    traj = shift_trajectory(self.x_traj, self.nUAV, self.INTER_ITS)
-                else:
-                    xb0 = self.xb
-                    traj = self.x_traj
-                self.problemUSV.solve_in_parallel(xb0, traj,\
-                    self.USV_should_stop)
 
             (self.uUSV) = self.get_control()
 
@@ -258,7 +240,8 @@ class USV_simulator():
         elif self.DISTRIBUTED:
             return self.problemUSV.ub[0:self.mUSV, 0:1].value
         elif self.PARALLEL:
-            return self.problemUSVFast.ub[0:self.mUSV, 0:1].value
+            uUSV = self.ub_traj[0:self.mUSV] + np.dot(self.problemUSV.K, self.xb-self.xb_traj[0:self.nUSV])
+            return uUSV
 
     # In parallel case, also stores solution duration of parallel problem
     def update_trajectories(self):

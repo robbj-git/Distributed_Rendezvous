@@ -248,8 +248,6 @@ class UAV_simulator():
             if self.PARALLEL and i%self.INTER_ITS == 0 and i > 0:
                 self.update_parallel_trajectories()
                 self.send_traj_to_USV(self.x_traj)
-                # print "state-ref, state-future_Ref"
-                # print np.linalg.norm(self.x-self.x_traj[0:self.nUAV]), np.linalg.norm(self.x-self.x_traj[self.nUAV:2*self.nUAV])
 
             if self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:

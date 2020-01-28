@@ -587,6 +587,10 @@ class USVProblem():
         self.Q = Q
         self.P = P
         self.R = R
+        P_inf = sp.linalg.solve_discrete_are(Ab, Bb, Q, R)
+        BPB = np.dot(Bb.T, np.dot(P_inf, Bb))
+        BPA = np.dot(Bb.T, np.dot(P_inf, Ab))
+        self.K = -np.linalg.solve(R+BPB, BPA)
         self.Qb_vel = Qb_vel
         self.Pb_vel = Pb_vel
         self.nUAV = nUAV
@@ -1343,127 +1347,76 @@ class FastUSVProblem():
         self.Ab = Ab
         self.Bb = Bb
         self.Q = Q
-        self.P = P
         self.R = R
+        self.P = sp.linalg.solve_discrete_are(Ab, Bb, Q, R)
+        BPB = np.dot(Bb.T, np.dot(self.P, Bb))
+        BPA = np.dot(Bb.T, np.dot(self.P, Ab))
+        self.L = -np.linalg.solve(R+BPB, BPA)   # Infinite-horizon LQR state feedback gain
         self.params = params
         self.last_solution_duration = np.nan # Most recent time taken to solve problem
         [self.nUSV, self.mUSV] = Bb.shape
-        self.create_optimisation_matrices()
+        self.create_optimisation_matrices() # Used only for prediction in cascading case
         self.create_optimisation_problem()
 
     def create_optimisation_matrices(self):
         T = self.T
         nUSV = self.nUSV
         mUSV = self.mUSV
+        AL = self.Ab + np.dot(self.Bb, self.L)
 
-        # Cost Matrices
-        self.Q_big  = np.kron(np.eye(T+1), self.Q)
-        self.Q_big[-nUSV:(T+1)*nUSV, -nUSV:(T+1)*nUSV] = self.P  # Not double-checked
-        self.Q_big_sparse = csc_matrix(self.Q_big)
-        self.R_big  = 1*np.kron(np.eye(T),   self.R)
-
-        # Dynamics Matrices
         self.Phi_b = np.zeros(( (T+1)*nUSV, nUSV ))
-        self.Lambda_b = np.zeros(( (T+1)*nUSV, T*mUSV ))
 
         for j in range(T+1):
-            self.Phi_b[j*nUSV:(j+1)*nUSV, :] = np.linalg.matrix_power(self.Ab, j)
-            for k in range(j):  # range(0) returns empty list
-                self.Lambda_b[j*nUSV:(j+1)*nUSV, k*mUSV:(k+1)*mUSV] = \
-                    np.linalg.matrix_power(self.Ab, j-k-1)*self.Bb
+            self.Phi_b[j*nUSV:(j+1)*nUSV, :] = np.linalg.matrix_power(AL, j)
 
-        # ------------------ OSQP Matrices ------------------
-        P_temp = 2*np.bmat([[self.Q_big, np.zeros(((T+1)*nUSV, T*mUSV))],
-            [np.zeros((T*mUSV, (T+1)*nUSV,)), self.R_big]
-        ])
-        P_data = np.diagonal(P_temp)
-        P_row = range(nUSV*(T+1) + mUSV*T)
-        P_col = range(nUSV*(T+1) + mUSV*T)
-        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
-        self.q_OSQP = -2*np.bmat([
-            [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUSV, 1 )) )],
-            [np.dot( self.R_big, np.zeros(( T*self.mUSV, 1)))]
-        ])
-        self.l_OSQP = np.dot(self.Phi_b, np.zeros((nUSV, 1)))
-        self.u_OSQP = np.dot(self.Phi_b, np.zeros((nUSV, 1)))
-        self.A_temp = np.bmat([[np.eye(nUSV*(T+1)), -self.Lambda_b]])
-        # self.l_OSQP = np.bmat([
-        #     [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],      # Dynamics
-        #     [np.full((T*mUSV, 1), self.params.amin_b)],          # Input constraints
-        # ])
-        # self.u_OSQP = np.bmat([
-        #     [np.dot(self.Phi_b, np.zeros((nUSV, 1)))],      # Dynamics
-        #     [np.full((T*mUSV, 1), self.params.amax_b)],        # Input constraints
-        # ])
-        # self.A_temp = np.bmat([
-        #     [np.eye(nUSV*(T+1)), -self.Lambda_b],              # Dynamics
-        #     [np.zeros((T*mUSV, nUSV*(T+1))), np.eye(T*mUSV)],     # Input constraints
-        # ])
-        self.A_OSQP = csc_matrix(self.A_temp)
+        return
 
     def create_optimisation_problem(self):
         T = self.T
         nUSV = self.nUSV
         mUSV = self.mUSV
         self.xb = cp.Variable(( nUSV*(T+1), 1 ))
-        self.ub = cp.Variable(( mUSV*T, 1 ))
-        self.xb_0 = cp.Parameter((nUSV, 1))
-        self.xb_des  = cp.Parameter((nUSV*(T+1), 1))
+        self.vb = cp.Variable(( mUSV*T, 1 ))
+        # self.ub = cp.Variable(( mUSV*T, 1 ))
+        # self.xb_0 = cp.Parameter((nUSV, 1))
+        # self.xb_des  = cp.Parameter((nUSV*(T+1), 1))
+        #
+        # objectiveUSV = cp.quad_form(self.xb_des-self.xb, self.Q_big) \
+        #     + cp.quad_form(self.ub, self.R_big)
+        # constraintsUSV = [ self.xb == self.Phi_b*self.xb_0 \
+        #     + self.Lambda_b*self.ub ]
+        # # MAYBE NOT NECESSARY, I'M NOT SURE
+        # temp_matrix = np.bmat([[np.eye(mUSV*T)], [-np.eye(mUSV*T)]])
+        # constraintsUSV += [temp_matrix*self.ub <= self.params.amax_b]
+        # # constraintsUSV += [self.ub <= self.params.amax_b]
+        # # constraintsUSV += [self.ub >= self.params.amin_b ]
+        #
+        # self.problemUSV = cp.Problem(cp.Minimize(objectiveUSV), constraintsUSV)
+        # self.problemOSQP = osqp.OSQP()
+        # self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 500)
+        return
 
-        objectiveUSV = cp.quad_form(self.xb_des-self.xb, self.Q_big) \
-            + cp.quad_form(self.ub, self.R_big)
-        constraintsUSV = [ self.xb == self.Phi_b*self.xb_0 \
-            + self.Lambda_b*self.ub ]
-        # MAYBE NOT NECESSARY, I'M NOT SURE
-        temp_matrix = np.bmat([[np.eye(mUSV*T)], [-np.eye(mUSV*T)]])
-        constraintsUSV += [temp_matrix*self.ub <= self.params.amax_b]
-        # constraintsUSV += [self.ub <= self.params.amax_b]
-        # constraintsUSV += [self.ub >= self.params.amin_b ]
-
-        self.problemUSV = cp.Problem(cp.Minimize(objectiveUSV), constraintsUSV)
-        self.problemOSQP = osqp.OSQP()
-        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 500)
-
-    def solve(self, xb_m, xb_des_m, ub_des, USV_should_stop = False):
+    def solve(self, xb, r, USV_should_stop = False):
         start = time.time()
-        # print self.x_hat.value.shape
-        # print (self.nUAV*(self.T+1), 1)
-        # print xhat_m.shape
-        self.xb_des.value = xb_des_m
-        self.xb_0.value = xb_m
-        if USV_should_stop:
-            self.ub.value = np.zeros((self.mUSV*self.T, 1))
-            self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
-        else:
-            self.update_OSQP(xb_m, xb_des_m, ub_des)
-            results = self.problemOSQP.solve()
-            self.xb.value = np.reshape(results.x[0:self.nUSV*(self.T+1)], (-1, 1))
-            self.ub.value = np.reshape(results.x[self.nUSV*(self.T+1):], (-1, 1))
-
-        # EDIT: I'm not sure this happens anymore
-        if self.xb.value is None:
-            # Sometimes a bug occurs where the solution returns only None
-            # In that case, apply no control input
-            self.ub.value = np.zeros((self.mUSV*self.T, 1))
-            self.xb.value = self.predict_trajectory(xb_m, self.ub.value)
-
+        self.xb.value = self.predict_trajectory(xb, r)
         end = time.time()
         self.last_solution_duration = end - start
 
-    def predict_trajectory( self, xb_0, ub_traj):
-        return np.dot(self.Phi_b, xb_0) + np.dot(self.Lambda_b, ub_traj)
+    def predict_trajectory( self, xb_0, r):
+        return np.dot(self.Phi_b, xb_0-r[0:self.nUSV]) + r
 
     def update_OSQP(self, xb0, xb_des, ub_des):
-        self.l_OSQP = np.dot(self.Phi_b, xb0)
-        self.u_OSQP = np.dot(self.Phi_b, xb0)
-        # self.l_OSQP[0:(self.T+1)*self.nUSV, 0] = np.dot(self.Phi_b, xb0)
-        # self.u_OSQP[0:(self.T+1)*self.nUSV, 0] = np.dot(self.Phi_b, xb0)
-        # self.q_OSQP[0:(self.T+1)*self.nUSV, 0] = self.Q_big_sparse.dot(-2*xb_des)
-        self.q_OSQP = np.block([
-            [self.Q_big_sparse.dot(-2*xb_des)],
-            [np.dot(self.R_big, -2*ub_des)]
-        ])
-        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
+        # self.l_OSQP = np.dot(self.Phi_b, xb0)
+        # self.u_OSQP = np.dot(self.Phi_b, xb0)
+        # # self.l_OSQP[0:(self.T+1)*self.nUSV, 0] = np.dot(self.Phi_b, xb0)
+        # # self.u_OSQP[0:(self.T+1)*self.nUSV, 0] = np.dot(self.Phi_b, xb0)
+        # # self.q_OSQP[0:(self.T+1)*self.nUSV, 0] = self.Q_big_sparse.dot(-2*xb_des)
+        # self.q_OSQP = np.block([
+        #     [self.Q_big_sparse.dot(-2*xb_des)],
+        #     [np.dot(self.R_big, -2*ub_des)]
+        # ])
+        # self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q=self.q_OSQP)
+        pass
 
 class FastVerticalProblem():
 
