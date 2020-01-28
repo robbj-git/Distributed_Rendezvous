@@ -248,15 +248,13 @@ class UAV_simulator():
             if self.PARALLEL and i%self.INTER_ITS == 0 and i > 0:
                 self.update_parallel_trajectories()
                 self.send_traj_to_USV(self.x_traj)
+                # print "state-ref, state-future_Ref"
+                # print np.linalg.norm(self.x-self.x_traj[0:self.nUAV]), np.linalg.norm(self.x-self.x_traj[self.nUAV:2*self.nUAV])
 
             if self.PARALLEL and i % self.INTER_ITS == 0:
                 if self.PRED_PARALLEL_TRAJ:
-                    if i <= self.INTER_ITS:
-                        x0 = self.x_traj[self.INTER_ITS*self.nUAV\
-                            :(self.INTER_ITS+1)*self.nUAV]
-                    else:
-                        x0 = self.x_traj_inner[self.INTER_ITS*self.nUAV\
-                            :(self.INTER_ITS+1)*self.nUAV]
+                    x0 = self.x_traj[self.INTER_ITS*self.nUAV\
+                        :(self.INTER_ITS+1)*self.nUAV]
                     # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
                     traj = shift_trajectory(self.xb_traj, self.nUSV, self.INTER_ITS)
                 else:
@@ -351,8 +349,9 @@ class UAV_simulator():
         elif self.DISTRIBUTED:
             return (self.problemUAV.u[0:self.mUAV, 0:1].value, None)
         elif self.PARALLEL:
-            # TODO: Are self.x and self.x_traj_inner updated to the most recent version at this stage???
-            uUAV = self.u_traj[0:self.mUAV]# + self.problemUAVFast.v # + np.dot(self.problemUAV.K, self.x-self.x_traj_inner[0:self.nUAV]
+            # uUAV = self.u_traj[0:self.mUAV] + self.problemUAVFast.v # + np.dot(self.problemUAV.K, self.x-self.x_traj_inner[0:self.nUAV])
+            # This assumes that problemUAV.K == problemUAVFast.L
+            uUAV = self.u_traj[0:self.mUAV] + np.dot(self.problemUAV.K, self.x-self.x_traj[0:self.nUAV])
             return (uUAV, None)
 
     def get_vertical_control(self):

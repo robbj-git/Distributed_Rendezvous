@@ -1306,13 +1306,17 @@ class FastUAVProblem():
             u=u_init, l=np.full((2*self.nUAV, 1), -np.inf), verbose=False, max_iter = 500)
 
     def solve(self, x, r):
+        # start = time.time()
+        # self.update_OSQP(x, r[0:self.nUAV])
+        # results = self.problemInit.solve()
+        # z0 = np.reshape(results.x, (-1, 1))
+        # x0 = z0+r[0:self.nUAV]
+        # self.v = np.dot(self.L, x0-r[0:self.nUAV])
+        # self.x.value = self.predict_trajectory(x0, r)
+        # end = time.time()
+        # self.last_solution_duration = end - start
         start = time.time()
-        self.update_OSQP(x, r[0:self.nUAV])
-        results = self.problemInit.solve()
-        z0 = np.reshape(results.x, (-1, 1))
-        x0 = z0+r[0:self.nUAV]
-        self.v = np.dot(self.L, x0-r[0:self.nUAV])
-        self.x.value = self.predict_trajectory(x0, r)
+        self.x.value = self.predict_trajectory(x, r)
         end = time.time()
         self.last_solution_duration = end - start
 
