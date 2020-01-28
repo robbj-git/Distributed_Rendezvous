@@ -517,6 +517,7 @@ class UAVProblem():
         self.last_solution_duration = duration
 
     def solve_in_parallel(self, x_m, xb_m):
+        self.most_recent_x_m = x_m  # DEBUG: Remove this, only used for a specific bebugging task on 28/01/2020
         self.update_OSQP(x_m, xb_m)
         self.parent_conn, child_conn = Pipe()
         self.p = Process(target=self.solve_process, args=(child_conn,))
@@ -563,7 +564,8 @@ class UAVProblem():
         #     alpha = alpha+d
         #
         # # TODO: FINSIH. Figure out what has to be done now that s and alpha are found
-        return Polytope(np.zeros((1, self.nUAV)), np.zeros((1,1)))
+        f = np.block([[np.eye(self.nUAV)], [-np.eye(self.nUAV)]])
+        return Polytope(f, np.zeros((2*self.nUAV,1)))
 
     def predict_trajectory(self, x_0, u_traj):
         return np.dot(self.Phi, x_0) + np.dot(self.Lambda, u_traj)
@@ -1301,13 +1303,14 @@ class FastUAVProblem():
         self.problemInit = osqp.OSQP()
         u_init = self.Z.g + np.dot(self.Z.f, np.zeros((nUAV, 1)))
         self.problemInit.setup(P=csc_matrix(self.P), A=csc_matrix(-self.Z.f),\
-            u=u_init, l=np.full((1, 1), -np.inf))
+            u=u_init, l=np.full((2*self.nUAV, 1), -np.inf), verbose=False, max_iter = 500)
 
     def solve(self, x, r):
         start = time.time()
         self.update_OSQP(x, r[0:self.nUAV])
         results = self.problemInit.solve()
-        x0 = np.reshape(results.x, (-1, 1))
+        z0 = np.reshape(results.x, (-1, 1))
+        x0 = z0+r[0:self.nUAV]
         self.v = np.dot(self.L, x0-r[0:self.nUAV])
         self.x.value = self.predict_trajectory(x0, r)
         end = time.time()

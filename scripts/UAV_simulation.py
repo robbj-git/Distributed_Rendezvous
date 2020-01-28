@@ -351,7 +351,9 @@ class UAV_simulator():
         elif self.DISTRIBUTED:
             return (self.problemUAV.u[0:self.mUAV, 0:1].value, None)
         elif self.PARALLEL:
-            return (self.problemUAVFast.v, None)
+            # TODO: Are self.x and self.x_traj_inner updated to the most recent version at this stage???
+            uUAV = self.u_traj[0:self.mUAV]# + self.problemUAVFast.v # + np.dot(self.problemUAV.K, self.x-self.x_traj_inner[0:self.nUAV]
+            return (uUAV, None)
 
     def get_vertical_control(self):
         if self.CENTRALISED or self.DISTRIBUTED:
