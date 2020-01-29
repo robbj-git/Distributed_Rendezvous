@@ -174,11 +174,6 @@ class UAV_simulator():
     def simulate_problem(self, sim_len, x_val, xv_val):
         self.reset(sim_len, x_val, xv_val)
 
-        # TODO: REWRITE THIS WHOLE FUNCTION, REGARDLESS OF IT IT'S CASCADING OR NOT...?
-        # MAYBE NOT, BUT SOLUTION OF OUTER PROBLEM CAN NOT BE STARTED AT THE BEGGINING
-        # OF THE FUNCTION SINCE IT USES LAST CANDIDATE TRAJECTORY FOR PREDICTION!!!
-        # SO YOU FOR SURE NEED TO IMPLEMENT CANDIDATE REFERENCE VARIABLE!!!
-
         self.x = x_val
         self.xv = xv_val
 
@@ -210,6 +205,12 @@ class UAV_simulator():
                 if rospy.is_shutdown():
                     return
                 self.rate.sleep()
+
+        self.dist_traj = get_dist_traj(self.x_traj, self.xb_traj, self.T, \
+            self.nUAV, self.nUSV)
+        self.dist_traj_signed = \
+            get_dist_traj(self.x_traj, self.xb_traj, self.T, self.nUAV,\
+            self.nUSV, True)
 
         start = time.time()
         for i in range(sim_len):
@@ -260,6 +261,19 @@ class UAV_simulator():
                     traj = self.xb_traj
                 self.problemUAV.solve_in_parallel(x0, traj)
 
+            if self.PARALLEL and i % self.INTER_ITS == 0:
+                if self.PRED_PARALLEL_TRAJ:
+                    xv0 = self.xv_traj[self.INTER_ITS*self.nv:\
+                        (self.INTER_ITS+1)*self.nv]
+                    dist_traj = shift_trajectory(np.asarray(self.dist_traj),\
+                        1, self.INTER_ITS)
+                else:
+                    xv0 = self.xv
+                    dist_traj = np.asarray(self.dist_traj)
+                # TODO: Make dist_traj nartually an array instead of matrix
+                self.problemVert.solve_in_parallel(xv0, 0.0,\
+                    dist_traj)
+
             # ------- Horizontal Problem --------
             if self.CENTRALISED:
                 self.problemCent.solve(self.x, self.xb)
@@ -276,35 +290,16 @@ class UAV_simulator():
 
             (self.uUAV, self.uUSV) = self.get_horizontal_control()
             # ------- Vertical Problem --------
-            if self.dist_traj is not None:
-                if not self.PARALLEL:
-                    # TODO: Make dist_traj naturally be an array instead of a matrix
-                    self.problemVert.solve(self.xv, 0.0, np.asarray(self.dist_traj))
+            if not self.PARALLEL and self.dist_traj is not None:
+                # TODO: Make dist_traj naturally be an array instead of a matrix
+                self.problemVert.solve(self.xv, 0.0, np.asarray(self.dist_traj))
 
             self.update_vert_trajectories()
 
             if self.PARALLEL:
                 self.problemVertFast.solve(self.xv,
-                    self.xv_traj[0:(self.T_inner+1)*self.nv, 0:1],
-                    self.wdes_traj[0:self.T_inner*self.mv, 0:1])
+                    self.xv_traj[0:(self.T_inner+1)*self.nv, 0:1])
                 self.xv_traj_inner = self.problemVertFast.xv.value
-
-            if self.PARALLEL and i % self.INTER_ITS == 0:
-                if self.PRED_PARALLEL_TRAJ:
-                    if i <= self.INTER_ITS:
-                        xv0 = self.xv_traj[self.INTER_ITS*self.nv:\
-                            (self.INTER_ITS+1)*self.nv]
-                    else:
-                        xv0 = self.xv_traj_inner[self.INTER_ITS*self.nv:\
-                            (self.INTER_ITS+1)*self.nv]
-                    dist_traj = shift_trajectory(np.asarray(self.dist_traj),\
-                        1, self.INTER_ITS)
-                else:
-                    xv0 = self.xv
-                    dist_traj = np.asarray(self.dist_traj)
-                # TODO: Make dist_traj nartually an array instead of matrix
-                self.problemVert.solve_in_parallel(xv0, 0.0,\
-                    dist_traj)
 
             self.wdes = self.get_vertical_control()
             self.update_logs(self.i)
@@ -356,7 +351,8 @@ class UAV_simulator():
         if self.CENTRALISED or self.DISTRIBUTED:
             wdes = self.problemVert.wdes[0:self.mv, 0:1].value
         elif self.PARALLEL:
-            wdes = self.problemVertFast.wdes[0:self.mv, 0:1].value
+            wdes = self.wdes_traj[0:self.mv] + np.dot(self.problemVert.K, self.xv-self.xv_traj[0:self.nv])
+            # wdes = self.problemVertFast.wdes[0:self.mv, 0:1].value
 
         if np.isnan(wdes).any():
             # If solution of vertical problem failed, make the UAV rise
@@ -376,7 +372,6 @@ class UAV_simulator():
             if self.i%self.INTER_ITS != 0:
                 self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
                 self.u_traj = shift_trajectory(self.u_traj, self.mUAV, 1)
-                # self.xb_traj = shift_trajectory(self.xb_traj, self.nUSV, 1)
 
         self.dist_traj = get_dist_traj(self.x_traj, self.xb_traj, self.T, \
             self.nUAV, self.nUSV)
@@ -403,6 +398,11 @@ class UAV_simulator():
         self.problemVert.end_process()
         self.x_traj = self.problemUAV.x.value
         self.u_traj = self.problemUAV.u.value
+        self.dist_traj = get_dist_traj(self.x_traj, self.xb_traj, self.T, \
+            self.nUAV, self.nUSV)
+        self.dist_traj_signed = \
+            get_dist_traj(self.x_traj, self.xb_traj, self.T, self.nUAV,\
+            self.nUSV, True)
         if np.isnan(self.problemVert.xv.value).any():
             # Failed to solve vertical problem, rise up to a safe height
             self.wdes_traj = np.full((self.T*self.mv, 1), self.params.wmax)

@@ -833,6 +833,10 @@ class VerticalProblem():
         self.Qv = Qv
         self.Pv = Pv
         self.Rv = Rv
+        P_inf = sp.linalg.solve_discrete_are(Av, Bv, Qv, Rv)
+        BPB = np.dot(Bv.T, np.dot(P_inf, Bv))
+        BPA = np.dot(Bv.T, np.dot(P_inf, Av))
+        self.K = -np.linalg.solve(Rv+BPB, BPA)
         self.params = params
         self.nv = 2
         self.mv = 1
@@ -1427,6 +1431,10 @@ class FastVerticalProblem():
         self.Qv = Qv
         self.Pv = Pv
         self.Rv = Rv
+        self.P = sp.linalg.solve_discrete_are(Av, Bv, Qv, Rv)
+        BPB = np.dot(Bv.T, np.dot(self.P, Bv))
+        BPA = np.dot(Bv.T, np.dot(self.P, Av))
+        self.L = -np.linalg.solve(Rv+BPB, BPA)   # Infinite-horizon LQR state feedback gain
         self.params = params
         self.nv = 2
         self.mv = 1
@@ -1440,139 +1448,58 @@ class FastVerticalProblem():
         T = self.T
         nv = self.nv
         mv = self.mv
-        params = self.params
+        AL = self.Av + np.dot(self.Bv, self.L)
 
         # Dynamics Matrices
         self.Phi_v = np.zeros(( (T+1)*nv, nv ))
-        self.Lambda_v =  np.zeros(( (T+1)*nv, T*mv ))
 
         for j in range(T+1):
-            self.Phi_v[ j*nv :(j+1)*nv,   :] = np.linalg.matrix_power(self.Av, j)
-            for k in range(j):  # range(0) returns empty list
-                self.Lambda_v[  j*nv:(j+1)*nv,    k*mv:(k+1)*mv   ] = \
-                    np.linalg.matrix_power(self.Av, j-k-1)*self.Bv
+            self.Phi_v[ j*nv :(j+1)*nv,   :] = np.linalg.matrix_power(AL, j)
 
-        # Cost Matrices
-        self.Qv_big = np.kron(np.eye(T+1), self.Qv)       # I haven't double-checked that this is correct
-        self.Qv_big[-nv:(T+1)*nv, -nv:(T+1)*nv] = self.Pv
-        self.Rv_big = 1*np.kron(np.eye(T),   self.Rv)
-
-        velocity_extractor = np.zeros(( T+1, nv*(T+1) ))
-        for i in range(T+1):
-            velocity_extractor[ i, nv*i+1 ] = 1
-
-        touchdown_matrix = np.zeros(( T+1, nv*(T+1) ))
-        for i in range(T+1):
-            touchdown_matrix[ i, nv*i ] = params.kl
-            touchdown_matrix[ i, nv*i+1 ] = 1
-
-        # Constraints appear in the following row order:
-        # * Max velocity constraints
-        # * Min velocity constraints
-        # * Touchdown constraints
-        self.vert_constraints_matrix = np.bmat([\
-            [velocity_extractor],\
-            [-velocity_extractor],\
-            [-touchdown_matrix],\
-        ])
-
-        self.vert_constraints_vector = np.bmat([\
-            [ params.wmax*np.ones((T+1, 1))],\
-            [-params.wmin*np.ones((T+1, 1))],\
-            [-params.wmin_land*np.ones((T+1, 1))], \
-        ])
-
-        # ------------- OSQP Matrices --------------
-        P_temp = 2*np.bmat([[self.Qv_big, np.zeros((nv*(T+1), mv*T))],\
-            [np.zeros((mv*T, nv*(T+1))), self.Rv_big]])
-        P_data = np.diagonal(P_temp)
-        P_row = range(nv*(T+1) + mv*T)
-        P_col = range(nv*(T+1) + mv*T)
-        self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
-        # self.l_OSQP = np.bmat([\
-        #     [np.dot(self.Phi_v,np.zeros((nv, 1)))],\
-        #     [np.full((3*(T+1), 1), -np.inf)]] )
-        # self.u_OSQP = np.bmat([\
-        #     [np.dot(self.Phi_v,np.zeros((nv, 1)))],\
-        #     [self.vert_constraints_vector]] )
-        # self.q_OSQP = np.bmat([\
-        #     [-2*np.dot(self.Qv_big, np.zeros((nv*(T+1), 1)))],\
-        #     [np.zeros((T*mv, 1))]])
-        # # I have added velocity constraints, but not constraints on wdes. Will this be enough?
-        # A_temp = np.bmat([\
-        #     [np.eye(nv*(T+1)), -self.Lambda_v],\
-        #     [self.vert_constraints_matrix, np.zeros((3*(T+1), mv*T))]] )
-        self.l_OSQP = np.dot(self.Phi_v,np.zeros((nv, 1)))
-        self.u_OSQP = np.dot(self.Phi_v,np.zeros((nv, 1)))
-        self.q_OSQP = -2*np.bmat([
-            [np.dot(self.Qv_big, np.zeros((nv*(T+1), 1)))],
-            [np.dot(self.Rv_big, np.zeros((mv*T, 1)) ) ]])
-        # I have added velocity constraints, but not constraints on wdes. Will this be enough?
-        A_temp = np.bmat([\
-            [np.eye(nv*(T+1)), -self.Lambda_v]] )
-        self.A_OSQP = csc_matrix(A_temp)
+        return
 
     def create_optimisation_problem(self):
         T = self.T
         nv = self.nv
-        params = self.params
+        # params = self.params
         self.xv = cp.Variable(( nv*(T+1), 1 ))
         self.wdes = cp.Variable(( T, 1 ))
-        self.xv_des = cp.Parameter(( nv*(T+1), 1 ))
-        self.xv_0 = cp.Parameter(( nv, 1 ))
+        # self.xv_des = cp.Parameter(( nv*(T+1), 1 ))
+        # self.xv_0 = cp.Parameter(( nv, 1 ))
+        #
+        # objectiveVert = cp.quad_form(self.wdes, self.Rv_big) +\
+        #     cp.quad_form(self.xv-self.xv_des, self.Qv_big)
+        # # Dynamics constraint
+        # constraintsVert = [self.xv == self.Phi_v*self.xv_0 \
+        #     + self.Lambda_v*self.wdes]
+        # # Velocity constraints and touchdown constraints
+        # constraintsVert += [self.vert_constraints_matrix*self.xv \
+        #     <= self.vert_constraints_vector]
+        #
+        #
+        # self.problemVert = \
+        #     cp.Problem(cp.Minimize(objectiveVert), constraintsVert)
+        #
+        # self.problemOSQP = osqp.OSQP()
+        # self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 300)
+        return
 
-        objectiveVert = cp.quad_form(self.wdes, self.Rv_big) +\
-            cp.quad_form(self.xv-self.xv_des, self.Qv_big)
-        # Dynamics constraint
-        constraintsVert = [self.xv == self.Phi_v*self.xv_0 \
-            + self.Lambda_v*self.wdes]
-        # Velocity constraints and touchdown constraints
-        constraintsVert += [self.vert_constraints_matrix*self.xv \
-            <= self.vert_constraints_vector]
-
-
-        self.problemVert = \
-            cp.Problem(cp.Minimize(objectiveVert), constraintsVert)
-
-        self.problemOSQP = osqp.OSQP()
-        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 300)
-
-    def solve(self, xv_m, xv_des_m, wdes_des):
+    def solve(self, xv, r):
         start = time.time()
-        T = self.T
-        nv = self.nv
-        self.xv_0.value = xv_m
-        self.xv_des.value = xv_des_m
-
-        self.update_OSQP(xv_m, xv_des_m, wdes_des)
-        results = self.problemOSQP.solve()
-
-        if results.x[0] is not None:
-            self.xv.value = np.reshape(results.x[0:self.nv*(self.T+1)], (-1, 1))
-            self.wdes.value = np.reshape(results.x[self.nv*(self.T+1):], (-1, 1))
-        else:
-            # Optimisation failed
-            # Using np.full() doesn't seem to work, since "variables must be
-            # real". Using this approach seems to circumvent that limitation
-            # np.zeros() is used instead of np.empty() since np.empty()
-            # sometimes contains non-real values, causing an exception
-            self.wdes.value = np.zeros((self.T, 1))
-            self.wdes.value.fill(np.nan)
-            self.xv.value = np.zeros(((self.T+1)*self.nv, 1))
-            self.xv.value.fill(np.nan)
-
-        duration = time.time() - start
-        self.num_iters_log.append(results.info.iter)
-        self.durations.append(duration)
+        self.xv.value = self.predict_trajectory(xv, r)
         end = time.time()
         self.last_solution_duration = end - start
 
+    def predict_trajectory( self, xv_0, r):
+        return np.dot(self.Phi_v, xv_0-r[0:self.nv]) + r
+
     def update_OSQP(self, x0, x_des, wdes_des):
-        self.l_OSQP = np.dot(self.Phi_v, x0)
-        self.u_OSQP = np.dot(self.Phi_v, x0)
-        # self.q_OSQP[0:(self.T+1)*self.nv, 0] = np.dot(-2*self.Qv_big, x_des)
-        self.q_OSQP = -2*np.block([
-            [np.dot(self.Qv_big, x_des)],
-            [np.dot(self.Rv_big, wdes_des)]
-        ])
-        self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q = self.q_OSQP)
+        # self.l_OSQP = np.dot(self.Phi_v, x0)
+        # self.u_OSQP = np.dot(self.Phi_v, x0)
+        # # self.q_OSQP[0:(self.T+1)*self.nv, 0] = np.dot(-2*self.Qv_big, x_des)
+        # self.q_OSQP = -2*np.block([
+        #     [np.dot(self.Qv_big, x_des)],
+        #     [np.dot(self.Rv_big, wdes_des)]
+        # ])
+        # self.problemOSQP.update(l=self.l_OSQP, u=self.u_OSQP, q = self.q_OSQP)
+        pass
