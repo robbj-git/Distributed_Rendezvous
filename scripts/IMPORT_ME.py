@@ -9,14 +9,14 @@ sim_len = 500
 USE_HIL = False
 # SET ONE OF THESE TO TRUE
 CENTRALISED = False
-DISTRIBUTED = True
-PARALLEL = False
+DISTRIBUTED = False
+PARALLEL = True
 
 SAMPLING_RATE = 20              # Dynamics change if this changes
 SAMPLING_TIME = 1.0/SAMPLING_RATE
 ADD_DROPOUT = False # Should a communication loss between the vehicles be simulated?
 
-PRED_PARALLEL_TRAJ = True
+PRED_PARALLEL_TRAJ = True       # DEPRECATED, ASSUMED TRUE IN NEW VERSIONS
 USE_COMPLETE_HORIZONTAL = False
 USE_COMPLETE_USV = False
 SOLVE_PARALLEL_AT_END = True

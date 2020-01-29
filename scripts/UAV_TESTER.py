@@ -30,6 +30,7 @@ from problemClasses import *
 from UAV_simulation import UAV_simulator
 from centralised_uav_simulator import CentralisedUAVSimulator
 from distributed_uav_simulator import DistributedUAVSimulator
+from cascading_uav_simulator import CascadingUAVSimulator
 
 lookahead = 0   # Only for parallel. TODO: Move to IMPORT_ME.py???
 
@@ -152,7 +153,7 @@ for N in range(hor_max, hor_min-1, -1):
     prev_simulator = my_uav_simulator
 
     # my_uav_simulator = UAV_simulator(problem_params, travel_dir = dir)
-    my_uav_simulator = DistributedUAVSimulator(problem_params)
+    my_uav_simulator = CascadingUAVSimulator(problem_params)
 
     # Makes sure that UAV receives info about round being -1 before the round changes to 0
     time.sleep(0.5)
