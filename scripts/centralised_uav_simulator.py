@@ -44,11 +44,10 @@ class CentralisedUAVSimulator(UAVSimulator2):
 
         start = time.time()
         for i in range(sim_len):
-            if rospy.is_shutdown():
-                return
+            if rospy.is_shutdown(): return
 
             self.i = i
-            # Get data from USV
+            # -------------- GET DATA FROM USV ----------------
             if i > 0:
                 try:
                     xb_msg = self.USV_state_queue.get()
