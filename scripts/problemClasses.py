@@ -826,7 +826,7 @@ class USVProblem():
 
 class VerticalProblem():
 
-    def __init__(self, T, Av, Bv, Qv, Pv, Rv, params, hb = 0, use_many_its = False):
+    def __init__(self, T, Av, Bv, Qv, Pv, Rv, params, hb = 0, num_its = 300):
         self.T = T
         self.Av = Av
         self.Bv = Bv
@@ -844,7 +844,7 @@ class VerticalProblem():
         # When problem is solved in parallel, this variable makes it easier to access solution duration
         self.last_solution_duration = np.nan
         self.create_optimisation_matrices(self.hb)
-        self.create_optimisation_problem(use_many_its)
+        self.create_optimisation_problem(num_its)
         self.durations = [] #DEBUG
         self.num_iters_log = [] #DEBUG
         self.obj_val = np.nan
@@ -983,7 +983,7 @@ class VerticalProblem():
         # ])
         self.A_OSQP = csc_matrix(self.A_temp)
 
-    def create_optimisation_problem(self, use_many_its):
+    def create_optimisation_problem(self, num_its):
         T = self.T
         nv = self.nv
         params = self.params
@@ -1032,8 +1032,7 @@ class VerticalProblem():
 
         # max_iter = 400 if self.PARALLEL else 200
         self.problemOSQP = osqp.OSQP()
-        its = 500 if use_many_its else 300
-        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, q=self.q_OSQP, verbose=False, max_iter = its)
+        self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, q=self.q_OSQP, verbose=False, max_iter = num_its)
 
     def ROS_init(self):
         if self.T == 100:

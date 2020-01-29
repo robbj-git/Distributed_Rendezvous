@@ -53,8 +53,9 @@ class UAV_simulator():
         self.long_ref = None
         self.lat_ref = None
 
+        num_vert_its = 500 if self.PARALLEL else 300
         self.problemVert = VerticalProblem(self.T, self.Av, self.Bv, pp.params.Qv,\
-            pp.params.Pv, pp.params.Rv, pp.params, self.params.hb, self.PARALLEL)
+            pp.params.Pv, pp.params.Rv, pp.params, self.params.hb, num_vert_its)
         if self.CENTRALISED:
             self.problemCent = CentralisedProblem(self.T, self.A, self.B,\
                 pp.params.Ab, pp.params.Bb, pp.params.Q, pp.params.P, \
@@ -72,8 +73,8 @@ class UAV_simulator():
 
         self.i = 0
         # These must be created already in the constructor since they are used in ROS callbacks
-        self.USVApprox = StampedTrajQueue(self.delay_len, should_shift = self.SHOULD_SHIFT_MESSAGES)
-        self.USV_state_queue = StampedMsgQueue(self.delay_len)
+        if not self.CENTRALISED: self.USVApprox = StampedTrajQueue(self.delay_len, should_shift = self.SHOULD_SHIFT_MESSAGES)
+        if self.CENTRALISED: self.USV_state_queue = StampedMsgQueue(self.delay_len)
 
         self.x = np.full((self.nUAV, 1), np.nan)
         self.xv = np.full((self.nv, 1), np.nan)
@@ -82,9 +83,8 @@ class UAV_simulator():
         # --------------------------- ROS SETUP ----------------------------------
         # rospy.init_node('UAV_main')
         self.rate = rospy.Rate(self.SAMPLING_RATE)
-        self.USV_input_pub = rospy.Publisher('USV_input', AccelStamped, queue_size = 10)
-        # self.experiment_index_pub = rospy.Publisher('experiment_index', Int8, queue_size=1, latch=True)
         if self.CENTRALISED:
+            self.USV_input_pub = rospy.Publisher('USV_input', AccelStamped, queue_size = 10)
             self.USV_state_sub = rospy.Subscriber(\
                 'USV_state', StateStamped, self.USV_state_callback)
             self.sim_stop_pub = rospy.Publisher('stop_sim', Bool, queue_size = 1)
@@ -168,8 +168,8 @@ class UAV_simulator():
             self.s_USV_log = np.full((self.problemCent.nUSV_s, sim_len), np.nan)
             self.uUSV_log = np.full((self.mUSV, sim_len), np.nan)
 
-        self.USVApprox = StampedTrajQueue(self.delay_len, should_shift = self.SHOULD_SHIFT_MESSAGES)
-        self.USV_state_queue = StampedMsgQueue(self.delay_len)
+        if not self.CENTRALISED: self.USVApprox = StampedTrajQueue(self.delay_len, should_shift = self.SHOULD_SHIFT_MESSAGES)
+        if self.CENTRALISED: self.USV_state_queue = StampedMsgQueue(self.delay_len)
 
     def simulate_problem(self, sim_len, x_val, xv_val):
         self.reset(sim_len, x_val, xv_val)
@@ -206,11 +206,11 @@ class UAV_simulator():
                     return
                 self.rate.sleep()
 
-        self.dist_traj = get_dist_traj(self.x_traj, self.xb_traj, self.T, \
-            self.nUAV, self.nUSV)
-        self.dist_traj_signed = \
-            get_dist_traj(self.x_traj, self.xb_traj, self.T, self.nUAV,\
-            self.nUSV, True)
+            self.dist_traj = get_dist_traj(self.x_traj, self.xb_traj, self.T, \
+                self.nUAV, self.nUSV)
+            self.dist_traj_signed = \
+                get_dist_traj(self.x_traj, self.xb_traj, self.T, self.nUAV,\
+                self.nUSV, True)
 
         start = time.time()
         for i in range(sim_len):
