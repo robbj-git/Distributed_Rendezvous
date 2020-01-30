@@ -82,14 +82,9 @@ class CascadingUAVSimulator(UAVSimulator2):
                 self.u_traj = self.problemUAV.u.value
                 self.dist_traj = get_dist_traj(self.x_traj, self.xb_traj, self.T, \
                     self.nUAV, self.nUSV)
-                self.dist_traj_signed = \
-                    get_dist_traj(self.x_traj, self.xb_traj, self.T, self.nUAV,\
-                    self.nUSV, True)
 
-                # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                # THIS PART HERE, SHOULD IT REALLY BE LIKE THIS????
-                # COMPARE TO FIXES IN OTHER VERSIONS!!!!!!!!!!!!1
-                if np.isnan(self.problemVert.xv.value).any():
+                if np.isnan(self.problemVert.xv.value).any()\
+                    or np.isnan(self.problemVert.wdes.value).any():
                     # Failed to solve vertical problem, rise up to a safe height
                     self.wdes_traj = np.full((self.T*self.mv, 1), self.params.wmax)
                     self.xv_traj = self.problemVert.predict_trajectory(self.xv, self.wdes_traj)
@@ -101,15 +96,12 @@ class CascadingUAVSimulator(UAVSimulator2):
 
                 self.send_traj_to_USV(self.x_traj)
 
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            # TODO: dist_traj is updated here in original, is that necessary?
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
             if self.i%self.INTER_ITS != 0:
                 self.x_traj = shift_trajectory(self.x_traj, self.nUAV, 1)
                 self.u_traj = shift_trajectory(self.u_traj, self.mUAV, 1)
+                self.dist_traj = shift_trajectory(self.dist_traj, 1, 1)
+                self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
+                self.wdes_traj = shift_trajectory(self.wdes_traj, self.mv, 1)
 
             # ------------- START NEW SOLUTION OF OUTER PROBLEMS ---------------
             if i % self.INTER_ITS == 0:
@@ -136,29 +128,12 @@ class CascadingUAVSimulator(UAVSimulator2):
             self.uUAV = self.u_traj[0:self.mUAV]\
                 + np.dot(self.problemUAV.K, self.x-self.x_traj[0:self.nUAV])
 
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            # TODO: STREAMLINE THIS block, SEE EXLAMATION MARKS ABOVE!!!!!
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if np.isnan(self.problemVert.xv.value).any():
-                # Failed to solve vertical problem, rise up to a safe height
-                self.wdes_traj = np.full((self.T*self.mv, 1), self.params.wmax)
-                self.xv_traj = self.problemVert.predict_trajectory(self.xv, self.wdes_traj)
-            elif self.i%self.INTER_ITS != 0:
-                self.xv_traj = shift_trajectory(self.xv_traj, self.nv, 1)
-                self.wdes_traj = shift_trajectory(self.wdes_traj, self.mv, 1)
-
             self.problemVertFast.solve(self.xv,
                 self.xv_traj[0:(self.T_inner+1)*self.nv, 0:1])
             self.xv_traj_inner = self.problemVertFast.xv.value
 
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            # ADD THIS BLOCK TO STREAMLINING AS WEL!!!!!!!!!!!!!
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1!!!!!!!
             self.wdes = self.wdes_traj[0:self.mv]\
                 + np.dot(self.problemVert.K, self.xv-self.xv_traj[0:self.nv])
-            if np.isnan(self.wdes).any():
-                # If solution of vertical problem failed, make the UAV rise
-                self.wdes = self.params.wmax
 
             self.update_logs(self.i)
 
