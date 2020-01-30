@@ -28,6 +28,7 @@ from USV_simulation import USV_simulator
 import pdb
 import random
 from centralised_usv_simulator import CentralisedUSVSimulator
+from distributed_usv_simulator import DistributedUSVSimulator
 
 lookahead = 0   # Only for parallel
 
