@@ -39,9 +39,7 @@ class CentralisedUAVSimulator(UAVSimulator2):
         self.reset(sim_len, x_val, xv_val)
         self.x = x_val
         self.xv = xv_val
-
         self.get_initial_USV_state_estimate()
-
         start = time.time()
         for i in range(sim_len):
             if rospy.is_shutdown(): return
@@ -148,10 +146,10 @@ class CentralisedUAVSimulator(UAVSimulator2):
         else:
             self.USV_input_pub.publish(USV_input_msg)
 
-    def send_sim_stop(self):
-        msg = Bool()
-        msg.data = True
-        self.sim_stop_pub.publish(msg)
+    # def send_sim_stop(self):
+    #     msg = Bool()
+    #     msg.data = True
+    #     self.sim_stop_pub.publish(msg)
 
     def deinitialise(self):
         super(CentralisedUAVSimulator, self).deinitialise()

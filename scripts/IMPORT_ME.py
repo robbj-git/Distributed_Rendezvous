@@ -8,9 +8,9 @@ sim_len = 500
 # simulating using the linear model of the dynamics
 USE_HIL = False
 # SET ONE OF THESE TO TRUE
-CENTRALISED = False
+CENTRALISED = True
 DISTRIBUTED = False
-PARALLEL = True
+PARALLEL = False
 
 SAMPLING_RATE = 20              # Dynamics change if this changes
 SAMPLING_TIME = 1.0/SAMPLING_RATE

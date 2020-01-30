@@ -153,7 +153,12 @@ for N in range(hor_max, hor_min-1, -1):
     prev_simulator = my_uav_simulator
 
     # my_uav_simulator = UAV_simulator(problem_params, travel_dir = dir)
-    my_uav_simulator = CascadingUAVSimulator(problem_params)
+    if settings.CENTRALISED:
+        my_uav_simulator = CentralisedUAVSimulator(problem_params)
+    elif settings.DISTRIBUTED:
+        my_uav_simulator = DistributedUAVSimulator(problem_params)
+    elif settings.PARALLEL:
+        my_uav_simulator = CascadingUAVSimulator(problem_params)
 
     # Makes sure that UAV receives info about round being -1 before the round changes to 0
     time.sleep(0.5)
@@ -175,7 +180,6 @@ for N in range(hor_max, hor_min-1, -1):
         if rospy.is_shutdown():
             cancelled = True
             break
-
         my_uav_simulator.simulate_problem(settings.sim_len, x_m, xv_m)
         print "FINISHED SIMULATING!"
         print "Mean iteration:", np.mean(my_uav_simulator.iteration_durations)
@@ -273,6 +277,7 @@ if not cancelled:
     np.savetxt(dir_path + 'Experiment_'+str(exp_index)+'/TEST/LANDING_TIMES.csv', landing_list, delimiter=',')
     try:
         time_str = str((UAV_time - USV_time).secs) + "\n" + str((UAV_time - USV_time).nsecs)
+        print "SUCCESSFULLY STORED TIME DIFFERENCE!"
     except:
         print "Failed to store time difference between vehicles"
         time_str = "nan\nnan"

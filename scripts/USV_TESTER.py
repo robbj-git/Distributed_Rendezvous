@@ -27,6 +27,7 @@ from problemClasses import *
 from USV_simulation import USV_simulator
 import pdb
 import random
+from centralised_usv_simulator import CentralisedUSVSimulator
 
 lookahead = 0   # Only for parallel
 
@@ -173,7 +174,13 @@ for N in range(hor_max, hor_min-1, -1):
         # We deinitialise here because hopefully old messages have stopped arriving by now
         my_usv_simulator.deinitialise()
     prev_simulator = my_usv_simulator
-    my_usv_simulator = USV_simulator(problem_params, travel_dir = dir)
+    # my_usv_simulator = USV_simulator(problem_params, travel_dir = dir)
+    if settings.CENTRALISED:
+        my_usv_simulator = CentralisedUSVSimulator(problem_params)
+    elif settings.DISTRIBUTED:
+        my_usv_simulator = DistributedUSVSimulator(problem_params)
+    elif settings.PARALLEL:
+        my_usv_simulator = CascadingUSVSimulator(problem_params)
 
     # Makes sure that UAV receives info about round being -1 before the round changes to 0
     time.sleep(0.5)

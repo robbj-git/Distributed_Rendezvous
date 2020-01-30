@@ -4,7 +4,7 @@ import time
 import datetime
 import numpy as np
 from sensor_msgs.msg import Imu, NavSatFix, Joy
-from std_msgs.msg import Float32, Header
+from std_msgs.msg import Float32, Header, Bool
 from geometry_msgs.msg import Vector3Stamped, QuaternionStamped
 from dji_sdk.srv import SDKControlAuthority
 from problemClasses import VerticalProblem
@@ -107,63 +107,6 @@ class UAVSimulator2(object):
         UAV_msg = Joy(Header(), axes, [])
         self.UAV_publisher.publish(UAV_msg)
 
-    # ----------------------------------------
-
-    # Allows for stopping an object from receiving ROS messages.
-    # Useful if a new instance is created, but old object is still kept
-    # for other purposes. If this function is not called, the old and new
-    # instances will both be subscribed to the same topic. I can't remember
-    # right now why that is a problem, but it did cause me issues previously.
-    def deinitialise(self):
-        if self.USE_HIL:
-            self.imu_sub.unregister()
-            self.height_sub.unregister()
-            self.vel_sub.unregister()
-            self.gps_sub.unregister()
-            self.attitude_sub.unregister()
-
-    # ---------- Callbacks -----------
-
-    def IMU_callback(self, msg):
-        # global w_1, w_2
-        self.w_1 = msg.angular_velocity.x
-        self.w_2 = msg.angular_velocity.y
-
-    def height_callback(self, msg):
-        # global xv
-        self.xv[0] = msg.data
-
-    def velocity_callback(self, msg):
-        # global xv, x
-        self.x[2]  = msg.vector.x
-        self.x[3]  = msg.vector.y
-        self.xv[1] = msg.vector.z
-
-    def pos_callback(self, msg):
-        # global x, long_ref, lat_ref
-        R = 6378138.12
-
-        if self.long_ref is None:
-            self.long_ref = msg.longitude
-        if self.lat_ref is None:
-            self.lat_ref = msg.latitude
-
-        phi_gps = msg.latitude
-        phi_ref = self.lat_ref
-        lambda_gps = msg.longitude
-        lambda_ref = self.long_ref
-
-        self.x[0:2] = lat_long_to_pos(phi_gps, lambda_gps, phi_ref, lambda_ref, R);
-
-    def attitude_callback(self, msg):
-        # global phi, theta
-        qw = msg.quaternion.w
-        qx = msg.quaternion.x
-        qy = msg.quaternion.y
-        qz = msg.quaternion.z
-        self.phi = atan( 2*(qw*qx + qy*qz)/(1 - 2*(qx*qx + qy*qy)) )
-        self.theta = asin(2*(qw*qy-qz*qx))
-
     def store_data(self, type, test_info_str = None):
         CENTRALISED = 0
         DISTRIBUTED = 1
@@ -245,3 +188,61 @@ class UAVSimulator2(object):
             np.savetxt(dir_path + 'Experiment_'+str(i)+'/UAV/USV_traj_log.csv', self.USV_traj_log, delimiter=',')
 
         return i
+
+    # Allows for stopping an object from receiving ROS messages.
+    # Useful if a new instance is created, but old object is still kept
+    # for other purposes. If this function is not called, the old and new
+    # instances will both be subscribed to the same topic. I can't remember
+    # right now why that is a problem, but it did cause me issues previously.
+    def deinitialise(self):
+        if self.USE_HIL:
+            self.imu_sub.unregister()
+            self.height_sub.unregister()
+            self.vel_sub.unregister()
+            self.gps_sub.unregister()
+            self.attitude_sub.unregister()
+
+    def send_sim_stop(self):
+        msg = Bool()
+        msg.data = True
+        self.sim_stop_pub.publish(msg)
+
+    def IMU_callback(self, msg):
+        # global w_1, w_2
+        self.w_1 = msg.angular_velocity.x
+        self.w_2 = msg.angular_velocity.y
+
+    def height_callback(self, msg):
+        # global xv
+        self.xv[0] = msg.data
+
+    def velocity_callback(self, msg):
+        # global xv, x
+        self.x[2]  = msg.vector.x
+        self.x[3]  = msg.vector.y
+        self.xv[1] = msg.vector.z
+
+    def pos_callback(self, msg):
+        # global x, long_ref, lat_ref
+        R = 6378138.12
+
+        if self.long_ref is None:
+            self.long_ref = msg.longitude
+        if self.lat_ref is None:
+            self.lat_ref = msg.latitude
+
+        phi_gps = msg.latitude
+        phi_ref = self.lat_ref
+        lambda_gps = msg.longitude
+        lambda_ref = self.long_ref
+
+        self.x[0:2] = lat_long_to_pos(phi_gps, lambda_gps, phi_ref, lambda_ref, R);
+
+    def attitude_callback(self, msg):
+        # global phi, theta
+        qw = msg.quaternion.w
+        qx = msg.quaternion.x
+        qy = msg.quaternion.y
+        qz = msg.quaternion.z
+        self.phi = atan( 2*(qw*qx + qy*qz)/(1 - 2*(qx*qx + qy*qy)) )
+        self.theta = asin(2*(qw*qy-qz*qx))
