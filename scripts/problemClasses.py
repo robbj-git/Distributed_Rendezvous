@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import sys
 import rospy
-from rendezvous_problem.srv import *
 from rendezvous_problem.msg import Float32MultiArrayStamped
 from std_msgs.msg import MultiArrayDimension
 import rendezvous_problem       # For ROS srv
