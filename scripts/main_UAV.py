@@ -4,18 +4,31 @@ import numpy as np
 import os
 from std_msgs.msg import Bool, Int8, Time
 from time import sleep
-from IMPORT_ME import settings
-from matrices_and_parameters import dynamics_parameters
+from IMPORT_MAIN import settings
+from IMPORT_UAV import UAV_parameters
+from IMPORT_USV import Bb, hb
 from UAV_simulation import UAV_simulator
 from random import randint
 from helper_functions import  get_travel_dir
+if settings.CENTRALISED:
+    from IMPORT_USV import USV_parameters
+
 
 class ProblemParams():
     def __init__(self):
         self.settings = settings
-        self.params = dynamics_parameters
+        self.params = UAV_parameters
         self.T = 0
         self.T_inner = 0
+        [self.nUSV, self.mUSV] = Bb.shape
+        self.hb = hb
+        if settings.CENTRALISED:
+            self.USV_params = USV_parameters
+            # self.Ab = Ab
+            # self.Bb = Bb
+            # self.Qb_vel = Qb_vel
+            # self.Pb_vel = Pb_vel
+            # # self.amin_b = amin_b
 
 def USV_ready_callback(msg):
     global USV_is_ready
@@ -28,7 +41,7 @@ def USV_time_callback(msg):
 
 problem_params = ProblemParams()
 problem_params.settings = settings
-problem_params.params = dynamics_parameters
+problem_params.params = UAV_parameters
 
 nUAV = problem_params.params.A.shape[0]
 UAV_ready_pub = rospy.Publisher('UAV_ready', Bool, queue_size = 1, latch=True)

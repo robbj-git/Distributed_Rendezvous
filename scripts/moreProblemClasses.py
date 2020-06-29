@@ -5,14 +5,17 @@ import osqp
 from scipy.sparse import csc_matrix
 from scipy.integrate import quad
 from multiprocessing import Process, Pipe
-from IMPORT_ME import SAMPLING_TIME
+from IMPORT_MAIN import SAMPLING_TIME, g
 from time import time
 
 # DEBUG
-from matrices_and_parameters import g, k_phi, k_theta, w_phi, w_theta, xi_phi, xi_theta, kdx, kdy, ddx, ddy, k_psib, tau_psib
-from matrices_and_parameters import Ab, Bb, Q, R, P, Qb_vel, Pb_vel, amin, amax, tau_wb,\
-    amin_b, amax_b, hs, ds, dl, wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max
-from helper_classes import Parameters
+from IMPORT_UAV import k_phi, k_theta, w_phi, w_theta, xi_phi, xi_theta, kdx,kdy
+# from IMPORT_UAV import
+from IMPORT_USV import ddx, ddy, k_psib, tau_psib
+from IMPORT_USV import Ab, Bb, Qb, Rb, Pb, Qb_vel, Pb_vel, tau_wb, amin_b, \
+    amax_b, vmax_b
+from IMPORT_UAV import Q, R, P, amin, amax, hs, ds, dl, wmin, wmax, wmin_land,\
+    kl, vmax, ang_max, ang_vel_max
 import cvxpy as cp
 
 class CompleteCentralisedProblem():
@@ -432,9 +435,8 @@ class CompleteUSVProblem():
     # def __init__(self, T, A, B, Ab, Bb, Q, P, R, Q_vel, P_vel, Qb_vel, Pb_vel, type, params, travel_dir = None):
     def __init__(self, T, Qb, Pb, Rb, Qb_vel, Pb_vel, nUAV, params, travel_dir = None):
         self.T = T
-        self.Qb = Q
-        self.Pb = P
-        self.Rb = R
+        self.Qb = Qb
+        self.Pb = Pb
         self.Rb = Rb
         self.Qb_vel = Qb_vel
         self.Pb_vel = Pb_vel
@@ -834,8 +836,3 @@ class CompleteUSVProblem():
 
     def predict_trajectory(self, xb0, ub_traj):
         return np.dot(self.Phi_b, xb0) + np.dot(self.Lambda_b, ub_traj)
-
-# if __name__ == '__main__':
-#     params = Parameters(amin, amax, amin_b, amax_b, hs, ds, dl, \
-#         wmin, wmax, wmin_land, kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max)
-#     my_prob = CompleteCentralisedProblem(100, Ab, Bb, Q, R, P, R, Qb_vel, Pb_vel, params)

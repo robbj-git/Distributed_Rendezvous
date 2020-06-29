@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from mpl_toolkits import mplot3d
-from matrices_and_parameters import dl, ds, hs, nv
+from IMPORT_UAV import dl, ds, hs, Bv
 from helper_classes import DataAnalysisParams
 import os
 from matplotlib.patches import Polygon, Circle
@@ -39,6 +39,7 @@ blue_like = '#7570b3'
 light_blue = (0.498, 0.804, 0.733, 0.7)
 # red = '#ff0000'
 red = (1.0, 0.0, 0.0, 0.7)
+nv = Bv.shape[0]
 
 class DataAnalyser():
 

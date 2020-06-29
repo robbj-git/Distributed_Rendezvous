@@ -33,9 +33,10 @@ class UAV_simulator():
         self.Av = pp.params.Av
         self.Bv = pp.params.Bv
         [self.nUAV, self.mUAV] = pp.params.B.shape
-        [self.nUSV, self.mUSV] = pp.params.Bb.shape
+        self.nUSV = pp.nUSV
+        self.mUSV = pp.mUSV
         [self.nv, self.mv] = pp.params.Bv.shape
-        self.hb = pp.params.hb
+        self.hb = pp.hb
         self.params = pp.params
         self.CENTRALISED = pp.settings.CENTRALISED
         self.DISTRIBUTED = pp.settings.DISTRIBUTED
@@ -54,12 +55,12 @@ class UAV_simulator():
         self.lat_ref = None
 
         self.problemVert = VerticalProblem(self.T, self.Av, self.Bv, pp.params.Qv,\
-            pp.params.Pv, pp.params.Rv, pp.params, self.params.hb, self.PARALLEL)
+            pp.params.Pv, pp.params.Rv, pp.params, self.hb, self.PARALLEL)
         if self.CENTRALISED:
             self.problemCent = CentralisedProblem(self.T, self.A, self.B,\
-                pp.params.Ab, pp.params.Bb, pp.params.Q, pp.params.P, \
-                pp.params.R, pp.params.Q_vel, pp.params.P_vel, pp.params.Qb_vel,\
-                pp.params.Pb_vel, pp.params, travel_dir = travel_dir)
+                pp.USV_params.Ab, pp.USV_params.Bb, pp.params.Q, pp.params.P, \
+                pp.params.R, pp.params.Q_vel, pp.params.P_vel, pp.USV_params.Qb_vel,\
+                pp.USV_params.Pb_vel, pp.params, pp.USV_params, travel_dir = travel_dir)
         if not self.CENTRALISED:
             self.problemUAV = UAVProblem(self.T, self.A,  self.B,  pp.params.Q, pp.params.P, pp.params.R,\
                 pp.params.Q_vel, pp.params.P_vel, self.nUSV, pp.params)

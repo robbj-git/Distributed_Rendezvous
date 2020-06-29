@@ -3,7 +3,8 @@ import numpy as np
 from rendezvous_problem.msg import Float32MultiArrayStamped
 from std_msgs.msg import MultiArrayDimension
 from math import sin, cos, atan, atan2, asin, pi, sqrt
-from matrices_and_parameters import g, tau_w, kw
+from IMPORT_MAIN import g
+from IMPORT_UAV import tau_w, kw
 
 def shift_traj_msg(traj_msg, n, samp_time):
     delta_time = rospy.Time.now() - traj_msg.header.stamp

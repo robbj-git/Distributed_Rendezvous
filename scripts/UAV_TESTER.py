@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 import rospy
-from IMPORT_ME import settings, NEXT_HORIZON
-from matrices_and_parameters import dynamics_parameters
-from helper_classes import Parameters
+from IMPORT_MAIN import settings, NEXT_HORIZON
+from IMPORT_UAV import UAV_parameters
 from helper_functions import mat_to_multiarray_stamped, get_dist_traj, get_travel_dir
 import Queue
 import os
@@ -29,7 +28,7 @@ from problemClasses import *
 # from UAV_simulation import UAV_simulator
 from UAV_simulation import UAV_simulator
 
-lookahead = 0   # Only for parallel. TODO: Move to IMPORT_ME.py???
+lookahead = 0   # Only for parallel. TODO: Move to IMPORT_MAIN.py???
 
 global USV_test_round, USV_has_stored_data, USV_time, UAV_time
 USV_test_round = np.inf

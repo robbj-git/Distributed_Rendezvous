@@ -1,52 +1,14 @@
 from rendezvous_problem.msg import Float32MultiArrayStamped
 from helper_functions import shift_trajectory, get_traj_dir, get_cos_angle_between
-from IMPORT_ME import SAMPLING_TIME, USE_COMPLETE_HORIZONTAL, USE_COMPLETE_USV
-from matrices_and_parameters import n_UAV, n_USV, nv, wmax, wmin, wmin_land, kl, vmax, vmax_b
+from IMPORT_MAIN import SAMPLING_TIME, USE_COMPLETE_HORIZONTAL, USE_COMPLETE_USV
+from IMPORT_UAV import Bv, wmax, wmin, wmin_land, kl, vmax
+from IMPORT_USV import vmax_b
+# from IMPORT_UAV import n_UAV, nv, wmax, wmin, wmin_land, kl, vmax
+# from IMPORT_USV import n_USV, vmax_b
 import numpy as np
 import Queue
 import rospy
-import time # for DEBUG, remove later
 import copy
-
-class Parameters():
-
-    def __init__(self, amin, amax, amin_b, amax_b, hs, ds, dl, wmin, wmax, wmin_land,\
-        kl, vmax, vmax_b, vmin_b, ang_max, ang_vel_max, psi_max, T_max, T_min):
-        self.amin = amin
-        self.amax = amax
-        self.amin_b = amin_b
-        self.hs = hs
-        self.amax_b = amax_b
-        self.ds = ds
-        self.dl = dl
-        self.wmin = wmin
-        self.wmax = wmax
-        self.wmin_land = wmin_land
-        self.kl = kl
-        self.v_max = vmax
-        self.v_max_b = vmax_b
-        self.v_min_b = vmin_b
-        self.ang_max = ang_max
-        self.ang_vel_max = ang_vel_max
-        self.psi_max = psi_max
-        self.T_max = T_max
-        self.T_min = T_min
-
-    def __str__(self):
-        string = ''
-        string += "amin: " + str(self.amin) + ";"
-        string += "amax: "+ str(self.amax) + ";"
-        string += "amin_b: "+ str(self.amin_b) + ";"
-        string += "amax_b: "+ str(self.amax_b) + ";"
-        string += "hs: "+ str(self.hs) + ";"
-        string += "ds: "+ str(self.ds) + ";"
-        string += "dl: "+ str(self.dl) + ";"
-        string += "wmin: "+ str(self.wmin) + ";"
-        string += "wmax: "+ str(self.wmax) + ";"
-        string += "wmin_land: "+ str(self.wmin_land) + ";"
-        string += "kl: "+ str(self.kl) + ";"
-        string += "v_max: "+ str(self.v_max) + ";"
-        return string
 
 class StampedMsgQueue():
 
@@ -169,7 +131,7 @@ class DataAnalysisParams():
         #     self.nUSV = n_USV
         # else:
         #     self.nUSV = 6
-        self.nv = nv
+        self.nv = Bv.shape[0]
         self.T = np.nan
         self.wmax = wmax
         self.wmin = wmin

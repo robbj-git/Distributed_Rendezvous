@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 import rospy
-from IMPORT_ME import settings, NEXT_HORIZON
-from matrices_and_parameters import dynamics_parameters
-from helper_classes import Parameters
+from IMPORT_MAIN import settings, NEXT_HORIZON
+from IMPORT_USV import USV_parameters
 from helper_functions import mat_to_multiarray_stamped, get_dist_traj, get_travel_dir
 import Queue
 import os

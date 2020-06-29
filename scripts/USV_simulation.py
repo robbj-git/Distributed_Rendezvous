@@ -25,7 +25,8 @@ class USV_simulator():
         self.Bb = pp.params.Bb
         self.params = pp.params
         self.delay_len = pp.settings.delay_len
-        [self.nUAV, self.mUAV] = pp.params.B.shape
+        self.nUAV = pp.nUAV
+        self.mUAV = pp.mUAV
         [self.nUSV, self.mUSV] = self.Bb.shape
 
         self.CENTRALISED = pp.settings.CENTRALISED
@@ -40,12 +41,12 @@ class USV_simulator():
         self.dropout_lower_bound = pp.settings.dropout_lower_bound
         self.dropout_upper_bound = pp.settings.dropout_upper_bound
 
-        self.problemUSV = USVProblem(self.T, self.Ab, self.Bb, pp.params.Q, pp.params.P, pp.params.R,\
+        self.problemUSV = USVProblem(self.T, self.Ab, self.Bb, pp.params.Qb, pp.params.Pb, pp.params.Rb,\
             pp.params.Qb_vel, pp.params.Pb_vel, self.nUAV, self.params, travel_dir = travel_dir)
 
         if self.PARALLEL:
             self.problemUSVFast = FastUSVProblem(self.T_inner, self.Ab, self.Bb,\
-                pp.params.Q, pp.params.P, pp.params.R, pp.params)
+                pp.params.Qb, pp.params.Pb, pp.params.Rb, pp.params)
 
         # --------------------------- ROS SETUP ----------------------------------
         # rospy.init_node('USV_main')

@@ -3,8 +3,9 @@ import rospy
 import numpy as np
 from std_msgs.msg import Bool, Int8, Time
 from time import sleep
-from IMPORT_ME import settings
-from matrices_and_parameters import dynamics_parameters
+from IMPORT_MAIN import settings
+from IMPORT_USV import USV_parameters
+from IMPORT_UAV import B
 from USV_simulation import USV_simulator
 from random import randint
 from helper_functions import get_travel_dir
@@ -12,9 +13,10 @@ from helper_functions import get_travel_dir
 class ProblemParams():
     def __init__(self):
         self.settings = settings
-        self.params = dynamics_parameters
+        self.params = USV_parameters
         self.T = 0
         self.T_inner = 0
+        [self.nUAV, self.mUAV] = B.shape
 
 def UAV_ready_callback(msg):
     global UAV_is_ready
@@ -26,7 +28,7 @@ def experiment_index_callback(msg):
 
 problem_params = ProblemParams()
 problem_params.settings = settings
-problem_params.params = dynamics_parameters
+problem_params.params = USV_parameters
 
 nUSV = problem_params.params.Ab.shape[0]
 USV_ready_pub = rospy.Publisher('USV_ready', Bool, queue_size = 1, latch=True)
