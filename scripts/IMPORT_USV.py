@@ -55,6 +55,8 @@ Qb = np.matrix([
     [0.,     0.,      0.,      0.]
 ])
 
+# When the USV has a secondary objective, the stage cost is Qb+Qb_vel. However,
+# if no secondary objective is used, the stage cost is only Qb.
 Qb_vel = np.matrix([
     [0.,     0.,      0.,      0.],
     [0.,     0.,      0.,      0.],
@@ -74,6 +76,7 @@ Pb = np.matrix([
     [0.,     0.,     0.,      0.]
 ])
 
+# Same function as Qb_vel, but for terminal cost
 Pb_vel = Qb_vel
 
 class USVParameters():
