@@ -1,10 +1,8 @@
 from rendezvous_problem.msg import Float32MultiArrayStamped
 from helper_functions import shift_trajectory, get_traj_dir, get_cos_angle_between
-from IMPORT_MAIN import SAMPLING_TIME, USE_COMPLETE_HORIZONTAL, USE_COMPLETE_USV
-from IMPORT_UAV import Bv, wmax, wmin, wmin_land, kl, vmax
-from IMPORT_USV import vmax_b
-# from IMPORT_UAV import n_UAV, nv, wmax, wmin, wmin_land, kl, vmax
-# from IMPORT_USV import n_USV, vmax_b
+from IMPORT_MAIN import SAMPLING_TIME
+from IMPORT_UAV import Bv, wmax, wmin, wmin_land, kl
+# from IMPORT_UAV import n_UAV, nv, wmax, wmin, wmin_land, kl
 import numpy as np
 import Queue
 import rospy

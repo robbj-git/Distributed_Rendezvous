@@ -18,9 +18,9 @@ USE_HIL = False
 
 # SET ONE OF THESE TO TRUE. See original paper, references in readme.md, for
 # differences between the different algorithms
-CENTRALISED = False
+CENTRALISED = True
 DISTRIBUTED = False
-PARALLEL = True
+PARALLEL = False
 
 # DO NOT CHANGE FROM 20. IMPORT_UAV AND IMPORT_USV USE DISCRETISED DYNAMICS THAT
 # CHANGE IF SAMPLING RATE IS CHANGED
@@ -48,10 +48,6 @@ dropout_upper_bound = 130
 
 # TODO: ADD TO CLASS!!!
 g = 9.8 # Used value for gravitational acceleration
-
-# Not yet implemented, only useful if classes from moreProblemClasses.py are used
-USE_COMPLETE_HORIZONTAL = False
-USE_COMPLETE_USV = False
 
 # This variable was used to simulate delay in the tranmission of messages.
 # The functionality is deprecated and I cannot guarantee that it works correctly
@@ -85,8 +81,6 @@ class Settings():
         self.dropout_lower_bound = dropout_lower_bound
         self.dropout_upper_bound = dropout_upper_bound
         self.g = g
-        self.USE_COMPLETE_HORIZONTAL = USE_COMPLETE_HORIZONTAL
-        self.USE_COMPLETE_USV = USE_COMPLETE_USV
         self.delay_len = delay_len
 
 settings = Settings()

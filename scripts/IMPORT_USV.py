@@ -17,11 +17,8 @@ ddx = 0.5
 ddy = 0.5
 amin_b = -3.0
 amax_b =  3.0
-# Bounds on USV velocity and applied torque, only used in moreProblemClasses.py
 vmax_b = 3.0
 vmin_b = 0.8
-T_max = 3
-T_min = -1.5
 
 # ----------------- Dynamics Matrices -------------------
 # NOTE: Sampling rate must be 20hz for this to be accurate. Check IMPORT_MAIN
@@ -91,8 +88,6 @@ class USVParameters():
         self.amax_b = amax_b
         self.v_max_b = vmax_b
         self.v_min_b = vmin_b
-        self.T_max = T_max
-        self.T_min = T_min
         self.Ab = Ab
         self.Bb = Bb
         self.Qb = Qb

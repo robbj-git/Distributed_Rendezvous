@@ -39,12 +39,8 @@ wmin_land = -0.3
 # where h is the UAV altitude and wmin_land is the maximum allowed descent
 # velocity at touchdown
 kl = 0.2
-# Maximum horizontal velocity of UAV, only used in moreProblemClasses.py
+# Maximum horizontal velocity of UAV
 vmax = 5.0
-# Bounds on UAV angles, only used in moreProblemClasses.py
-ang_max = np.radians(30)
-ang_vel_max = np.radians(30)
-psi_max = np.radians(10)
 
 # ----------------- Dynamics Matrices -------------------
 # NOTE: Sampling rate must be 20hz for this to be accurate. Check IMPORT_MAIN
@@ -144,9 +140,6 @@ class UAVParameters():
         self.wmin_land = wmin_land
         self.kl = kl
         self.v_max = vmax
-        self.ang_max = ang_max
-        self.ang_vel_max = ang_vel_max
-        self.psi_max = psi_max
         self.A = A
         self.B = B
         self.Av = Av

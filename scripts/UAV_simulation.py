@@ -13,7 +13,6 @@ from matplotlib.collections import PatchCollection
 import os
 from problemClasses import CentralisedProblem, UAVProblem, VerticalProblem
 from problemClasses import FastUAVProblem, FastVerticalProblem
-from moreProblemClasses import CompleteCentralisedProblem
 from helper_classes import StampedTrajQueue, StampedMsgQueue
 from helper_functions import get_dist_traj, mat_to_multiarray_stamped, shift_trajectory, lat_long_to_pos, fill_lost_values, get_cmd_angle
 from math import atan, asin, acos

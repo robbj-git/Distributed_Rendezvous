@@ -4,7 +4,6 @@ import numpy as np
 from helper_classes import StampedTrajQueue, StampedMsgQueue
 from helper_functions import mat_to_multiarray_stamped, shift_trajectory
 from problemClasses import USVProblem, FastUSVProblem
-from moreProblemClasses import CompleteUSVProblem
 from rendezvous_problem.msg import Float32MultiArrayStamped, StateStamped
 from geometry_msgs.msg import AccelStamped
 from std_msgs.msg import Int8, Bool
@@ -209,7 +208,7 @@ class USV_simulator():
                     # steps into the future
                     xb0 = self.xb_traj_inner[self.INTER_ITS*self.nUSV\
                         :(self.INTER_ITS+1)*self.nUSV]
-                        
+
                 # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
                 traj = shift_trajectory(self.x_traj, self.nUAV, self.INTER_ITS)
                 self.problemUSV.solve_in_parallel(xb0, traj,\
