@@ -28,7 +28,7 @@ np.seterr(divide='ignore', invalid='ignore')
 
 class CentralisedProblem():
 
-    def __init__(self, T, A, B, Ab, Bb, Q, P, R, Q_vel, P_vel, Qb_vel, Pb_vel, params, USV_params, travel_dir = None):
+    def __init__(self, T, A, B, Ab, Bb, Q, P, R, Qb_vel, Pb_vel, params, USV_params, travel_dir = None):
         self.T = T
         self.A = A
         self.B = B
@@ -39,8 +39,6 @@ class CentralisedProblem():
         self.R = R
         self.Qb_vel = Qb_vel
         self.Pb_vel = Pb_vel
-        self.Q_vel = Q_vel
-        self.P_vel = P_vel
         self.params = params
         self.USV_params = USV_params
         [self.nUAV, self.mUAV] = B.shape
@@ -70,8 +68,6 @@ class CentralisedProblem():
         self.R_big  = np.kron(np.eye(T),   self.R)
         self.Qb_big_vel  = np.kron(np.eye(T+1), self.Qb_vel)
         self.Qb_big_vel[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.Pb_vel
-        self.Q_big_vel  = np.kron(np.eye(T+1), self.Q_vel)
-        self.Q_big_vel[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P_vel
 
         # Dynamics Matrices
         self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
@@ -117,7 +113,7 @@ class CentralisedProblem():
         else:
             Q_temp = self.Q_big + self.Qb_big_vel
         P_temp = 2*np.bmat([
-            [self.Q_big+self.Q_big_vel,    zeros,       zeros_tall,   -self.Q_big,       zeros,          zeros_tall],
+            [self.Q_big,    zeros,       zeros_tall,   -self.Q_big,       zeros,          zeros_tall],
             [zeros.T,                    self.R_big,     zeros_short,    zeros.T,       zeros_sqr,       zeros_short],
             [zeros_tall.T,              zeros_short.T,     self.C,      zeros_tall.T, zeros_short.T, np.zeros((2,2))],
             [-self.Q_big,                 zeros,         zeros_tall,    Q_temp,         zeros,          zeros_tall],
@@ -330,15 +326,13 @@ class CentralisedProblem():
 
 class UAVProblem():
 
-    def __init__(self, T, A, B, Q, P, R, Q_vel, P_vel, nUSV, params):
+    def __init__(self, T, A, B, Q, P, R, nUSV, params):
         self.T = T
         self.A = A
         self.B = B
         self.Q = Q
         self.P = P
         self.R = R
-        self.Q_vel = Q_vel
-        self.P_vel = P_vel
         self.nUSV = nUSV
         self.params = params
         # When problem is solved in parallel, this variable makes it easier to access solution duration
@@ -357,8 +351,6 @@ class UAVProblem():
         self.Q_big  = np.kron(np.eye(T+1), self.Q)
         self.Q_big[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P  # Not double-checked
         self.R_big  = np.kron(np.eye(T),   self.R)
-        self.Q_big_vel = np.kron(np.eye(T+1), self.Q_vel)
-        self.Q_big_vel[-nUAV:(T+1)*nUAV, -nUAV:(T+1)*nUAV] = self.P_vel
 
         # Dynamics Matrices
         self.Phi = np.zeros(( (T+1)*nUAV, nUAV ))
@@ -377,7 +369,7 @@ class UAVProblem():
                 velocity_extractor[ 2*i+j, nUAV*i+2+j ] = 1
 
         self.C = 100*(T+1)*np.eye(2)
-        P_temp = 2*np.bmat([[self.Q_big+self.Q_big_vel, np.zeros((nUAV*(T+1), mUAV*T)), np.zeros((nUAV*(T+1), 2))],\
+        P_temp = 2*np.bmat([[self.Q_big, np.zeros((nUAV*(T+1), mUAV*T)), np.zeros((nUAV*(T+1), 2))],\
             [np.zeros((mUAV*T, nUAV*(T+1))),                self.R_big,                 np.zeros((mUAV*T, 2))],
             [np.zeros((2, nUAV*(T+1))),                     np.zeros((2, mUAV*T)),      self.C]])
         P_data = np.diagonal(P_temp)

@@ -94,14 +94,6 @@ Q = np.matrix([
     [0.,     0.,      0.,      0.]
 ])
 
-# Deprecated, should be removed
-Q_vel = np.matrix([
-    [0.,     0.,      0.,      0.],
-    [0.,     0.,      0.,      0.],
-    [0.,     0.,      0.,      0.],
-    [0.,     0.,      0.,      0.]
-])
-
 R = np.matrix([
     [0.1,         0.],
     [  0.,       0.1]
@@ -113,9 +105,6 @@ P = np.matrix([
     [0.,     0.,     0.,      0.],
     [0.,     0.,     0.,      0.]
 ])
-
-# Deprecated, should be removed
-P_vel = Q_vel
 
 # Cost matrices for vertical problem:
 Qv = np.matrix([
@@ -165,8 +154,6 @@ class UAVParameters():
         self.Q = Q
         self.P = P
         self.R = R
-        self.Q_vel = Q_vel
-        self.P_vel = P_vel
         self.Qv = Qv
         self.Pv = Pv
         self.Rv = Rv

@@ -58,11 +58,11 @@ class UAV_simulator():
         if self.CENTRALISED:
             self.problemCent = CentralisedProblem(self.T, self.A, self.B,\
                 pp.USV_params.Ab, pp.USV_params.Bb, pp.params.Q, pp.params.P, \
-                pp.params.R, pp.params.Q_vel, pp.params.P_vel, pp.USV_params.Qb_vel,\
-                pp.USV_params.Pb_vel, pp.params, pp.USV_params, travel_dir = travel_dir)
+                pp.params.R, pp.USV_params.Qb_vel, pp.USV_params.Pb_vel, \
+                pp.params, pp.USV_params, travel_dir = travel_dir)
         if not self.CENTRALISED:
-            self.problemUAV = UAVProblem(self.T, self.A,  self.B,  pp.params.Q, pp.params.P, pp.params.R,\
-                pp.params.Q_vel, pp.params.P_vel, self.nUSV, pp.params)
+            self.problemUAV = UAVProblem(self.T, self.A,  self.B,  pp.params.Q,\
+            pp.params.P, pp.params.R, self.nUSV, pp.params)
         if self.PARALLEL:
             self.problemUAVFast = FastUAVProblem(self.T_inner, self.A, self.B,  pp.params.Q, pp.params.P,\
                 pp.params.R, pp.params)

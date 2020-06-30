@@ -20,7 +20,6 @@ import cvxpy as cp
 
 class CompleteCentralisedProblem():
 
-    # def __init__(self, T, A, B, Ab, Bb, Q, P, R, Q_vel, P_vel, Qb_vel, Pb_vel, type, params, travel_dir = None):
     def __init__(self, T, Ab, Bb, Q, P, R, Rb, Qb_vel, Pb_vel, params):
         self.T = T
         # self.A = A
@@ -33,8 +32,6 @@ class CompleteCentralisedProblem():
         self.Rb = Rb
         self.Qb_vel = Qb_vel
         self.Pb_vel = Pb_vel
-        # # self.Q_vel = Q_vel
-        # # self.P_vel = P_vel
         self.params = params
         self.nUAV_s = 6
         self.nUSV_s = 2
@@ -432,7 +429,6 @@ class CompleteCentralisedProblem():
 
 class CompleteUSVProblem():
 
-    # def __init__(self, T, A, B, Ab, Bb, Q, P, R, Q_vel, P_vel, Qb_vel, Pb_vel, type, params, travel_dir = None):
     def __init__(self, T, Qb, Pb, Rb, Qb_vel, Pb_vel, nUAV, params, travel_dir = None):
         self.T = T
         self.Qb = Qb
