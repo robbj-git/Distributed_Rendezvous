@@ -18,9 +18,9 @@ USE_HIL = False
 
 # SET ONE OF THESE TO TRUE. See original paper, references in readme.md, for
 # differences between the different algorithms
-CENTRALISED = False
+CENTRALISED = True
 DISTRIBUTED = False
-PARALLEL = True
+PARALLEL = False
 
 # DO NOT CHANGE FROM 20. IMPORT_UAV AND IMPORT_USV USE DISCRETISED DYNAMICS THAT
 # CHANGE IF SAMPLING RATE IS CHANGED

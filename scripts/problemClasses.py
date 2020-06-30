@@ -200,6 +200,9 @@ class CentralisedProblem():
         mUSV = self.mUSV
         params = self.params
         USV_params = self.USV_params
+        # An old version of the code used cvxpy. We have now switched to OSQP,
+        # but cvxpy-variables are still used to store data as there are more
+        # pressing code changes necessary
         self.x  = cp.Variable(( nUAV*(T+1), 1 ))
         self.xb = cp.Variable(( nUSV*(T+1), 1 ))
         self.u  = cp.Variable(( mUAV*T, 1 ))
@@ -208,33 +211,6 @@ class CentralisedProblem():
         self.xb_0 = cp.Parameter((nUSV, 1))
         self.s_UAV = cp.Variable((2, 1))
         self.s_USV = cp.Variable((2, 1))
-
-        objectiveCent = cp.quad_form(self.x-self.xb, self.Q_big) \
-            + cp.quad_form(self.u, self.R_big) \
-            + cp.quad_form(self.ub, self.R_big)
-        constraintsCent  = [ self.x  ==  self.Phi*self.x_0 \
-            + self.Lambda*self.u ]
-        constraintsCent += [ self.xb == self.Phi_b*self.xb_0 \
-            + self.Lambda_b*self.ub ]
-        #constraintsCent += [self.Phi_j*self.x_0 + self.Lambda_j*self.u \
-        #    <= self.V_vec]
-
-        # COULD PROBABLY DELETE THIS, DOESN'T MAKE SENSE TO USE IT
-        # Better approximation of true constraint set. Not worth computation.
-        # constraintsCent += \
-        #     [self.in_constr_matrix * self.u  <=  self.in_constr_vector]
-        # constraintsCent += \
-        #     [self.in_constr_matrix_b*self.ub <= self.in_constr_vector_b]
-
-        # Multiplying it with square root of 0.5 makes it more conservative,
-        # and bounds the admissible set within the true circular constraint set
-
-        # Assumed mUAV = mUSV
-        in_consr_matrix = np.bmat([[np.eye(mUAV*T)], [-np.eye(mUAV*T)]])
-        constraintsCent += [in_consr_matrix*self.u  <= params.amax*np.sqrt(0.5)]    # TODO: Makes more sense to have amax
-        constraintsCent += [in_consr_matrix*self.ub <= USV_params.amax_b*np.sqrt(0.5)]  # already divided by sqrt(2)
-
-        self.problemCent = cp.Problem(cp.Minimize(objectiveCent), constraintsCent)
 
         self.problemOSQP = osqp.OSQP()
         self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, q = self.q_OSQP, A=self.A_OSQP, verbose=False, max_iter = 200)
@@ -435,23 +411,14 @@ class UAVProblem():
         nUAV = self.nUAV
         mUAV = self.mUAV
         nUSV = self.nUSV
+        # An old version of the code used cvxpy. We have now switched to OSQP,
+        # but cvxpy-variables are still used to store data as there are more
+        # pressing code changes necessary
         self.x  = cp.Variable(( nUAV*(T+1), 1 ))
         self.u  = cp.Variable(( mUAV*T, 1 ))
         self.x_0  = cp.Parameter((nUAV, 1))
         self.xb_hat = cp.Parameter(( nUSV*(T+1), 1 ))
         self.s  = cp.Variable((2, 1))
-
-        objectiveUAV = cp.quad_form(self.x-self.xb_hat, self.Q_big) \
-            + cp.quad_form(self.u, self.R_big)
-        constraintsUAV  = [ self.x  ==  self.Phi*self.x_0 \
-            + self.Lambda*self.u ]
-
-        temp_matrix = np.bmat([[np.eye(mUAV*T)], [-np.eye(mUAV*T)]])
-        constraintsUAV += [temp_matrix*self.u <= self.params.amax]
-        # constraintsUAV += [self.u  <= self.params.amax]
-        # constraintsUAV += [self.u  >= self.params.amin]
-
-        self.problemUAV = cp.Problem(cp.Minimize(objectiveUAV), constraintsUAV)
 
         self.problemOSQP = osqp.OSQP()
         self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, q=self.q_OSQP, verbose=False, max_iter = 500)
@@ -657,22 +624,14 @@ class USVProblem():
         nUAV = self.nUAV
         nUSV = self.nUSV
         mUSV = self.mUSV
+        # An old version of the code used cvxpy. We have now switched to OSQP,
+        # but cvxpy-variables are still used to store data as there are more
+        # pressing code changes necessary
         self.xb = cp.Variable(( nUSV*(T+1), 1 ))
         self.ub = cp.Variable(( mUSV*T, 1 ))
         self.xb_0 = cp.Parameter((nUSV, 1))
         self.x_hat  = cp.Parameter((nUAV*(T+1), 1))
         self.s  = cp.Variable((2, 1))
-
-        objectiveUSV = cp.quad_form(self.x_hat-self.xb, self.Q_big) \
-            + cp.quad_form(self.ub, self.R_big)
-        constraintsUSV = [ self.xb == self.Phi_b*self.xb_0 \
-            + self.Lambda_b*self.ub ]
-        temp_matrix = np.bmat([[np.eye(mUSV*T)], [-np.eye(mUSV*T)]])
-        constraintsUSV += [temp_matrix*self.ub <= self.params.amax_b]
-        # constraintsUSV += [self.ub <= self.params.amax_b]
-        # constraintsUSV += [self.ub >= self.params.amin_b ]
-
-        self.problemUSV = cp.Problem(cp.Minimize(objectiveUSV), constraintsUSV)
 
         self.problemOSQP = osqp.OSQP()
         self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, q=self.q_OSQP, verbose=False, max_iter = 500)
@@ -935,6 +894,9 @@ class VerticalProblem():
         T = self.T
         nv = self.nv
         params = self.params
+        # An old version of the code used cvxpy. We have now switched to OSQP,
+        # but cvxpy-variables are still used to store data as there are more
+        # pressing code changes necessary
         self.xv = cp.Variable(( nv*(T+1), 1 ))
         self.wdes = cp.Variable(( T, 1 ))
         self.s = cp.Variable((1, 1))
@@ -944,41 +906,6 @@ class VerticalProblem():
         self.b  = cp.Parameter(( T+1,  1))  # True if within landing distance
         self.b2 = cp.Parameter(( nv*(T+1),  ))
 
-        # safe_states_extractor = cp.diag( self.b2 )
-        # self.safe_states_extractor = safe_states_extractor  #DEBUG
-        # objectiveVert = cp.quad_form(self.wdes, self.Rv_big) +\
-        #     cp.quad_form(safe_states_extractor*(self.xv-self.xb_v), self.Qv_big)
-        # # Dynamics constraint
-        # constraintsVert = [self.xv == self.Phi_v*self.xv_0 \
-        #     + self.Lambda_v*self.wdes]
-        # # Velocity constraints, above 0-constraint, and touchdown constraints
-        # constraintsVert += [self.vert_constraints_matrix*self.xv \
-        #     <= self.vert_constraints_vector]
-        # # Input constraints
-        # constraintsVert += [params.wmin <= self.wdes, self.wdes <= params.wmax]
-        #
-        # # Safety constraints
-        # constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
-        #     <= cp.diag(self.b)*(params.hs*params.dl - params.hs*self.dist)]
-        # # constraintsVert += [(params.dl-params.ds)*self.height_extractor*self.xv\
-        # #     <= cp.diag(self.b)*(params.hs*params.dl + params.hs*self.dist)]
-        # # Safe height constraints
-        # constraintsVert += [-self.height_extractor*self.xv \
-        #     <= -params.hs*(np.ones(( T+1, 1 )) - self.b)]
-
-        # # RIDICULOUS DEBUG!!!!
-        # new_mat = np.bmat([[self.vert_constraints_matrix, np.zeros((4*(T+1),T))], \
-        #     [np.zeros((T, 2*(T+1))),  np.eye(T)],\
-        #     [np.zeros((T, 2*(T+1))), -np.eye(T)]])
-        # new_vec = np.bmat([[self.vert_constraints_vector],\
-        #     [params.wmax*np.ones((T,1))],\
-        #     [-params.wmin*np.ones((T,1))]])
-        # constraintsVert += [new_mat*cp.bmat([[self.xv],[self.wdes]]) <= new_vec]
-
-        # self.problemVert = \
-        #     cp.Problem(cp.Minimize(objectiveVert), constraintsVert)
-
-        # max_iter = 400 if self.PARALLEL else 200
         self.problemOSQP = osqp.OSQP()
         its = 500 if use_many_its else 300
         self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, q=self.q_OSQP, verbose=False, max_iter = its)
@@ -1264,26 +1191,14 @@ class FastUAVProblem():
         T = self.T
         nUAV = self.nUAV
         mUAV = self.mUAV
+        # An old version of the code used cvxpy. We have now switched to OSQP,
+        # but cvxpy-variables are still used to store data as there are more
+        # pressing code changes necessary
         self.x  = cp.Variable(( nUAV*(T+1), 1 ))
         self.u  = cp.Variable(( mUAV*T, 1 ))
         self.x_0  = cp.Parameter((nUAV, 1))
         self.x_des = cp.Parameter(( nUAV*(T+1), 1 ))
 
-        objectiveUAV = cp.quad_form(self.x-self.x_des, self.Q_big) \
-            + cp.quad_form(self.u, self.R_big)
-        constraintsUAV  = [ self.x  ==  self.Phi*self.x_0 \
-            + self.Lambda*self.u ]
-
-        # TODO: Do we really need saturation constraints? Can't we expect the
-        # optimal control inputs to be feasible, since the desired trajectory
-        # was designed using feasible control inputs?
-        # Try it out, I guess
-        temp_matrix = np.bmat([[np.eye(mUAV*T)], [-np.eye(mUAV*T)]])
-        constraintsUAV += [temp_matrix*self.u <= self.params.amax]
-        # constraintsUAV += [self.u  <= self.params.amax]
-        # constraintsUAV += [self.u  >= self.params.amin]
-
-        self.problemUAV = cp.Problem(cp.Minimize(objectiveUAV), constraintsUAV)
         self.problemOSQP = osqp.OSQP()
         self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 500)
 
@@ -1388,22 +1303,14 @@ class FastUSVProblem():
         T = self.T
         nUSV = self.nUSV
         mUSV = self.mUSV
+        # An old version of the code used cvxpy. We have now switched to OSQP,
+        # but cvxpy-variables are still used to store data as there are more
+        # pressing code changes necessary
         self.xb = cp.Variable(( nUSV*(T+1), 1 ))
         self.ub = cp.Variable(( mUSV*T, 1 ))
         self.xb_0 = cp.Parameter((nUSV, 1))
         self.xb_des  = cp.Parameter((nUSV*(T+1), 1))
 
-        objectiveUSV = cp.quad_form(self.xb_des-self.xb, self.Q_big) \
-            + cp.quad_form(self.ub, self.R_big)
-        constraintsUSV = [ self.xb == self.Phi_b*self.xb_0 \
-            + self.Lambda_b*self.ub ]
-        # MAYBE NOT NECESSARY, I'M NOT SURE
-        temp_matrix = np.bmat([[np.eye(mUSV*T)], [-np.eye(mUSV*T)]])
-        constraintsUSV += [temp_matrix*self.ub <= self.params.amax_b]
-        # constraintsUSV += [self.ub <= self.params.amax_b]
-        # constraintsUSV += [self.ub >= self.params.amin_b ]
-
-        self.problemUSV = cp.Problem(cp.Minimize(objectiveUSV), constraintsUSV)
         self.problemOSQP = osqp.OSQP()
         self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 500)
 
@@ -1546,23 +1453,13 @@ class FastVerticalProblem():
         T = self.T
         nv = self.nv
         params = self.params
+        # An old version of the code used cvxpy. We have now switched to OSQP,
+        # but cvxpy-variables are still used to store data as there are more
+        # pressing code changes necessary
         self.xv = cp.Variable(( nv*(T+1), 1 ))
         self.wdes = cp.Variable(( T, 1 ))
         self.xv_des = cp.Parameter(( nv*(T+1), 1 ))
         self.xv_0 = cp.Parameter(( nv, 1 ))
-
-        objectiveVert = cp.quad_form(self.wdes, self.Rv_big) +\
-            cp.quad_form(self.xv-self.xv_des, self.Qv_big)
-        # Dynamics constraint
-        constraintsVert = [self.xv == self.Phi_v*self.xv_0 \
-            + self.Lambda_v*self.wdes]
-        # Velocity constraints and touchdown constraints
-        constraintsVert += [self.vert_constraints_matrix*self.xv \
-            <= self.vert_constraints_vector]
-
-
-        self.problemVert = \
-            cp.Problem(cp.Minimize(objectiveVert), constraintsVert)
 
         self.problemOSQP = osqp.OSQP()
         self.problemOSQP.setup(P=self.P_OSQP, l=self.l_OSQP, u=self.u_OSQP, A=self.A_OSQP, verbose=False, max_iter = 300)
