@@ -13,6 +13,8 @@ from helper_functions import  get_travel_dir
 if settings.CENTRALISED:
     from IMPORT_USV import USV_parameters
 
+# Makes the USV try to follow a reference velocity instead of only helping the UAV to land
+ADD_USV_SECOND_OBJECTIVE = True
 
 class ProblemParams():
     def __init__(self):
@@ -53,7 +55,7 @@ xv = np.array([[7.0], [0.0]])   # Initial USV horizontal state
 
 if settings.CENTRALISED:
     xb =  np.array([[-6], [6], [0], [0]])
-    if settings.ADD_USV_SECOND_OBJECTIVE:
+    if ADD_USV_SECOND_OBJECTIVE:
         # Makes the UAV attempt to move at a constant velocity as a second
         # objective. This velocity is along the line between the USV's
         # initial position and the origin.

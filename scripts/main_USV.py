@@ -10,6 +10,9 @@ from USV_simulation import USV_simulator
 from random import randint
 from helper_functions import get_travel_dir
 
+# Makes the USV try to follow a reference velocity instead of only helping the UAV to land
+ADD_USV_SECOND_OBJECTIVE = True
+
 class ProblemParams():
     def __init__(self):
         self.settings = settings
@@ -37,7 +40,7 @@ rospy.Subscriber('UAV_ready', Bool, UAV_ready_callback)
 rospy.Subscriber('experiment_index', Int8, experiment_index_callback)
 
 xb =  np.array([[-6], [6], [0], [0]])
-if not settings.CENTRALISED and settings.ADD_USV_SECOND_OBJECTIVE:
+if not settings.CENTRALISED and ADD_USV_SECOND_OBJECTIVE:
     # Makes the UAV attempt to move at a constant velocity as a second
     # objective. This velocity is along the line between the USV's
     # initial position and the origin.
