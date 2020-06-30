@@ -15,7 +15,7 @@ import time
 
 class USV_simulator():
 
-    def __init__(self, problem_params, travel_dir = None):
+    def __init__(self, problem_params, travel_vel = None):
         pp = problem_params
         # self.experiment_index = -1  # Used in store_data()
         self.T = pp.T
@@ -40,7 +40,7 @@ class USV_simulator():
         self.dropout_upper_bound = pp.settings.dropout_upper_bound
 
         self.problemUSV = USVProblem(self.T, self.Ab, self.Bb, pp.params.Qb, pp.params.Pb, pp.params.Rb,\
-            pp.params.Qb_vel, pp.params.Pb_vel, self.nUAV, self.params, travel_dir = travel_dir)
+            pp.params.Qb_vel, pp.params.Pb_vel, self.nUAV, self.params, travel_vel = travel_vel)
 
         if self.PARALLEL:
             self.problemUSVFast = FastUSVProblem(self.T_inner, self.Ab, self.Bb,\

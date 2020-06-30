@@ -8,7 +8,7 @@ from IMPORT_USV import USV_parameters
 from IMPORT_UAV import B
 from USV_simulation import USV_simulator
 from random import randint
-from helper_functions import get_travel_dir
+from helper_functions import get_travel_vel
 
 # Makes the USV try to follow a reference velocity instead of only helping the UAV to land
 ADD_USV_SECOND_OBJECTIVE = True
@@ -47,9 +47,12 @@ if not settings.CENTRALISED and ADD_USV_SECOND_OBJECTIVE:
 
     # Should the velocity point from the USV initial position or not?
     reverse_dir = False
-    dir = get_travel_dir(xb, reverse_dir)
+    speed = 6
+    # Sets vel to travel in the direction from the origin to xb with the specified speed
+    #If reverse_dir = True, it will travel with the same speed but in the opposite direction
+    vel = get_travel_vel(xb, speed, reverse_dir)
 else:
-    dir = None
+    vel = None
 
 global UAV_is_ready, exp_index
 UAV_is_ready = False
@@ -71,7 +74,7 @@ elif settings.PARALLEL:
     problem_params.T_inner = 60
 # ---------------------------
 
-USV_simulator = USV_simulator(problem_params, travel_dir = dir)
+USV_simulator = USV_simulator(problem_params, travel_vel = vel)
 
 USV_ready_pub.publish(Bool(True))
 

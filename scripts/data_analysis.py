@@ -1395,10 +1395,10 @@ class DataLoader:
 if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
     # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
-    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
-    data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)    # data_analyser.plot_altitude(real_time = False, perspective = ACTUAL)
+    # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)    # data_analyser.plot_altitude(real_time = False, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)
     # data_analyser.store_formatted_descent(perspective = ACTUAL) # WARNING: ONLY ACTUAL PERSPECTIVE IS CORRECTLY IMPLEMENTED, TIME STAMPS ARE NOT CORRECT FOR OTHER PERSPECTIVES

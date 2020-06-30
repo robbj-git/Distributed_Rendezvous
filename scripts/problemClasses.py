@@ -28,7 +28,7 @@ np.seterr(divide='ignore', invalid='ignore')
 
 class CentralisedProblem():
 
-    def __init__(self, T, A, B, Ab, Bb, Q, P, R, Qb_vel, Pb_vel, params, USV_params, travel_dir = None):
+    def __init__(self, T, A, B, Ab, Bb, Q, P, R, Qb_vel, Pb_vel, params, USV_params, travel_vel = None):
         self.T = T
         self.A = A
         self.B = B
@@ -46,7 +46,7 @@ class CentralisedProblem():
         self.nUAV_s = 2
         self.nUSV_s = 2
         self.last_solution_duration = np.nan
-        self.travel_dir = travel_dir
+        self.travel_vel = travel_vel
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
 
@@ -108,7 +108,7 @@ class CentralisedProblem():
         zeros_tall = np.zeros((nUAV*(T+1), 2))
         zeros_short = np.zeros((mUAV*T, 2))
         self.C = 10*(T+1)*np.eye(2)#np.full((1, 1), 10000*(T+1))
-        if self.travel_dir is None:
+        if self.travel_vel is None:
             Q_temp = self.Q_big
         else:
             Q_temp = self.Q_big + self.Qb_big_vel
@@ -139,13 +139,13 @@ class CentralisedProblem():
             [np.full((T*mUSV, 1), USV_params.amax_b)],        # USV Input constraints
             [np.full((2*(T+1),   1), USV_params.v_max_b)]     # USV Velocity constraints
         ])
-        if self.travel_dir is None:
+        if self.travel_vel is None:
             self.q_OSQP = np.zeros( (2*nUAV*(T+1) + 2*mUAV*T + 4, 1) )
         else:
-            x1 = USV_params.v_max_b*self.travel_dir[0, 0]
-            x2 = USV_params.v_min_b*self.travel_dir[0, 0]
-            y1 = USV_params.v_max_b*self.travel_dir[1, 0]
-            y2 = USV_params.v_min_b*self.travel_dir[1, 0]
+            x1 = USV_params.v_max_b*self.travel_vel[0, 0]
+            x2 = USV_params.v_min_b*self.travel_vel[0, 0]
+            y1 = USV_params.v_max_b*self.travel_vel[1, 0]
+            y2 = USV_params.v_min_b*self.travel_vel[1, 0]
             v_max_x_b = max(x1, x2)
             v_max_y_b = max(y1, y2)
             v_min_x_b = min(x1, x2)
@@ -495,7 +495,7 @@ class UAVProblem():
 
 class USVProblem():
 
-    def __init__(self, T, Ab, Bb, Q, P, R, Qb_vel, Pb_vel, nUAV, params, travel_dir = None):
+    def __init__(self, T, Ab, Bb, Q, P, R, Qb_vel, Pb_vel, nUAV, params, travel_vel = None):
         self.T = T
         self.Ab = Ab
         self.Bb = Bb
@@ -510,7 +510,7 @@ class USVProblem():
         self.last_solution_duration = np.nan
         [self.nUSV, self.mUSV] = Bb.shape
         self.USV_has_stopped = False
-        self.travel_dir = travel_dir
+        self.travel_vel = travel_vel
         self.create_optimisation_matrices()
         self.create_optimisation_problem()
         if type == 'CVXGEN':
@@ -552,7 +552,7 @@ class USVProblem():
 
         self.C = 10*(T+1)*np.eye(2)
 
-        if self.travel_dir is None:
+        if self.travel_vel is None:
             P_temp = 2*np.bmat([[self.Q_big, np.zeros((dim1, dim2)), np.zeros((dim1, 2))],
                 [np.zeros((dim2, dim1)), self.R_big, np.zeros((dim2, 2))],
                 [np.zeros((2, dim1)), np.zeros((2, dim2)), self.C]
@@ -567,25 +567,13 @@ class USVProblem():
         P_row = range(nUSV*(T+1) + mUSV*T + 2)
         P_col = range(nUSV*(T+1) + mUSV*T + 2)
         self.P_OSQP = csc_matrix((P_data, (P_row, P_col)))
-        if self.travel_dir is None:
+        if self.travel_vel is None:
             self.q_OSQP = -2*np.bmat([
                 [np.dot( self.Q_big, np.zeros(( (T+1)*self.nUAV, 1 )) )],
                 [np.zeros((T*mUSV+2, 1))]
             ])
         else:
-            x1 = params.v_max_b*self.travel_dir[0, 0]
-            x2 = params.v_min_b*self.travel_dir[0, 0]
-            y1 = params.v_max_b*self.travel_dir[1, 0]
-            y2 = params.v_min_b*self.travel_dir[1, 0]
-            v_max_x_b = max(x1, x2)
-            v_max_y_b = max(y1, y2)
-            v_min_x_b = min(x1, x2)
-            v_min_y_b = min(y1, y2)
-            # print "X:", v_min_x_b, "to", v_max_x_b
-            # print "Y:", v_min_y_b, "to", v_max_y_b
-            v_x_des = 0.9*v_min_x_b + 0.1*v_max_x_b
-            v_y_des = 0.9*v_min_y_b + 0.1*v_max_y_b
-            vel_state = np.array([[0], [0], [v_x_des], [v_y_des]])
+            vel_state = np.array([[0], [0], [self.travel_vel[0, 0]], [self.travel_vel[1, 0]]])
             vel_vec = np.kron(np.ones((T+1, 1)), vel_state)
             self.vel_cost_vec = np.dot( self.Qb_big_vel, vel_vec)
             self.q_OSQP = -2*np.bmat([

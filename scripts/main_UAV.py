@@ -9,7 +9,7 @@ from IMPORT_UAV import UAV_parameters
 from IMPORT_USV import Bb, hb
 from UAV_simulation import UAV_simulator
 from random import randint
-from helper_functions import  get_travel_dir
+from helper_functions import  get_travel_vel
 if settings.CENTRALISED:
     from IMPORT_USV import USV_parameters
 
@@ -53,6 +53,7 @@ rospy.Subscriber('USV_time', Time, USV_time_callback)
 x = np.zeros((nUAV, 1))         # Initial UAV horizontal state
 xv = np.array([[7.0], [0.0]])   # Initial USV horizontal state
 
+vel = None
 if settings.CENTRALISED:
     xb =  np.array([[-6], [6], [0], [0]])
     if ADD_USV_SECOND_OBJECTIVE:
@@ -62,9 +63,8 @@ if settings.CENTRALISED:
 
         # Should the velocity point from the USV initial position or not?
         reverse_dir = False
-        dir = get_travel_dir(xb, reverse_dir)
-    else:
-        dir = None
+        speed = 6
+        vel = get_travel_vel(xb, speed, reverse_dir)
 
 global USV_is_ready, UAV_time, USV_time
 USV_is_ready = False
@@ -89,7 +89,7 @@ elif settings.PARALLEL:
     problem_params.T_inner = 60
 # ---------------------------
 
-UAV_simulator = UAV_simulator(problem_params, travel_dir = dir)
+UAV_simulator = UAV_simulator(problem_params, travel_vel = vel)
 
 UAV_ready_pub.publish(Bool(True))
 
