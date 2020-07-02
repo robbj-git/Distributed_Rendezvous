@@ -1,6 +1,6 @@
 **Minimum required work to get results:** 
 
-Make sure roscore is already running, and run "scripts/main_UAV.py" and "scripts/main_USV.py" in separate terminal windows on the same machine. After the scripts have terminated, run "scripts/data_analysis.py Experiment_1" to get a plot of the two vehicles moving, as seen from above. If you have performed more than one experiment, you need to go into the folder "robbj_experiment_results" in your home directory as put the name of the most recent folder there instead of "Experiment_1".
+Make sure roscore is already running, and run "scripts/main_UAV.py" and "scripts/main_USV.py" in separate terminal windows on the same machine. After the scripts have terminated, run "scripts/data_analysis.py Experiment_1" to get a plot of the two vehicles moving, as seen from above. If you have performed more than one experiment, you need to go into the folder "robbj_experiment_results" in your home directory as put the name of the most recent folder instead of "Experiment_1".
 
 **More detailed experiment procedure:**
 
