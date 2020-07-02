@@ -39,13 +39,17 @@ time_pub = rospy.Publisher('USV_time', Time, queue_size = 1, latch = False)
 rospy.Subscriber('UAV_ready', Bool, UAV_ready_callback)
 rospy.Subscriber('experiment_index', Int8, experiment_index_callback)
 
+# ---------------- CHANGE INITIAL USV STATE HERE ---------------
+# Initial state of USV, [x-pos, y-pos, x-vel, y-vel]
 xb =  np.array([[-6], [6], [0], [0]])
+# -------------- CHANGE USV MOTION HERE -----------------------
 if not settings.CENTRALISED and ADD_USV_SECOND_OBJECTIVE:
     # Makes the UAV attempt to move at a constant velocity as a second
     # objective. This velocity is along the line between the USV's
     # initial position and the origin.
+    # NOTE: In centralised case, this is done in main_UAV.py instead
 
-    # Should the velocity point from the USV initial position or not?
+    # Should the velocity point from the USV initial position or in the oppoisite direction?
     reverse_dir = False
     speed = 6
     # Sets vel to travel in the direction from the origin to xb with the specified speed

@@ -26,11 +26,6 @@ class ProblemParams():
         self.hb = hb
         if settings.CENTRALISED:
             self.USV_params = USV_parameters
-            # self.Ab = Ab
-            # self.Bb = Bb
-            # self.Qb_vel = Qb_vel
-            # self.Pb_vel = Pb_vel
-            # # self.amin_b = amin_b
 
 def USV_ready_callback(msg):
     global USV_is_ready
@@ -50,21 +45,23 @@ UAV_ready_pub = rospy.Publisher('UAV_ready', Bool, queue_size = 1, latch=True)
 experiment_index_pub = rospy.Publisher('experiment_index', Int8, queue_size=1, latch=True)
 rospy.Subscriber('USV_ready', Bool, USV_ready_callback)
 rospy.Subscriber('USV_time', Time, USV_time_callback)
+# ------------- CHANGE INITIAL STATE HERE ---------------
+# State contains [x-pos, y-pos, x-vel, y-vel]
 x = np.zeros((nUAV, 1))         # Initial UAV horizontal state
-xv = np.array([[7.0], [0.0]])   # Initial USV horizontal state
+# State contains [altitude, vertical velocity]
+xv = np.array([[7.0], [0.0]])   # Initial UAV vertical state
 
+# ----- CHANGE USV MOTION IN CENTRALISED CASE -------------
 vel = None
 if settings.CENTRALISED:
-    xb =  np.array([[-6], [6], [0], [0]])
+    # Set the direction of the USVs motion by putting x- and y-coordinates in
+    # the first and second elements. The other elements should be 0.
+    xb_dir =  np.array([[-6], [6], [0], [0]])
     if ADD_USV_SECOND_OBJECTIVE:
-        # Makes the UAV attempt to move at a constant velocity as a second
-        # objective. This velocity is along the line between the USV's
-        # initial position and the origin.
-
-        # Should the velocity point from the USV initial position or not?
-        reverse_dir = False
-        speed = 6
-        vel = get_travel_vel(xb, speed, reverse_dir)
+        speed = 6       # Desired speed of USV motion
+        # Will make the USV move witht the specified speed in the specified
+        # direction as its secondary objective, but only in centralised case
+        vel = get_travel_vel(xb_dir, speed, False)
 
 global USV_is_ready, UAV_time, USV_time
 USV_is_ready = False
