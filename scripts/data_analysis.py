@@ -179,7 +179,7 @@ class DataAnalyser():
             fig.show()
         plt.show()# raw_input()
 
-    def plot_topview(self, real_time = False, perspective = ACTUAL):
+    def plot_topview(self, real_time = False, perspective = ACTUAL, plot_predicted_traj = False):
         self.should_close = False
         for file_index, dir in enumerate(self.files):
             fig = plt.figure()
@@ -259,8 +259,10 @@ class DataAnalyser():
 
 
                 # Actual trajectories
-                ax.plot(x_log[0, t], x_log[1, t], 'bx')
-                ax.plot(xb_log[0, t], xb_log[1, t], 'rx')
+                ax.plot(x_log[0, 0:t], x_log[1, 0:t], 'b')
+                ax.plot(xb_log[0, 0:t], xb_log[1, 0:t], 'r')
+                ax.plot(x_log[0, t], x_log[1, t], 'b*')
+                ax.plot(xb_log[0, t], xb_log[1, t], 'r*')
                 if dtl.nUSV == 6:
                     ax.arrow(xb_log[0, t], xb_log[1,t], np.cos(xb_log[4, t]), np.sin(xb_log[4, t]))
                     speed = np.sqrt(xb_log[2, t]**2 + xb_log[3, t]**2)
@@ -269,14 +271,13 @@ class DataAnalyser():
                     print "Psi_des:", np.rad2deg(ub_log[1,t]), "Psi:", np.rad2deg(xb_log[4, t])
                     # ax.arrow(xb_log[0, t], xb_log[1,t], np.cos(ub_log[1,t]), np.sin(ub_log[1,t]), color='blue')
                 # Predicted trajectories
-                ax.plot(x_pred_traj, y_pred_traj, 'b.', alpha=0.4)
-                ax.plot(xb_pred_traj, yb_pred_traj, 'r.', alpha=0.4)
-                # ax.plot(x_pred_traj_USV, y_pred_traj_USV, 'k.', alpha=0.1)  # DEBUG
-                # ax.plot(xb_pred_traj_UAV, yb_pred_traj_UAV, 'k.', alpha=0.1)  # DEBUG
+                if plot_predicted_traj:
+                    ax.plot(x_pred_traj, y_pred_traj, 'b', alpha=0.2)
+                    ax.plot(xb_pred_traj, yb_pred_traj, 'r', alpha=0.2)
 
-                if self.file_types[file_index] == PARALLEL:
-                    ax.plot(x_inner_pred_traj, y_inner_pred_traj, 'g*', alpha=0.4)
-                    ax.plot(xb_inner_pred_traj, yb_inner_pred_traj, 'y*', alpha=0.4)
+                if self.file_types[file_index] == PARALLEL and plot_predicted_traj:
+                    ax.plot(x_inner_pred_traj, y_inner_pred_traj, 'bx', alpha=0.2)
+                    ax.plot(xb_inner_pred_traj, yb_inner_pred_traj, 'rx', alpha=0.2)
                     # DEBUG
                     # if t%5 == 0:
                     #     black_star_x = xb_inner_pred_traj[5]
@@ -563,9 +564,9 @@ class DataAnalyser():
                 # instead of predicted future trajectories, no? Naah, would only work if you did that only
                 # for horizontal, and kept predicted for vertical. There seems to be no point to it really
                 ax.plot(dist_log[0:t+1], xv_log[0, 0:t+1], 'blue')
-                ax.plot(dist_pred_log, vert_pred_log, 'green', alpha=0.5)
+                ax.plot(dist_pred_log, vert_pred_log, 'blue', alpha=0.2)
                 if self.file_types[file_index] == PARALLEL:
-                    ax.plot(dist_inner_pred_log, vert_inner_pred_log, 'yellow', alpha=0.5)
+                    ax.plot(dist_inner_pred_log, vert_inner_pred_log, 'bx', alpha=0.2)
                 ax.add_collection(safety_patch_collection)
                 plt.xlabel('horizontal distance [m]')
                 plt.ylabel('height [m]')
@@ -1394,46 +1395,11 @@ class DataLoader:
 
 if __name__ == '__main__':
     data_analyser = DataAnalyser(sys.argv[1:])
-    # data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
-    data_analyser.plot_topview(real_time = True, perspective = ACTUAL)
+    data_analyser.plot_3d(real_time = True, perspective=ACTUAL)
+    # data_analyser.plot_topview(real_time = True, perspective = ACTUAL, plot_predicted_traj = True)  # If you're confused about the plot, set plot_predicted_traj = False
     # data_analyser.compare_topviews(real_time = True)
     # data_analyser.plot_time_evolution(real_time = True)
     # data_analyser.plot_with_constraints(real_time = True, perspective = ACTUAL)    # data_analyser.plot_altitude(real_time = False, perspective = ACTUAL)
     # data_analyser.plot_with_vel_constraints(real_time = True)
     # data_analyser.plot_hor_velocities(real_time = True)
     # data_analyser.store_formatted_descent(perspective = ACTUAL) # WARNING: ONLY ACTUAL PERSPECTIVE IS CORRECTLY IMPLEMENTED, TIME STAMPS ARE NOT CORRECT FOR OTHER PERSPECTIVES
-
-    # Only used for more complex test scripts. Basically, do not use these if you're not the author of the code
-    # data_analyser.plot_time_histogram()
-    # data_analyser.plot_time_curve()
-    # data_analyser.store_formatted_durations()
-
-    # use_dir = False
-    # use_horizon_vs_performance = False
-    # if len(sys.argv) == 2:
-    #     # directory specified
-    #     dir = sys.argv[1]
-    #     use_dir = True
-    # elif len(sys.argv) > 2:
-    #     # start and end index specified
-    #     # start = int(sys.argv[1])
-    #     # end = int(sys.argv[2])
-    #     if not use_horizon_vs_performance:
-    #         combine_multiple_results(sys.argv[1:3])
-    #         exit()
-    #     else:
-    #         dirs = sys.argv[1:4]
-    # else:
-    #     print "ERROR: Please select directory"
-    #     exit()
-    #
-    # if use_horizon_vs_performance:
-    #     if len(sys.argv) > 2:
-    #         horizon_vs_performance(dirs)
-    #     else:
-    #         horizon_vs_performance([dir])
-    # elif use_dir:
-    #     print_data(dir)
-    # else:
-    #     for i in range(int(start), int(end)+1):
-    #         print_data('Experiment_' + str(i))

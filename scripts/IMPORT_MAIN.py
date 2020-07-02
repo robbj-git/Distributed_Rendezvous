@@ -22,13 +22,14 @@ CENTRALISED = False
 DISTRIBUTED = True
 PARALLEL = False
 
+# Only relevant if PARALLEL == True. Specifies the number of iterations between
+# each solution of the outer optimisaion problem
+INTER_ITS = 5
+
 # DO NOT CHANGE FROM 20. IMPORT_UAV AND IMPORT_USV USE DISCRETISED DYNAMICS THAT
 # CHANGE IF SAMPLING RATE IS CHANGED
 SAMPLING_RATE = 20
 SAMPLING_TIME = 1.0/SAMPLING_RATE
-# Only relevant if PARALLEL == True. Specifies the number of iterations between
-# each solution of the outer optimisaion problem
-INTER_ITS = 5
 
 # Should be set to True by default, only change if you are sure about what you
 # are doing. Having this as true shifts all trajectories received by the other
