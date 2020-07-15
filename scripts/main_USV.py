@@ -3,18 +3,23 @@ import rospy
 import numpy as np
 from std_msgs.msg import Bool, Int8, Time
 from time import sleep
-from IMPORT_ME import settings
-from matrices_and_parameters import dynamics_parameters
+from IMPORT_MAIN import settings
+from IMPORT_USV import USV_parameters
+from IMPORT_UAV import B
 from USV_simulation import USV_simulator
 from random import randint
-from helper_functions import get_travel_dir
+from helper_functions import get_travel_vel
+
+# Makes the USV try to follow a reference velocity instead of only helping the UAV to land
+ADD_USV_SECOND_OBJECTIVE = True
 
 class ProblemParams():
     def __init__(self):
         self.settings = settings
-        self.params = dynamics_parameters
+        self.params = USV_parameters
         self.T = 0
         self.T_inner = 0
+        [self.nUAV, self.mUAV] = B.shape
 
 def UAV_ready_callback(msg):
     global UAV_is_ready
@@ -26,7 +31,7 @@ def experiment_index_callback(msg):
 
 problem_params = ProblemParams()
 problem_params.settings = settings
-problem_params.params = dynamics_parameters
+problem_params.params = USV_parameters
 
 nUSV = problem_params.params.Ab.shape[0]
 USV_ready_pub = rospy.Publisher('USV_ready', Bool, queue_size = 1, latch=True)
@@ -34,17 +39,24 @@ time_pub = rospy.Publisher('USV_time', Time, queue_size = 1, latch = False)
 rospy.Subscriber('UAV_ready', Bool, UAV_ready_callback)
 rospy.Subscriber('experiment_index', Int8, experiment_index_callback)
 
+# ---------------- CHANGE INITIAL USV STATE HERE ---------------
+# Initial state of USV, [x-pos, y-pos, x-vel, y-vel]
 xb =  np.array([[-6], [6], [0], [0]])
-if not settings.CENTRALISED and settings.ADD_USV_SECOND_OBJECTIVE:
+# -------------- CHANGE USV MOTION HERE -----------------------
+if not settings.CENTRALISED and ADD_USV_SECOND_OBJECTIVE:
     # Makes the UAV attempt to move at a constant velocity as a second
     # objective. This velocity is along the line between the USV's
     # initial position and the origin.
+    # NOTE: In centralised case, this is done in main_UAV.py instead
 
-    # Should the velocity point from the USV initial position or not?
+    # Should the velocity point from the USV initial position or in the oppoisite direction?
     reverse_dir = False
-    dir = get_travel_dir(xb, reverse_dir)
+    speed = 6
+    # Sets vel to travel in the direction from the origin to xb with the specified speed
+    #If reverse_dir = True, it will travel with the same speed but in the opposite direction
+    vel = get_travel_vel(xb, speed, reverse_dir)
 else:
-    dir = None
+    vel = None
 
 global UAV_is_ready, exp_index
 UAV_is_ready = False
@@ -66,7 +78,7 @@ elif settings.PARALLEL:
     problem_params.T_inner = 60
 # ---------------------------
 
-USV_simulator = USV_simulator(problem_params, travel_dir = dir)
+USV_simulator = USV_simulator(problem_params, travel_vel = vel)
 
 USV_ready_pub.publish(Bool(True))
 

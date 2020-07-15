@@ -13,7 +13,6 @@ from matplotlib.collections import PatchCollection
 import os
 from problemClasses import CentralisedProblem, UAVProblem, VerticalProblem
 from problemClasses import FastUAVProblem, FastVerticalProblem
-from moreProblemClasses import CompleteCentralisedProblem
 from helper_classes import StampedTrajQueue, StampedMsgQueue
 from helper_functions import get_dist_traj, mat_to_multiarray_stamped, shift_trajectory, lat_long_to_pos, fill_lost_values, get_cmd_angle
 from math import atan, asin, acos
@@ -24,7 +23,7 @@ from std_msgs.msg import Int8
 
 class UAV_simulator():
 
-    def __init__(self, problem_params, travel_dir = None):
+    def __init__(self, problem_params, travel_vel = None):
         pp = problem_params
         self.T = pp.T
         self.T_inner = pp.T_inner
@@ -33,9 +32,10 @@ class UAV_simulator():
         self.Av = pp.params.Av
         self.Bv = pp.params.Bv
         [self.nUAV, self.mUAV] = pp.params.B.shape
-        [self.nUSV, self.mUSV] = pp.params.Bb.shape
+        self.nUSV = pp.nUSV
+        self.mUSV = pp.mUSV
         [self.nv, self.mv] = pp.params.Bv.shape
-        self.hb = pp.params.hb
+        self.hb = pp.hb
         self.params = pp.params
         self.CENTRALISED = pp.settings.CENTRALISED
         self.DISTRIBUTED = pp.settings.DISTRIBUTED
@@ -46,7 +46,6 @@ class UAV_simulator():
         self.USE_HIL = pp.settings.USE_HIL
         self.INTER_ITS = pp.settings.INTER_ITS
         self.ADD_DROPOUT = pp.settings.ADD_DROPOUT
-        self.PRED_PARALLEL_TRAJ = pp.settings.PRED_PARALLEL_TRAJ
         self.dropout_lower_bound = pp.settings.dropout_lower_bound
         self.dropout_upper_bound = pp.settings.dropout_upper_bound
         self.delay_len = pp.settings.delay_len
@@ -54,15 +53,15 @@ class UAV_simulator():
         self.lat_ref = None
 
         self.problemVert = VerticalProblem(self.T, self.Av, self.Bv, pp.params.Qv,\
-            pp.params.Pv, pp.params.Rv, pp.params, self.params.hb, self.PARALLEL)
+            pp.params.Pv, pp.params.Rv, pp.params, self.hb, self.PARALLEL)
         if self.CENTRALISED:
             self.problemCent = CentralisedProblem(self.T, self.A, self.B,\
-                pp.params.Ab, pp.params.Bb, pp.params.Q, pp.params.P, \
-                pp.params.R, pp.params.Q_vel, pp.params.P_vel, pp.params.Qb_vel,\
-                pp.params.Pb_vel, pp.params, travel_dir = travel_dir)
+                pp.USV_params.Ab, pp.USV_params.Bb, pp.params.Q, pp.params.P, \
+                pp.params.R, pp.USV_params.Qb_vel, pp.USV_params.Pb_vel, \
+                pp.params, pp.USV_params, travel_vel = travel_vel)
         if not self.CENTRALISED:
-            self.problemUAV = UAVProblem(self.T, self.A,  self.B,  pp.params.Q, pp.params.P, pp.params.R,\
-                pp.params.Q_vel, pp.params.P_vel, self.nUSV, pp.params)
+            self.problemUAV = UAVProblem(self.T, self.A,  self.B,  pp.params.Q,\
+            pp.params.P, pp.params.R, self.nUSV, pp.params)
         if self.PARALLEL:
             self.problemUAVFast = FastUAVProblem(self.T_inner, self.A, self.B,  pp.params.Q, pp.params.P,\
                 pp.params.R, pp.params)
@@ -259,18 +258,14 @@ class UAV_simulator():
                 self.x_traj_inner = self.problemUAVFast.x.value
 
             if self.PARALLEL and i % self.INTER_ITS == 0:
-                if self.PRED_PARALLEL_TRAJ:
-                    if i <= self.INTER_ITS:
-                        x0 = self.x_traj[self.INTER_ITS*self.nUAV\
-                            :(self.INTER_ITS+1)*self.nUAV]
-                    else:
-                        x0 = self.x_traj_inner[self.INTER_ITS*self.nUAV\
-                            :(self.INTER_ITS+1)*self.nUAV]
-                    # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
-                    traj = shift_trajectory(self.xb_traj, self.nUSV, self.INTER_ITS)
+                if i <= self.INTER_ITS:
+                    x0 = self.x_traj[self.INTER_ITS*self.nUAV\
+                        :(self.INTER_ITS+1)*self.nUAV]
                 else:
-                    x0 = self.x
-                    traj = self.xb_traj
+                    x0 = self.x_traj_inner[self.INTER_ITS*self.nUAV\
+                        :(self.INTER_ITS+1)*self.nUAV]
+                # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
+                traj = shift_trajectory(self.xb_traj, self.nUSV, self.INTER_ITS)
                 self.problemUAV.solve_in_parallel(x0, traj)
 
             (self.uUAV, self.uUSV) = self.get_horizontal_control()
@@ -289,19 +284,15 @@ class UAV_simulator():
                 self.xv_traj_inner = self.problemVertFast.xv.value
 
             if self.PARALLEL and i % self.INTER_ITS == 0:
-                if self.PRED_PARALLEL_TRAJ:
-                    if i <= self.INTER_ITS:
-                        xv0 = self.xv_traj[self.INTER_ITS*self.nv:\
-                            (self.INTER_ITS+1)*self.nv]
-                    else:
-                        xv0 = self.xv_traj_inner[self.INTER_ITS*self.nv:\
-                            (self.INTER_ITS+1)*self.nv]
-                    dist_traj = shift_trajectory(np.asarray(self.dist_traj),\
-                        1, self.INTER_ITS)
+                if i <= self.INTER_ITS:
+                    xv0 = self.xv_traj[self.INTER_ITS*self.nv:\
+                        (self.INTER_ITS+1)*self.nv]
                 else:
-                    xv0 = self.xv
-                    dist_traj = np.asarray(self.dist_traj)
-                # TODO: Make dist_traj nartually an array instead of matrix
+                    xv0 = self.xv_traj_inner[self.INTER_ITS*self.nv:\
+                        (self.INTER_ITS+1)*self.nv]
+
+                dist_traj = shift_trajectory(np.asarray(self.dist_traj),\
+                    1, self.INTER_ITS)
                 self.problemVert.solve_in_parallel(xv0, 0.0,\
                     dist_traj)
 
@@ -522,9 +513,6 @@ class UAV_simulator():
         info_str += "hs: " + str(self.params.hs) + "\n"
         info_str += "Received messages WERE shifted to account for delay\n" \
             if self.SHOULD_SHIFT_MESSAGES else "Received messages were NOT shifted to account for delay\n"
-        if self.PARALLEL:
-            info_str += "Parallel DID predict initial state for outer problem\n" \
-                if self.PRED_PARALLEL_TRAJ else "Parallel did NOT predict initial state for outer problem\n"
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/info.txt', [info_str], fmt="%s")
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/x_log.csv', self.x_log, delimiter=',')
         np.savetxt(dir_path + 'Experiment_'+str(i)+'/xv_log.csv', self.xv_log, delimiter=',')

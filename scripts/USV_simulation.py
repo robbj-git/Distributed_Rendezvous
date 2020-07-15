@@ -4,7 +4,6 @@ import numpy as np
 from helper_classes import StampedTrajQueue, StampedMsgQueue
 from helper_functions import mat_to_multiarray_stamped, shift_trajectory
 from problemClasses import USVProblem, FastUSVProblem
-from moreProblemClasses import CompleteUSVProblem
 from rendezvous_problem.msg import Float32MultiArrayStamped, StateStamped
 from geometry_msgs.msg import AccelStamped
 from std_msgs.msg import Int8, Bool
@@ -16,7 +15,7 @@ import time
 
 class USV_simulator():
 
-    def __init__(self, problem_params, travel_dir = None):
+    def __init__(self, problem_params, travel_vel = None):
         pp = problem_params
         # self.experiment_index = -1  # Used in store_data()
         self.T = pp.T
@@ -25,7 +24,8 @@ class USV_simulator():
         self.Bb = pp.params.Bb
         self.params = pp.params
         self.delay_len = pp.settings.delay_len
-        [self.nUAV, self.mUAV] = pp.params.B.shape
+        self.nUAV = pp.nUAV
+        self.mUAV = pp.mUAV
         [self.nUSV, self.mUSV] = self.Bb.shape
 
         self.CENTRALISED = pp.settings.CENTRALISED
@@ -35,17 +35,16 @@ class USV_simulator():
         self.USE_HIL = pp.settings.USE_HIL
         self.INTER_ITS = pp.settings.INTER_ITS
         self.ADD_DROPOUT = pp.settings.ADD_DROPOUT
-        self.PRED_PARALLEL_TRAJ = pp.settings.PRED_PARALLEL_TRAJ
         self.SHOULD_SHIFT_MESSAGES = pp.settings.SHOULD_SHIFT_MESSAGES
         self.dropout_lower_bound = pp.settings.dropout_lower_bound
         self.dropout_upper_bound = pp.settings.dropout_upper_bound
 
-        self.problemUSV = USVProblem(self.T, self.Ab, self.Bb, pp.params.Q, pp.params.P, pp.params.R,\
-            pp.params.Qb_vel, pp.params.Pb_vel, self.nUAV, self.params, travel_dir = travel_dir)
+        self.problemUSV = USVProblem(self.T, self.Ab, self.Bb, pp.params.Qb, pp.params.Pb, pp.params.Rb,\
+            pp.params.Qb_vel, pp.params.Pb_vel, self.nUAV, self.params, travel_vel = travel_vel)
 
         if self.PARALLEL:
             self.problemUSVFast = FastUSVProblem(self.T_inner, self.Ab, self.Bb,\
-                pp.params.Q, pp.params.P, pp.params.R, pp.params)
+                pp.params.Qb, pp.params.Pb, pp.params.Rb, pp.params)
 
         # --------------------------- ROS SETUP ----------------------------------
         # rospy.init_node('USV_main')
@@ -190,31 +189,28 @@ class USV_simulator():
                 self.xb_traj_inner = self.problemUSVFast.xb.value
 
             if self.PARALLEL and i % self.INTER_ITS == 0:
-                if self.PRED_PARALLEL_TRAJ:
-                    if i <= self.INTER_ITS:
-                        # Up until and including i == INTER_ITS, the inner trajectory
-                        # will here only track the initial outer trajectory,
-                        # which is stationary at the origin. We know for a fact
-                        # that the UAV will NOT stay at the origin
-                        # for the iterations after i == INTER_ITS, so using the inner
-                        # trajectory for prediction at this point would be wrong.
-                        # We use instead the outer prediction, which at iteration
-                        # i == INTER_ITS will finally predict that the USV will actually move
-                        xb0 = self.xb_traj[self.INTER_ITS*self.nUSV:\
-                            (self.INTER_ITS+1)*self.nUSV]
-                    else:
-                        # We need to take elements from (self.INTER_ITS+1)*self.nUAV
-                        # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
-                        # is at this point still from iteration i-1. Since we want to predict
-                        # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
-                        # steps into the future
-                        xb0 = self.xb_traj_inner[self.INTER_ITS*self.nUSV\
-                            :(self.INTER_ITS+1)*self.nUSV]
-                    # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
-                    traj = shift_trajectory(self.x_traj, self.nUAV, self.INTER_ITS)
+                if i <= self.INTER_ITS:
+                    # Up until and including i == INTER_ITS, the inner trajectory
+                    # will here only track the initial outer trajectory,
+                    # which is stationary at the origin. We know for a fact
+                    # that the UAV will NOT stay at the origin
+                    # for the iterations after i == INTER_ITS, so using the inner
+                    # trajectory for prediction at this point would be wrong.
+                    # We use instead the outer prediction, which at iteration
+                    # i == INTER_ITS will finally predict that the USV will actually move
+                    xb0 = self.xb_traj[self.INTER_ITS*self.nUSV:\
+                        (self.INTER_ITS+1)*self.nUSV]
                 else:
-                    xb0 = self.xb
-                    traj = self.x_traj
+                    # We need to take elements from (self.INTER_ITS+1)*self.nUAV
+                    # instead of from self.INTER_ITS*self.nUAV because self.x_traj_inner
+                    # is at this point still from iteration i-1. Since we want to predict
+                    # state at iteration i+INTER_ITS, we need to predict INTER_ITS+1
+                    # steps into the future
+                    xb0 = self.xb_traj_inner[self.INTER_ITS*self.nUSV\
+                        :(self.INTER_ITS+1)*self.nUSV]
+
+                # We want to pass the future predicted trajectory, so we shift the current predicted trajectory an appropriate amount
+                traj = shift_trajectory(self.x_traj, self.nUAV, self.INTER_ITS)
                 self.problemUSV.solve_in_parallel(xb0, traj,\
                     self.USV_should_stop)
 
